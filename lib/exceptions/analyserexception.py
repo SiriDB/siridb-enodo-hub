@@ -1,0 +1,2 @@
+class AnalyserException(Exception):
+    pass
