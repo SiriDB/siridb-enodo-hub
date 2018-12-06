@@ -3,3 +3,6 @@ test/*
 .idea
 .idea/*
 .idea/vcs.xml
+
+*.pyc
+*.pyo
