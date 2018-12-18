@@ -5,7 +5,7 @@ class Serie:
     datapoints_count_lock = None
     analysed = None
 
-    def __init__(self, name, datapoints_count, serie_type="miliseconds"):
+    def __init__(self, name, datapoints_count=None, serie_type="miliseconds"):
         self.name = name
         self.datapoints_count = datapoints_count
         self.serie_type = serie_type

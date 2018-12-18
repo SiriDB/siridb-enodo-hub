@@ -41,10 +41,10 @@ def on_data(data):
 
 async def watch_series():
     while True:
-        for serie_name in Config.enabled_series_for_analysis:
+        for serie_name in await SerieManager.get_series():
             serie = await SerieManager.get_serie(serie_name)
-            if not await serie.get_analysed() and not await Analyser.serie_in_queue(serie_name):
-                if serie is not None and await serie.get_datapoints_count() >= Config.min_data_points:
+            if serie is not None and not await serie.get_analysed() and not await Analyser.serie_in_queue(serie_name):
+                if await serie.get_datapoints_count() >= Config.min_data_points:
                     print(f"Adding serie: {serie_name} to the Analyser queue")
                     # await Analyser.analyse_serie(serie_name)
                     await Analyser.add_to_queue(serie_name)

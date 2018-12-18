@@ -28,7 +28,6 @@ class TestSerieManager(TestCase):
             await SerieManager.prepare()
 
             # Add serie to SerieManager
-            SerieManager._monitored_series.add(serie_name)
             SerieManager._series[serie_name] = serie
 
             # Check if returned serie is the same as inserted one
@@ -51,11 +50,10 @@ class TestSerieManager(TestCase):
             await SerieManager.prepare()
 
             # Add serie to SerieManager
-            SerieManager._monitored_series.add(serie_name)
             SerieManager._series[serie_name] = serie
 
             # Check if returned serie is the same as inserted one
-            json_monitored_series = await SerieManager.get_monitored_series()
+            json_monitored_series = await SerieManager.get_series_to_dict()
             expected_value = [{'data_points': 50, 'name': 'serie_02', 'type': 'miliseconds'}]
             self.assertEqual(json_monitored_series, expected_value)
 
@@ -77,8 +75,6 @@ class TestSerieManager(TestCase):
             await SerieManager.prepare()
 
             # Add serie to SerieManager
-            for serie_name in ('Serie_001', 'Serie_002', 'Serie_003', 'Serie_004'):
-                SerieManager._monitored_series.add(serie_name)
             SerieManager._series['Serie_001'] = serie1
             SerieManager._series['Serie_002'] = serie2
             SerieManager._series['Serie_003'] = serie3
@@ -89,7 +85,7 @@ class TestSerieManager(TestCase):
             await SerieManager.remove_serie('Serie_003')
 
             # Check if returned serie is the same as inserted one
-            json_monitored_series = await SerieManager.get_monitored_series()
+            json_monitored_series = await SerieManager.get_series_to_dict()
             expected_value = [{'data_points': 20, 'name': 'Serie_002', 'type': 'miliseconds'},
                               {'data_points': 11, 'name': 'Serie_004', 'type': 'miliseconds'}]
             self.assertEqual(json_monitored_series, expected_value)
@@ -110,14 +106,13 @@ class TestSerieManager(TestCase):
             await SerieManager.prepare()
 
             # Add serie to SerieManager
-            SerieManager._monitored_series.add(serie_name)
             SerieManager._series[serie_name] = serie
 
             # Add value to the counter
             await SerieManager.add_to_datapoint_counter(serie_name, 12)
 
             # Check if returned serie is the same as inserted one
-            json_monitored_series = await SerieManager.get_monitored_series()
+            json_monitored_series = await SerieManager.get_series_to_dict()
             expected_value = [{'data_points': 62, 'name': 'serie_02', 'type': 'miliseconds'}]
             self.assertEqual(json_monitored_series, expected_value)
 

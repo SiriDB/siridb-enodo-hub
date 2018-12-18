@@ -8,4 +8,4 @@ async def test_webserver(request):
 
 
 async def get_monitored_series(request):
-    return web.json_response(data={'data': list(await SerieManager.get_monitored_series())})
+    return web.json_response(data={'data': list(await SerieManager.get_series_to_dict())})
