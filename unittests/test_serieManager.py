@@ -90,7 +90,6 @@ class TestSerieManager(TestCase):
 
             # Check if returned serie is the same as inserted one
             json_monitored_series = await SerieManager.get_monitored_series()
-            print(json_monitored_series)
             expected_value = [{'data_points': 20, 'name': 'Serie_002', 'type': 'miliseconds'},
                               {'data_points': 11, 'name': 'Serie_004', 'type': 'miliseconds'}]
             self.assertEqual(json_monitored_series, expected_value)

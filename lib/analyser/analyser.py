@@ -7,7 +7,6 @@ class Analyser:
 
     @classmethod
     async def prepare(cls):
-        cls._series_analysed = set()
         cls._analyse_queue = list()
         cls._busy = False
 
