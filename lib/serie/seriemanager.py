@@ -35,7 +35,7 @@ class SerieManager:
                 print(f"Added new serie: {serie_name}")
 
     @classmethod
-    async def read_state(cls):
+    async def read_serie_state(cls):
         # ToDo
         pass
 
@@ -46,6 +46,10 @@ class SerieManager:
             serie = cls._series.get(serie_name, None)
 
         return serie
+
+    @classmethod
+    async def get_monitored_series(cls):
+        return [await serie.to_json() for serie in cls._series.values()]
 
     @classmethod
     async def remove_serie(cls, serie_name):
