@@ -1,5 +1,4 @@
 siridb-connector
-aiojobs
 aiohttp
 aiohttp_cors
 tinydb

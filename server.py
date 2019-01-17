@@ -1,10 +1,8 @@
 import asyncio
 import sys
-from asyncio import Queue
 from threading import Thread
 
 import aiohttp_cors
-import aiojobs
 import os
 
 from aiohttp import web
@@ -31,11 +29,7 @@ async def start_up():
     await SerieManager.prepare(siridb_client)
 
     asyncio.ensure_future(Analyser.prepare(analyser_queue), loop=worker_loop)
-
     asyncio.run_coroutine_threadsafe(watch_queue(), worker_loop)
-
-    scheduler = await aiojobs.create_scheduler()
-    await scheduler.spawn(watch_series())
 
 
 def on_data(data):
