@@ -22,7 +22,7 @@ class TestSerieManager(TestCase):
             serie = Serie(serie_name, 12)
 
             # Mock config class
-            Config.enabled_series_for_analysis = []
+            Config.names_enabled_series_for_analysis = []
 
             # Prepare SerieManger (clear/reset)
             await SerieManager.prepare()
@@ -44,7 +44,7 @@ class TestSerieManager(TestCase):
             serie = Serie(serie_name, 50)
 
             # Mock config class
-            Config.enabled_series_for_analysis = []
+            Config.names_enabled_series_for_analysis = []
 
             # Prepare SerieManger (clear/reset)
             await SerieManager.prepare()
@@ -69,7 +69,7 @@ class TestSerieManager(TestCase):
             serie4 = Serie('Serie_004', 11)
 
             # Mock config class
-            Config.enabled_series_for_analysis = []
+            Config.names_enabled_series_for_analysis = []
 
             # Prepare SerieManger (clear/reset)
             await SerieManager.prepare()
@@ -100,7 +100,7 @@ class TestSerieManager(TestCase):
             serie = Serie(serie_name, 50)
 
             # Mock config class
-            Config.enabled_series_for_analysis = []
+            Config.names_enabled_series_for_analysis = []
 
             # Prepare SerieManger (clear/reset)
             await SerieManager.prepare()

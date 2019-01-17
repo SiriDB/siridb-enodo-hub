@@ -1,5 +1,6 @@
 import asyncio
 import sys
+from asyncio import Queue
 from threading import Thread
 
 import aiohttp_cors
@@ -17,6 +18,7 @@ from lib.webserver import handlers
 
 loop = asyncio.get_event_loop()
 worker_loop = None
+analyser_queue = list()
 
 
 async def start_up():
@@ -25,9 +27,10 @@ async def start_up():
     if os.path.exists(Config.pipe_path):
         os.unlink(Config.pipe_path)
 
-    await SiriDB.prepare()
-    await SerieManager.prepare()
-    await Analyser.prepare()
+    siridb_client = SiriDB()
+    await SerieManager.prepare(siridb_client)
+
+    asyncio.ensure_future(Analyser.prepare(analyser_queue), loop=worker_loop)
 
     asyncio.run_coroutine_threadsafe(watch_queue(), worker_loop)
 
@@ -43,18 +46,18 @@ async def watch_series():
     while True:
         for serie_name in await SerieManager.get_series():
             serie = await SerieManager.get_serie(serie_name)
-            if serie is not None and not await serie.get_analysed() and not await Analyser.serie_in_queue(serie_name):
+            serie_in_queue = serie_name in analyser_queue
+            if serie is not None and not await serie.get_analysed() and not serie_in_queue:
                 if await serie.get_datapoints_count() >= Config.min_data_points:
                     print(f"Adding serie: {serie_name} to the Analyser queue")
-                    # await Analyser.analyse_serie(serie_name)
-                    await Analyser.add_to_queue(serie_name)
+                    analyser_queue.append(serie_name)
 
         await asyncio.sleep(Config.watcher_interval)
 
 
 async def handle_data(data):
     for serie_name, values in data.items():
-        should_be_handled = serie_name in Config.enabled_series_for_analysis
+        should_be_handled = serie_name in Config.names_enabled_series_for_analysis
 
         if should_be_handled:
             await SerieManager.add_to_datapoint_counter(serie_name, len(values))
@@ -87,6 +90,7 @@ if __name__ == '__main__':
 
         app.router.add_get("/test", handlers.test_webserver)
         app.router.add_get("/series", handlers.get_monitored_series)
+        app.router.add_post("/series", handlers.add_serie)
 
         # Configure CORS on all routes.
         for route in list(app.router.routes()):
