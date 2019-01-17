@@ -14,13 +14,21 @@ class Analysis:
     def __init__(self, serie_name, dataset, m, d=None, d_large=None):
         self.forecast_values = None
         self._serie_name = serie_name
-        begin = list(dataset.iloc[[0]].to_dict().get(1).keys())[0]
-        end = list(dataset.iloc[[int(dataset.size / 4)]].to_dict().get(1).keys())[0]
+
+        # Determine average interval between measurements
+        begin = next(dataset.iloc[[0]].to_dict().get(1).keys())
+        end = next(dataset.iloc[[int(dataset.size / 4)]].to_dict().get(1).keys())
         self._interval_indexes = (end - begin) / int(dataset.size / 4)
-        self._last_value = list(dataset.iloc[[-1]].to_dict().get(1).keys())[0]
+
+        # Determine index of last measurement
+        self._last_value = next(dataset.iloc[[-1]].to_dict().get(1).keys())
+
+        # Set index to the first column (datetime)
         dataset.set_index(0, inplace=True)
-        dataset.head()
+
+        # Parse indexes to datetimes
         dataset.index = pd.to_datetime(dataset.index, unit='ms')
+
         if d is None:
             # Estimate the number of differences using an ADF test:
             d = ndiffs(dataset, test='adf')
@@ -50,7 +58,7 @@ class Analysis:
         if update or self.forecast_values is None:
             if self._stepwise_model is not None:
 
-                periods = 24
+                periods = 24  # TODO: make default and settable per serie
                 indexes = []
 
                 current_value = self._last_value + self._interval_indexes

@@ -3,6 +3,7 @@ import sys
 from threading import Thread
 
 import aiohttp_cors
+import aiojobs
 import os
 
 from aiohttp import web
@@ -17,9 +18,10 @@ from lib.webserver import handlers
 loop = asyncio.get_event_loop()
 worker_loop = None
 analyser_queue = list()
+watch_series_task = None
 
 
-async def start_up():
+async def start_up(server_loop, _watch_series_task):
     await Config.read_config()
 
     if os.path.exists(Config.pipe_path):
@@ -30,6 +32,12 @@ async def start_up():
 
     asyncio.ensure_future(Analyser.prepare(analyser_queue), loop=worker_loop)
     asyncio.run_coroutine_threadsafe(watch_queue(), worker_loop)
+    _watch_series_task = server_loop.create_task(watch_series())
+
+
+async def clean_up():
+    watch_series_task.cancel()
+    await watch_series_task
 
 
 def on_data(data):
@@ -90,13 +98,15 @@ if __name__ == '__main__':
         for route in list(app.router.routes()):
             cors.add(route)
 
-        loop.run_until_complete(start_up())
+        loop.run_until_complete(start_up(loop, watch_series_task))
         loop.run_until_complete(start_siridb_pipeserver())
 
         web.run_app(app)
         loop.run_forever()
     except (KeyboardInterrupt, SystemExit):
         # cleanup_stop_thread()
+        loop.run_until_complete(clean_up())
+        watch_series_task.cancel()
         loop.close()
         worker_loop.close()
         asyncio.gather(*asyncio.Task.all_tasks()).cancel()
