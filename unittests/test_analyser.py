@@ -17,13 +17,13 @@ class TestAnalyser(TestCase):
         async def async_test_add_to_queue():
             serie_name = 'serie_name_101'
             # Reset Analyser
-            await Analyser.prepare()
+            await Analyser.prepare(list())
 
             # Add serie_name to queue
             await Analyser.add_to_queue(serie_name)
 
             # Assert
-            self.assertEqual(Analyser._analyse_queue, [serie_name])
+            self.assertEqual(Analyser._analyser_queue, [serie_name])
 
         coro = asyncio.coroutine(async_test_add_to_queue)
         self.loop.run_until_complete(coro())
@@ -31,7 +31,7 @@ class TestAnalyser(TestCase):
     def test_remove_from_queue(self):
         async def async_test_remove_from_queue():
             # Reset Analyser
-            await Analyser.prepare()
+            await Analyser.prepare(list())
 
             # Add series to queue
             await Analyser.add_to_queue('serie_name_1')
@@ -42,7 +42,7 @@ class TestAnalyser(TestCase):
             await Analyser.remove_from_queue('serie_name_2')
 
             # Assert
-            self.assertEqual(Analyser._analyse_queue, ['serie_name_1', 'serie_name_3'])
+            self.assertEqual(Analyser._analyser_queue, ['serie_name_1', 'serie_name_3'])
 
         coro = asyncio.coroutine(async_test_remove_from_queue)
         self.loop.run_until_complete(coro())
@@ -50,7 +50,7 @@ class TestAnalyser(TestCase):
     def test_is_busy(self):
         async def async_test_is_busy():
             # Reset Analyser
-            await Analyser.prepare()
+            await Analyser.prepare(list())
 
             # Assert initial value
             self.assertFalse(Analyser.is_busy())
@@ -67,7 +67,7 @@ class TestAnalyser(TestCase):
     def test_get_queue_size(self):
         async def async_test_get_queue_size():
             # Reset Analyser
-            await Analyser.prepare()
+            await Analyser.prepare(list())
 
             # Assert initial state
             self.assertEqual(Analyser.get_queue_size(), 0)
@@ -89,7 +89,7 @@ class TestAnalyser(TestCase):
         async def async_test_serie_in_queue():
             serie_name = 'serie_name_101'
             # Reset Analyser
-            await Analyser.prepare()
+            await Analyser.prepare(list())
 
             # Assert initial state
             self.assertFalse(await Analyser.serie_in_queue(serie_name))

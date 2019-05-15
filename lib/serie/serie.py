@@ -1,4 +1,4 @@
-from lib.analyser.analysis import Analysis
+from lib.analyser.model.arimamodel import ARIMAModel
 
 
 class Serie:
@@ -9,15 +9,20 @@ class Serie:
     _analysed = None
     _serie_parameters = None
 
-    def __init__(self, name, datapoints_count=None, serie_type="ms", serie_parameters=None):
+    def __init__(self, name, datapoints_count=None, serie_type="ms", serie_parameters=None, analysed=False):
         self._name = name
         self._datapoints_count = datapoints_count
         self._serie_type = serie_type
         self._datapoints_count_lock = False
-        self._analysed = False
+        self._analysed = analysed
         self._serie_parameters = serie_parameters if serie_parameters is not None else dict()
 
     async def set_datapoints_counter_lock(self, is_locked):
+        """
+        Set lock so it can or can not be changed
+        :param is_locked:
+        :return:
+        """
         self._datapoints_count_lock = is_locked
 
     async def get_datapoints_counter_lock(self):
@@ -33,12 +38,17 @@ class Serie:
         return self._datapoints_count
 
     async def add_to_datapoints_count(self, add_to_count):
+        """
+        Add value to existing value of data points counter
+        :param add_to_count:
+        :return:
+        """
         if self._datapoints_count_lock is False:
             self._datapoints_count += add_to_count
 
     async def get_forecast(self):
         if self._analysed:
-            analysis = await Analysis.load(self._name)
+            analysis = ARIMAModel.load(self._name)
             if analysis is not None:
                 return analysis.forecast_values
 
@@ -50,7 +60,7 @@ class Serie:
             'type': self._serie_type,
             'data_points': self._datapoints_count,
             'analysed': self._analysed,
-            'parameters': self._serie_parameters
+            'parameters': self._serie_parameters,
         }
 
     async def get_analysed(self):

@@ -17,9 +17,9 @@ class TestSerie(TestCase):
         async def async_test_set_datapoints_counter_lock():
             serie = Serie('test_serie', 234)
             await serie.set_datapoints_counter_lock(True)
-            self.assertEqual(serie.datapoints_count_lock, True)
+            self.assertEqual(serie._datapoints_count_lock, True)
             await serie.set_datapoints_counter_lock(False)
-            self.assertEqual(serie.datapoints_count_lock, False)
+            self.assertEqual(serie._datapoints_count_lock, False)
 
         coro = asyncio.coroutine(async_test_set_datapoints_counter_lock)
         self.loop.run_until_complete(coro())
@@ -76,7 +76,8 @@ class TestSerie(TestCase):
         async def async_test_to_json():
             serie_name = 'test_serie123'
             serie = Serie(serie_name, 123456)
-            expected_result = {'data_points': 123456, 'name': 'test_serie123', 'type': 'miliseconds'}
+            expected_result = {'analysed': False, 'data_points': 123456, 'name': 'test_serie123', 'parameters': {},
+                               'type': 'ms'}
             self.assertEqual(await serie.to_dict(), expected_result)
 
         coro = asyncio.coroutine(async_test_to_json)

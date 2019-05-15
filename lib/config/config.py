@@ -16,6 +16,10 @@ class Config:
 
     @classmethod
     async def read_config(cls):
+        """
+        Read config from conf file and json database
+        :return:
+        """
 
         cls._config = configparser.ConfigParser()
         cls._config.read(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'analyser.conf'))
@@ -26,6 +30,8 @@ class Config:
         cls.watcher_interval = int(cls._config['analyser']['watcher_interval'])
         cls.period_to_forecast = int(cls._config['analyser']['period_to_forecast'])
 
+        if not os.path.exists(Config.analysis_save_path):
+            os.makedirs(Config.analysis_save_path)
         if not os.path.exists(os.path.join(Config.analysis_save_path, 'db.json')):
             open(os.path.join(Config.analysis_save_path, 'db.json'), 'a').close()
 

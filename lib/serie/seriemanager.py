@@ -8,9 +8,9 @@ class SerieManager:
     _siridb_client = None
 
     @classmethod
-    async def prepare(cls, siridb_client):
+    async def prepare(cls):
         cls._series = {}
-        cls._siridb_client = siridb_client
+        cls._siridb_client = SiriDB()
 
         await cls.check_for_config_changes()
 
@@ -34,7 +34,9 @@ class SerieManager:
                     'd': Config.enabled_series_for_analysis[serie_name].get('d', None),
                     'D': Config.enabled_series_for_analysis[serie_name].get('D', None)
                 }
-                cls._series[serie_name] = Serie(serie_name, collected_datapoints, serie_parameters=serie_parameters)
+                analysed = Config.enabled_series_for_analysis[serie_name].get('analysed', False)
+                cls._series[serie_name] = Serie(serie_name, collected_datapoints, serie_parameters=serie_parameters,
+                                                analysed=analysed)
                 print(f"Added new serie: {serie_name}")
 
     @classmethod
@@ -62,6 +64,12 @@ class SerieManager:
     async def remove_serie(cls, serie_name):
         if serie_name in cls._series:
             del cls._series[serie_name]
+
+            Config.names_enabled_series_for_analysis = [serie for serie in
+                                                        Config.names_enabled_series_for_analysis if serie != serie_name]
+            Config.enabled_series_for_analysis.pop(serie_name, None)
+            return True
+        return False
 
     @classmethod
     async def add_to_datapoint_counter(cls, serie_name, value):
