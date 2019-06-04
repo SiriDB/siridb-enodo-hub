@@ -54,7 +54,8 @@ class TestSerieManager(TestCase):
 
             # Check if returned serie is the same as inserted one
             json_monitored_series = await SerieManager.get_series_to_dict()
-            expected_value = [{'data_points': 50, 'name': 'serie_02', 'type': 'miliseconds'}]
+            expected_value = [
+                {'analysed': False, 'data_points': 50, 'name': 'serie_02', 'parameters': {}, 'type': 'ms'}]
             self.assertEqual(json_monitored_series, expected_value)
 
         coro = asyncio.coroutine(async_test_get_monitored_series)
@@ -70,6 +71,7 @@ class TestSerieManager(TestCase):
 
             # Mock config class
             Config.names_enabled_series_for_analysis = []
+            Config.enabled_series_for_analysis = {}
 
             # Prepare SerieManger (clear/reset)
             await SerieManager.prepare()
@@ -86,8 +88,9 @@ class TestSerieManager(TestCase):
 
             # Check if returned serie is the same as inserted one
             json_monitored_series = await SerieManager.get_series_to_dict()
-            expected_value = [{'data_points': 20, 'name': 'Serie_002', 'type': 'miliseconds'},
-                              {'data_points': 11, 'name': 'Serie_004', 'type': 'miliseconds'}]
+            expected_value = [
+                {'analysed': False, 'data_points': 20, 'name': 'Serie_002', 'parameters': {}, 'type': 'ms'},
+                {'analysed': False, 'data_points': 11, 'name': 'Serie_004', 'parameters': {}, 'type': 'ms'}]
             self.assertEqual(json_monitored_series, expected_value)
 
         coro = asyncio.coroutine(async_test_remove_serie)
@@ -113,7 +116,8 @@ class TestSerieManager(TestCase):
 
             # Check if returned serie is the same as inserted one
             json_monitored_series = await SerieManager.get_series_to_dict()
-            expected_value = [{'data_points': 62, 'name': 'serie_02', 'type': 'miliseconds'}]
+            expected_value = [
+                {'analysed': False, 'data_points': 62, 'name': 'serie_02', 'parameters': {}, 'type': 'ms'}]
             self.assertEqual(json_monitored_series, expected_value)
 
         coro = asyncio.coroutine(async_test_add_to_datapoint_counter)
