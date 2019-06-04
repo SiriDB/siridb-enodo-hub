@@ -1,7 +1,9 @@
+import psutil as psutil
 from aiohttp import web
 
 from lib.analyser.model.arimamodel import ARIMAModel
 from lib.config.config import Config
+from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
 from lib.siridb.siridb import SiriDB
 
@@ -51,9 +53,10 @@ async def add_serie(request):
     if all(required_field in data for required_field in required_fields):
         serie_data = {
             'serie_name': data.get('name'),
-            'm': data.get('m', 12),
-            'd': data.get('d', None),
-            'D': data.get('D', None)
+            'parameters': {
+                'm': data.get('m', 12),
+                'd': data.get('d', None),
+                'D': data.get('D', None)}
         }
 
         # Config.db.insert(serie_data)
@@ -77,6 +80,42 @@ async def remove_serie(request):
     return web.json_response(data={}, status=404)
 
 
+async def get_siridb_status(request):
+    """
+    Get siridb connection status
+    :param request:
+    :return:
+    """
+
+    return web.json_response(data={'data': {
+        'connected': SiriDB.siridb_connected,
+        'status': SiriDB.siridb_status
+    }}, status=200)
+
+
+async def get_siridb_enodo_status(request):
+    """
+    Get status of this analyser instance
+    :param request:
+    :return:
+    """
+
+    cpu_usage = psutil.cpu_percent()
+    return web.json_response(data={'data': {
+        'cpu_usage': cpu_usage
+    }}, status=200)
+
+
+async def get_event_log(request):
+    """
+    Returns event log
+    :param request:
+    :return:
+    """
+    log = EventLogger.get()
+    return web.json_response(data={'data': log}, status=200)
+
+
 async def get_settings(request):
     settings = await build_settings_dict()
 
@@ -85,7 +124,8 @@ async def get_settings(request):
 
 async def build_settings_dict():
     settings = {}
-    fields = ['pipe_path', 'min_data_points', 'analysis_save_path']
+    fields = ['pipe_path', 'min_data_points', 'analysis_save_path', 'siridb_host', 'siridb_port', 'siridb_user',
+              'siridb_password', 'siridb_database']
     for field in fields:
         settings[field] = getattr(Config, field)
     return settings
@@ -99,11 +139,14 @@ async def set_settings(request):
     """
     data = await request.json()
 
-    fields = ['pipe_path', 'min_data_points', 'analysis_save_path']
+    fields = ['pipe_path', 'min_data_points', 'analysis_save_path', 'siridb_host', 'siridb_port', 'siridb_user',
+              'siridb_password', 'siridb_database']
 
     for field in fields:
         if field in data:
             setattr(Config, field, data[field])
+
+    await Config.save_config()
 
     settings = await build_settings_dict()
 

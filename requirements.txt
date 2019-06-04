@@ -1,3 +1,4 @@
+fbprophet
 siridb-connector
 aiohttp
 aiohttp_cors

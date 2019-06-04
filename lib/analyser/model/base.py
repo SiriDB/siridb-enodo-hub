@@ -12,12 +12,12 @@ class Model:
         self._dataset = dataset
 
         if initialize:
-            self._has_trend = self._adf_stationarity_test(self._dataset.values)
+            self._has_trend = self._adf_stationarity_test(self._dataset)
 
     def _adf_stationarity_test(self, timeseries):
 
         # Dickey-Fuller test:
-        adf_test = adfuller(timeseries, autolag='AIC')
+        adf_test = adfuller(timeseries[1], autolag='AIC')
 
         p_value = adf_test[1]
 

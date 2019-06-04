@@ -62,17 +62,17 @@ class ARIMAModel(Model):
 
         if self._d is None:
             # Estimate the number of differences using an ADF test:
-            d = ndiffs(self._dataset, test='adf')
+            self._d = ndiffs(self._dataset, test='adf')
 
         if self._d_large is None:
             # estimate number of seasonal differences
-            d_large = nsdiffs(self._dataset,
-                              m=m,  # commonly requires knowledge of dataset
-                              max_D=12,
-                              test='ch')
+            self._d_large = nsdiffs(self._dataset,
+                                    m=self._m,  # commonly requires knowledge of dataset
+                                    max_D=12,
+                                    test='ch')
         try:
             self._stepwise_model = auto_arima(self._dataset, start_p=1, start_q=1,
-                                              max_p=3, max_q=3, m=m,
+                                              max_p=3, max_q=3, m=self._m,
                                               seasonal=True,
                                               d=int(self._d), D=int(self._d_large),
                                               error_action='ignore',
