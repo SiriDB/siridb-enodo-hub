@@ -1,20 +1,18 @@
 import asyncio
-import functools
+import json
 import signal
-from threading import Thread
-
 import aiohttp_cors
 import os
-
 from aiohttp import web
 
-from lib.analyser.analyser import Analyser, start_analyser_worker
 from lib.config.config import Config
 from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
-from lib.siridb.pipeserver import PipeServer
 from lib.siridb.siridb import SiriDB
+from lib.socket.package import LISTENER_ADD_SERIE_COUNT, create_header, REPONSE_OK
+from lib.socket.socketserver import SocketServer
 from lib.webserver import handlers
+from lib.webserver.handlers import Handlers
 
 
 class Server:
@@ -23,9 +21,11 @@ class Server:
         self.run = True
         self.loop = loop
         self.app = app
-        self.worker_loop = None
-        self.analyser_queue = list()  # Queue should only be read/processed by one thread only
+        self.socket_server = None
         self.watch_series_task = None
+        self.check_siridb_connection_task = None
+        self.socket_server_task = None
+        self._analyse_queue = []
 
     async def start_up(self):
         await Config.read_config()
@@ -39,28 +39,30 @@ class Server:
         SiriDB.siridb_status = status
         SiriDB.siridb_connected = connected
 
+        self.socket_server = SocketServer('127.0.0.1', 9103, {LISTENER_ADD_SERIE_COUNT: self.update_serie_count})
+        await Handlers.prepare(self.socket_server)
+
         await SerieManager.prepare()
-        asyncio.ensure_future(Analyser.prepare(self.analyser_queue), loop=self.worker_loop)
-        asyncio.run_coroutine_threadsafe(Analyser.watch_queue(), self.worker_loop)
         self.watch_series_task = self.loop.create_task(self.watch_series())
-        self.watch_series_task = self.loop.create_task(self.check_siridb_connection())
+        self.check_siridb_connection_task = self.loop.create_task(self.check_siridb_connection())
+        self.socket_server_task = self.loop.create_task(self.socket_server.create())
 
     async def clean_up(self):
         """
         Cleans up before shutdown
         :return:
         """
-        # self.watch_series_task.cancel()
         await self.watch_series_task
-        await Analyser.shutdown()
+        await self.check_siridb_connection_task
+        await self.socket_server_task
 
-    def on_data(self, data):
-        """
-        Forwards incoming data to a async handler
-        :param data:
-        :return:
-        """
-        asyncio.ensure_future(self.handle_data(data))
+    async def update_serie_count(self, writer, packet_type, packet_id, data):
+        data = json.loads(data.decode("utf-8"))
+        print(data)
+        for serie in data:
+            await SerieManager.add_to_datapoint_counter(serie, data.get(serie))
+        response = create_header(0, REPONSE_OK, packet_id)
+        writer.write(response)
 
     async def check_siridb_connection(self):
         while self.run:
@@ -76,33 +78,18 @@ class Server:
 
     async def watch_series(self):
         while self.run:
+            await self.socket_server.check_clients_alive(Config.client_max_timeout)
+
             for serie_name in await SerieManager.get_series():
                 serie = await SerieManager.get_serie(serie_name)
-                serie_in_queue = serie_name in self.analyser_queue
-                if serie is not None and not await serie.get_analysed() and not serie_in_queue:
+                if serie is not None and not await serie.get_analysed() and serie_name not in self._analyse_queue:
                     if await serie.get_datapoints_count() >= Config.min_data_points:
                         print(f"Adding serie: {serie_name} to the Analyser queue")
-                        EventLogger.log(f"Adding serie: {serie_name} to the Analyser queue", "info",
-                                              "serie_add_queue")
-                        self.analyser_queue.append(serie_name)
+                        EventLogger.log(f"Adding serie: {serie_name} to the Analyse queue", "info",
+                                        "serie_add_queue")
+                        self._analyse_queue.append(serie_name)
 
             await asyncio.sleep(Config.watcher_interval)
-
-    async def handle_data(self, data):
-        """
-        Handles incoming data, when not relevant, it will be ignored
-        :param data:
-        :return:
-        """
-        for serie_name, values in data.items():
-            should_be_handled = serie_name in Config.names_enabled_series_for_analysis
-
-            if should_be_handled:
-                await SerieManager.add_to_datapoint_counter(serie_name, len(values))
-
-    async def start_siridb_pipeserver(self):
-        pipe_server = PipeServer(Config.pipe_path, self.on_data)
-        await pipe_server.create()
 
     def stop_server(self):
         EventLogger.log('Stopping analyser server...', "info")
@@ -116,18 +103,12 @@ class Server:
             task.cancel()
         self.loop.run_until_complete(asyncio.gather(*pending, loop=self.loop))
 
-        self.worker_loop.stop()
+        # self.worker_loop.stop()
         self.loop.stop()
         print('Bye!')
 
     def start_server(self):
         print('Starting...')
-
-        # Create the new loop and worker thread, Only one worker thread should be made.
-        self.worker_loop = asyncio.new_event_loop()
-        worker = Thread(target=start_analyser_worker, args=(self.worker_loop,))
-        # Start the thread
-        worker.start()
 
         cors = aiohttp_cors.setup(self.app, defaults={
             "*": aiohttp_cors.ResourceOptions(
@@ -138,31 +119,27 @@ class Server:
         })
 
         # Add rest api routes
-        self.app.router.add_get("/series", handlers.get_monitored_series)
-        self.app.router.add_post("/series", handlers.add_serie)
-        self.app.router.add_get("/series/{serie_name}", handlers.get_monitored_serie_details)
-        self.app.router.add_delete("/series/{serie_name}", handlers.remove_serie)
-        self.app.router.add_get("/settings", handlers.get_settings)
-        self.app.router.add_post("/settings", handlers.set_settings)
-        self.app.router.add_get("/siridb/status", handlers.get_siridb_status)
-        self.app.router.add_get("/enodo/status", handlers.get_siridb_enodo_status)
-        self.app.router.add_get("/enodo/log", handlers.get_event_log)
+        self.app.router.add_get("/series", Handlers.get_monitored_series)
+        self.app.router.add_post("/series", Handlers.add_serie)
+        self.app.router.add_get("/series/{serie_name}", Handlers.get_monitored_serie_details)
+        self.app.router.add_delete("/series/{serie_name}", Handlers.remove_serie)
+        self.app.router.add_get("/settings", Handlers.get_settings)
+        self.app.router.add_post("/settings", Handlers.set_settings)
+        self.app.router.add_get("/siridb/status", Handlers.get_siridb_status)
+        self.app.router.add_get("/enodo/status", Handlers.get_siridb_enodo_status)
+        self.app.router.add_get("/enodo/log", Handlers.get_event_log)
+        self.app.router.add_get("/enodo/clients", Handlers.get_connected_clients)
 
         # Configure CORS on all routes.
         for route in list(self.app.router.routes()):
             cors.add(route)
 
         self.loop.run_until_complete(self.start_up())
-        self.loop.run_until_complete(self.start_siridb_pipeserver())
 
         for signame in ('SIGINT', 'SIGTERM'):
-            # self.loop.add_signal_handler(getattr(signal, signame),
-            #                              functools.partial(self.loop.stop, self.loop, signame))
-            # self.worker_loop.add_signal_handler(getattr(signal, signame),
-            #                                     functools.partial(self.worker_loop.stop, self.loop, signame))
             print("hi1")
             # self.stop_server()
-            self.loop.add_signal_handler(getattr(signal, signame), self.worker_loop.stop)
+            # self.loop.add_signal_handler(getattr(signal, signame), self.worker_loop.stop)
             self.loop.add_signal_handler(getattr(signal, signame), self.loop.stop)
 
         web.run_app(self.app)
@@ -176,4 +153,3 @@ class Server:
         # cleanup signal handlers
         for signame in ('SIGINT', 'SIGTERM'):
             self.loop.remove_signal_handler(getattr(signal, signame))
-            self.worker_loop.remove_signal_handler(getattr(signal, signame))

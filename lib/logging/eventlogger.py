@@ -1,4 +1,5 @@
 import datetime
+import os
 
 
 class EventLogger:
@@ -30,6 +31,9 @@ class EventLogger:
 
     @classmethod
     def parse(cls):
+        if not os.path.isfile(cls.log_file_path):
+            return
+
         for line in list(open(cls.log_file_path)):
             line = line.rstrip()
             elements = line.split(f' {cls.split_char} ')

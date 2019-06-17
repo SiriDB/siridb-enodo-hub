@@ -24,6 +24,7 @@ class Config:
 
     # Enodo
     log_path = None
+    client_max_timeout = None
 
     @classmethod
     async def read_config(cls):
@@ -52,6 +53,7 @@ class Config:
 
         # Enodo
         cls.log_path = cls._config['enodo']['log_path']
+        cls.client_max_timeout = await cls.to_int(cls._config['enodo']['client_max_timeout'])
 
         if not os.path.exists(Config.analysis_save_path):
             os.makedirs(Config.analysis_save_path)
