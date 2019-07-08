@@ -1,18 +1,15 @@
 import configparser
-from tinydb import TinyDB
 import os
 
 
 class Config:
     _config = None
-    pipe_path = None
+    _path = None
     analysis_save_path = None
     min_data_points = None
     watcher_interval = None
     siridb_connection_check_interval = None
     period_to_forecast = None
-    enabled_series_for_analysis = None
-    names_enabled_series_for_analysis = None
     db = None
 
     # Siridb
@@ -25,18 +22,23 @@ class Config:
     # Enodo
     log_path = None
     client_max_timeout = None
+    socket_server_host = None
+    socket_server_port = None
+    model_pkl_save_path = None
+    series_save_path = None
+    save_to_disk_interval = None
 
     @classmethod
-    async def read_config(cls):
+    async def read_config(cls, path):
         """
         Read config from conf file and json database
         :return:
         """
 
+        cls._path = path
         cls._config = configparser.ConfigParser()
-        cls._config.read(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'analyser.conf'))
+        cls._config.read(path)
 
-        cls.pipe_path = cls._config['analyser']['pipe_path']
         cls.analysis_save_path = cls._config['analyser']['analysis_save_path']
         cls.min_data_points = await cls.to_int(cls._config['analyser']['min_data_points'])
         cls.watcher_interval = await cls.to_int(cls._config['analyser']['watcher_interval'])
@@ -54,20 +56,29 @@ class Config:
         # Enodo
         cls.log_path = cls._config['enodo']['log_path']
         cls.client_max_timeout = await cls.to_int(cls._config['enodo']['client_max_timeout'])
+        cls.socket_server_host = cls._config['enodo']['socket_server_hostname']
+        cls.socket_server_port = await cls.to_int(cls._config['enodo']['socker_server_port'])
+        cls.model_pkl_save_path = cls._config['enodo']['model_pkl_save_path']
+        cls.series_save_path = cls._config['enodo']['series_save_path']
+        cls.save_to_disk_interval = await cls.to_int(cls._config['enodo']['save_to_disk_interval'])
 
+        if not os.path.exists(Config.series_save_path):
+            os.makedirs(Config.series_save_path)
+        if not os.path.exists(Config.model_pkl_save_path):
+            os.makedirs(Config.model_pkl_save_path)
         if not os.path.exists(Config.analysis_save_path):
             os.makedirs(Config.analysis_save_path)
         if not os.path.exists(os.path.join(Config.analysis_save_path, 'db.json')):
             open(os.path.join(Config.analysis_save_path, 'db.json'), 'a').close()
 
-        cls.db = TinyDB(os.path.join(Config.analysis_save_path, 'db.json'))
+        # cls.db = TinyDB(os.path.join(Config.analysis_save_path, 'db.json'))
 
-        cls.enabled_series_for_analysis = {}
-
-        for serie in cls.db.all():
-            if 'name' in serie:
-                cls.enabled_series_for_analysis[serie.get('name')] = serie
-        cls.names_enabled_series_for_analysis = [serie.get('name') for serie in cls.db.all()]
+        # cls.enabled_series_for_analysis = {}
+        #
+        # for serie in cls.db.all():
+        #     if 'name' in serie:
+        #         cls.enabled_series_for_analysis[serie.get('name')] = serie
+        # cls.names_enabled_series_for_analysis = [serie.get('name') for serie in cls.db.all()]
 
     @classmethod
     async def save_config(cls):
@@ -85,8 +96,7 @@ class Config:
         cls._config.set('siridb', 'password', cls.siridb_password)
         cls._config.set('siridb', 'database', cls.siridb_database)
 
-        with open(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'analyser.conf'),
-                  "w") as fh:
+        with open(cls._path, "w") as fh:
             cls._config.write(fh)
 
     @staticmethod

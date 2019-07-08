@@ -1,5 +1,4 @@
-fbprophet
+psutil
 siridb-connector
 aiohttp
 aiohttp_cors
-tinydb

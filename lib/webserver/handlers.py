@@ -4,11 +4,12 @@ import json
 import psutil as psutil
 from aiohttp import web
 
-from lib.analyser.model.arimamodel import ARIMAModel
+# from lib.analyser.model.arimamodel import ARIMAModel
 from lib.config.config import Config
 from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
 from lib.siridb.siridb import SiriDB
+from lib.socket.clientmanager import ClientManager
 
 
 class Handlers:
@@ -43,9 +44,10 @@ class Handlers:
         _siridb_client = SiriDB()
         serie_points = await _siridb_client.query_serie_data(await serie.get_name(), "*")
         serie_data['points'] = serie_points.get(await serie.get_name())
-        if await serie.get_analysed():
-            saved_analysis = ARIMAModel.load(await serie.get_name())
-            serie_data['forecast_points'] = saved_analysis.forecast_values
+        if await serie.get_analysed() and False:
+            # saved_analysis = ARIMAModel.load(await serie.get_name())
+            # serie_data['forecast_points'] = saved_analysis.forecast_values
+            pass
         else:
             serie_data['forecast_points'] = []
 
@@ -58,24 +60,13 @@ class Handlers:
         :param request:
         :return:
         """
-        required_fields = ['m', 'name', 'unit']
+        required_fields = ['name', 'model']
         data = await request.json()
-
+        #
         if all(required_field in data for required_field in required_fields):
-            serie_data = {
-                'serie_name': data.get('name'),
-                'parameters': {
-                    'm': data.get('m', 12),
-                    'd': data.get('d', None),
-                    'D': data.get('D', None)}
-            }
+            await SerieManager.add_serie(data)
 
-            # Config.db.insert(serie_data)
-            Config.names_enabled_series_for_analysis.append(data.get('name'))
-            Config.enabled_series_for_analysis[data.get('name')] = serie_data
-            await SerieManager.check_for_config_changes()
-
-            return web.json_response(data={'data': list(await SerieManager.get_series_to_dict())}, status=201)
+        return web.json_response(data={'data': list(await SerieManager.get_series_to_dict())}, status=201)
 
         return web.json_response(data={'error': 'missing required fields'}, status=400)
 
@@ -171,8 +162,8 @@ class Handlers:
         :return:
         """
         return web.json_response(data={
-            'data': {'listeners': await cls._socket_server.get_connected_clients('listeners'),
-                     'workers': await cls._socket_server.get_connected_clients('workers')}}, status=200,
+            'data': {'listeners': [l.to_dict() for l in ClientManager.listeners.values()],
+                     'workers': [w.to_dict() for w in ClientManager.workers.values()]}}, status=200,
             dumps=cls._safe_json_dumps)
 
     @classmethod
