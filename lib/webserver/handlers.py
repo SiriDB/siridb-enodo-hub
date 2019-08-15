@@ -26,7 +26,8 @@ class Handlers:
         :param request:
         :return:
         """
-        return web.json_response(data={'data': list(await SerieManager.get_series_to_dict())})
+        return web.json_response(data={'data': list(await SerieManager.get_series_to_dict())},
+                                 dumps=cls._safe_json_dumps)
 
     @classmethod
     async def get_monitored_serie_details(cls, request):
@@ -44,14 +45,13 @@ class Handlers:
         _siridb_client = SiriDB()
         serie_points = await _siridb_client.query_serie_data(await serie.get_name(), "*")
         serie_data['points'] = serie_points.get(await serie.get_name())
-        if await serie.get_analysed() and False:
-            # saved_analysis = ARIMAModel.load(await serie.get_name())
-            # serie_data['forecast_points'] = saved_analysis.forecast_values
-            pass
+        if await serie.is_forecasted():
+            serie_data['analysed'] = True
+            serie_data['forecast_points'] = await SerieManager.get_serie_forecast(await serie.get_name())
         else:
             serie_data['forecast_points'] = []
 
-        return web.json_response(data={'data': serie_data})
+        return web.json_response(data={'data': serie_data}, dumps=cls._safe_json_dumps)
 
     @classmethod
     async def add_serie(cls, request):

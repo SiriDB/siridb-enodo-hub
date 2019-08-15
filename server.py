@@ -9,8 +9,9 @@ from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
 from lib.siridb.siridb import SiriDB
 from lib.socket.clientmanager import ClientManager
-from lib.socket.handler import update_serie_count, receive_worker_status_update, send_forecast_request
-from lib.socket.package import LISTENER_ADD_SERIE_COUNT, WORKER_UPDATE_BUSY
+from lib.socket.handler import update_serie_count, receive_worker_status_update, send_forecast_request, \
+    receive_worker_result
+from lib.socket.package import LISTENER_ADD_SERIE_COUNT, WORKER_UPDATE_BUSY, WORKER_RESULT
 from lib.socket.socketserver import SocketServer
 from lib.webserver.handlers import Handlers
 
@@ -44,6 +45,7 @@ class Server:
 
         self.socket_server = SocketServer(Config.socket_server_host, Config.socket_server_port,
                                           {LISTENER_ADD_SERIE_COUNT: update_serie_count,
+                                           WORKER_RESULT: receive_worker_result,
                                            WORKER_UPDATE_BUSY: receive_worker_status_update})
         await Handlers.prepare(self.socket_server)
 
@@ -51,17 +53,18 @@ class Server:
         await SerieManager.read_from_disk()
         self.watch_series_task = self.loop.create_task(self.watch_series())
         self.check_siridb_connection_task = self.loop.create_task(self.check_siridb_connection())
-        self.socket_server_task = self.loop.create_task(self.socket_server.create())
         self.save_to_disk_task = self.loop.create_task(self.save_to_disk())
+        await self.socket_server.create()
 
     async def clean_up(self):
         """
         Cleans up before shutdown
         :return:
         """
-        await self.watch_series_task
-        await self.check_siridb_connection_task
-        await self.socket_server_task
+        # await self.watch_series_task
+        self.watch_series_task.cancel()
+        self.check_siridb_connection_task.cancel()
+        await self.socket_server.stop()
         await self.save_to_disk_task
 
     async def check_siridb_connection(self):
@@ -82,7 +85,7 @@ class Server:
 
             for serie_name in await SerieManager.get_series():
                 serie = await SerieManager.get_serie(serie_name)
-                if serie is not None and (not await serie.is_forecasted or (
+                if serie is not None and not await serie.pending_forecast() and (not await serie.is_forecasted() or (
                         serie.new_forecast_at is not None and serie.new_forecast_at < datetime.datetime.now())):
                     # Should be forecasted if not forecasted yet or new forecast should be made
 
@@ -97,28 +100,42 @@ class Server:
 
             await asyncio.sleep(Config.watcher_interval)
 
-    async def save_to_disk(self):
+    @staticmethod
+    async def save_to_disk():
+        await SerieManager.save_to_disk()
+
+    async def save_to_disk_on_interval(self):
         while self.run:
             await asyncio.sleep(Config.save_to_disk_interval)
             EventLogger.log('Saving seriemanager state to disk', "verbose")
-            await SerieManager.save_to_disk()
+            await self.save_to_disk()
 
-    def stop_server(self):
+    async def stop_server(self):
         EventLogger.log('Stopping analyser server...', "info")
-        self.loop.run_until_complete(self.save_to_disk())
+        EventLogger.log('...Saving log to disk', "info")
+        await self.save_to_disk()
         EventLogger.save_to_disk()
         self.run = False
-        self.loop.run_until_complete(self.clean_up())
+        EventLogger.log('...Doing clean up', "info")
+        await self.clean_up()
         # asyncio.gather(*asyncio.Task.all_tasks()).cancel()
 
-        pending = asyncio.Task.all_tasks(self.loop)
-        for task in pending:
-            task.cancel()
-        self.loop.run_until_complete(asyncio.gather(*pending, loop=self.loop))
+        EventLogger.log('...Stopping all running tasks', "info")
 
-        # self.worker_loop.stop()
+        await asyncio.sleep(2)
+
+        for task in asyncio.Task.all_tasks():
+            try:
+                task.cancel()
+                await asyncio.wait([task])
+            except asyncio.CancelledError as e:
+                pass
+
         self.loop.stop()
         print('Bye!')
+
+    async def _stop_server_from_aiohttp_cleanup(self, *args, **kwargs):
+        await self.stop_server()
 
     def start_server(self):
         print('Starting...')
@@ -149,17 +166,15 @@ class Server:
 
         self.loop.run_until_complete(self.start_up())
 
-        for signame in ('SIGINT', 'SIGTERM'):
-            # self.stop_server()
-            # self.loop.add_signal_handler(getattr(signal, signame), self.worker_loop.stop)
-            self.loop.add_signal_handler(getattr(signal, signame), self.loop.stop)
+        # for signame in ('SIGINT', 'SIGTERM'):
+        #     # self.stop_server()
+        #     # self.loop.add_signal_handler(getattr(signal, signame), self.worker_loop.stop)
+        #     self.loop.add_signal_handler(getattr(signal, signame), self.loop.stop)
+
+        self.app.on_cleanup.append(self._stop_server_from_aiohttp_cleanup)
 
         web.run_app(self.app)
 
-        # self.loop.run_forever()
-
-        self.stop_server()
-
-        # cleanup signal handlers
-        for signame in ('SIGINT', 'SIGTERM'):
-            self.loop.remove_signal_handler(getattr(signal, signame))
+        # # cleanup signal handlers
+        # for signame in ('SIGINT', 'SIGTERM'):
+        #     self.loop.remove_signal_handler(getattr(signal, signame))

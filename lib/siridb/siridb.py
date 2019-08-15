@@ -45,6 +45,28 @@ class SiriDB:
         self.siri.close()
         return result
 
+    async def drop_serie(self, serie_name):
+        await self.siri.connect()
+        result = None
+        try:
+            result = await self.siri.query(f'drop series "{serie_name}"')
+        except (QueryError, InsertError, ServerError, PoolError, AuthenticationError, UserAuthError) as e:
+            print("Connection problem with SiriDB server")
+            pass
+        self.siri.close()
+        return result
+
+    async def insert_points(self, serie_name, points):
+        await self.siri.connect()
+        result = None
+        try:
+            await self.siri.insert({serie_name: points})
+        except (QueryError, InsertError, ServerError, PoolError, AuthenticationError, UserAuthError) as e:
+            print("Connection problem with SiriDB server")
+            pass
+        self.siri.close()
+        return result
+
     async def test_connection(self):
         try:
             await self.siri.connect()

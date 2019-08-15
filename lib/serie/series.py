@@ -94,6 +94,9 @@ class Series:
     async def set_pending_forecast(self, pending):
         self._pending_forecast = pending
 
+    async def schedule_forecast(self, datetime):
+        self.new_forecast_at = datetime
+
     async def is_forecasted(self):
         return self.new_forecast_at is not None
 
@@ -104,6 +107,7 @@ class Series:
         return {
             'name': self._name,
             'datapoint_count': self._datapoint_count,
+            'analysed': await self.is_forecasted(),
             'new_forecast_at': self.new_forecast_at,
             'model': self._model,
             'model_parameters': self._model_parameters

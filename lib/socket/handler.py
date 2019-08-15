@@ -41,8 +41,22 @@ async def receive_worker_result(writer, packet_type, packet_id, data, client_id)
 
 
 async def send_forecast_request(worker, serie):
-    model = await serie.get_model_pkl()
-    wrapper = AnalyserWrapper(model, await serie.get_model(), await serie.get_model_parameters())
-    data = json.dumps({'serie_name': await serie.get_name(), 'wrapper': wrapper}).encode('utf-8')
-    header = create_header(len(data), FORECAST_SERIE, 0)
-    worker.writer.write(header + data)
+    print("hi")
+    try:
+        model = await serie.get_model_pkl()
+        wrapper = AnalyserWrapper(model, await serie.get_model(), await serie.get_model_parameters())
+        # data = json.dumps({'serie_name': await serie.get_name(), 'wrapper': wrapper}).encode('utf-8')
+        data = pickle.dumps({'serie_name': await serie.get_name(), 'wrapper': wrapper})
+        header = create_header(len(data), FORECAST_SERIE, 0)
+        worker.writer.write(header + data)
+    except Exception as e:
+        print("something when wrong", e)
+
+
+async def receive_worker_result(writer, packet_type, packet_id, data, client_id):
+    print("Received result from worker: ", data)
+    try:
+        data = json.loads(data.decode('utf-8'))
+        await SerieManager.add_forecast_to_serie(data.get('name'), data.get('points'))
+    except Exception as e:
+        print(e)

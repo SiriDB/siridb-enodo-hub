@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 
@@ -72,6 +73,27 @@ class SerieManager:
             await serie.add_to_datapoints_count(value)
         elif serie_name not in cls._series and serie_name in Config.names_enabled_series_for_analysis:
             await cls.add_serie(serie_name)
+
+    @classmethod
+    async def add_forecast_to_serie(cls, serie_name, points):
+        print("H2", serie_name, points)
+        serie = cls._series.get(serie_name, None)
+        if serie is not None:
+            print("H3")
+            await cls._siridb_client.drop_serie(f'forecast_{serie_name}')
+            await cls._siridb_client.insert_points(f'forecast_{serie_name}', points)
+            await serie.set_pending_forecast(False)
+
+            date_1 = datetime.datetime.now()
+            end_date = date_1 + datetime.timedelta(days=1)
+            await serie.schedule_forecast(end_date)
+
+    @classmethod
+    async def get_serie_forecast(cls, serie_name):
+        values = await cls._siridb_client.query_serie_data(f'forecast_{serie_name}')
+        if values is not None:
+            return values.get(f'forecast_{serie_name}', None)
+        return None
 
     @classmethod
     async def update_listeners(cls, series):
