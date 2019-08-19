@@ -91,7 +91,7 @@ class Server:
 
                     if await serie.get_datapoints_count() >= Config.min_data_points:
                         print(f"Adding serie: {serie_name} to the Analyser queue")
-                        EventLogger.log(f"Adding serie: {serie_name} to the Analyse queue", "info",
+                        EventLogger.log(f"Adding serie: sending {serie_name} to Worker", "info",
                                         "serie_add_queue")
                         worker = await ClientManager.get_free_worker()
                         if worker is not None:

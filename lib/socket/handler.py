@@ -22,7 +22,7 @@ async def receive_worker_status_update(writer, packet_type, packet_id, data, cli
     busy = data.decode('utf-8')
     worker = await ClientManager.get_worker_by_id(client_id)
     if worker is not None:
-        worker.busy = busy
+        worker.busy = busy == "True"
 
 
 async def receive_worker_result(writer, packet_type, packet_id, data, client_id):
@@ -41,7 +41,6 @@ async def receive_worker_result(writer, packet_type, packet_id, data, client_id)
 
 
 async def send_forecast_request(worker, serie):
-    print("hi")
     try:
         model = await serie.get_model_pkl()
         wrapper = AnalyserWrapper(model, await serie.get_model(), await serie.get_model_parameters())

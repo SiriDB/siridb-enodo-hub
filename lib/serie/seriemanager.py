@@ -7,6 +7,7 @@ from lib.serie.series import Series
 from lib.siridb.siridb import SiriDB
 from lib.socket.clientmanager import ClientManager
 from lib.socket.package import create_header, UPDATE_SERIES
+from lib.util.util import safe_json_dumps
 
 
 class SerieManager:
@@ -17,20 +18,6 @@ class SerieManager:
     async def prepare(cls):
         cls._series = {}
         cls._siridb_client = SiriDB()
-        # if SiriDB.siridb_connected:
-        #     await cls.check_for_config_changes()
-
-    # @classmethod
-    # async def check_for_config_changes(cls):
-    #     for serie_name in cls._series:
-    #         if serie_name not in Config.names_enabled_series_for_analysis:
-    #             del cls._series[serie_name]
-    #
-    #     for serie_name in Config.names_enabled_series_for_analysis:
-    #         if serie_name not in cls._series:
-    #             await cls.add_serie(serie_name)
-    #
-    #     await cls.save_to_disk()
 
     @classmethod
     async def add_serie(cls, serie):
@@ -85,7 +72,8 @@ class SerieManager:
             await serie.set_pending_forecast(False)
 
             date_1 = datetime.datetime.now()
-            end_date = date_1 + datetime.timedelta(days=1)
+            # end_date = date_1 + datetime.timedelta(days=1)
+            end_date = date_1 + datetime.timedelta(seconds=Config.interval_schedules_series)
             await serie.schedule_forecast(end_date)
 
     @classmethod
@@ -125,7 +113,7 @@ class SerieManager:
             if not os.path.exists(Config.series_save_path):
                 raise Exception()
             f = open(os.path.join(Config.series_save_path, "series.json"), "w")
-            f.write(json.dumps(serialized_series))
+            f.write(json.dumps(serialized_series, default=safe_json_dumps))
             f.close()
         except Exception as e:
             print(e)

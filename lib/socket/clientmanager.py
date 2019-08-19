@@ -45,6 +45,7 @@ class ClientManager:
     @classmethod
     async def get_free_worker(cls):
         for worker in cls.workers:
+            print(cls.workers.get(worker).busy, not cls.workers.get(worker).busy, cls.workers.get(worker).busy is False)
             if not cls.workers.get(worker).busy:
                 return cls.workers.get(worker)
         return None

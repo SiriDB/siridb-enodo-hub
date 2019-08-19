@@ -11,6 +11,7 @@ class Config:
     siridb_connection_check_interval = None
     period_to_forecast = None
     db = None
+    interval_schedules_series = None
 
     # Siridb
     siridb_host = None
@@ -45,6 +46,7 @@ class Config:
         cls.siridb_connection_check_interval = await cls.to_int(
             cls._config['analyser']['siridb_connection_check_interval'])
         cls.period_to_forecast = await cls.to_int(cls._config['analyser']['period_to_forecast'])
+        cls.interval_schedules_series = await cls.to_int(cls._config['analyser']['interval_schedules_series'])
 
         # SiriDB
         cls.siridb_host = cls._config['siridb']['host']
@@ -88,6 +90,7 @@ class Config:
         cls._config.set('analyser', 'watcher_interval', str(cls.watcher_interval))
         cls._config.set('analyser', 'siridb_connection_check_interval', str(cls.siridb_connection_check_interval))
         cls._config.set('analyser', 'period_to_forecast', str(cls.period_to_forecast))
+        cls._config.set('analyser', 'interval_schedules_series', str(cls.interval_schedules_series))
 
         # SiriDB
         cls._config.set('siridb', 'host', cls.siridb_host)

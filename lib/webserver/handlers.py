@@ -10,6 +10,7 @@ from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
 from lib.siridb.siridb import SiriDB
 from lib.socket.clientmanager import ClientManager
+from lib.util.util import safe_json_dumps
 
 
 class Handlers:
@@ -27,7 +28,7 @@ class Handlers:
         :return:
         """
         return web.json_response(data={'data': list(await SerieManager.get_series_to_dict())},
-                                 dumps=cls._safe_json_dumps)
+                                 dumps=safe_json_dumps)
 
     @classmethod
     async def get_monitored_serie_details(cls, request):
@@ -51,7 +52,7 @@ class Handlers:
         else:
             serie_data['forecast_points'] = []
 
-        return web.json_response(data={'data': serie_data}, dumps=cls._safe_json_dumps)
+        return web.json_response(data={'data': serie_data}, dumps=safe_json_dumps)
 
     @classmethod
     async def add_serie(cls, request):
@@ -164,13 +165,4 @@ class Handlers:
         return web.json_response(data={
             'data': {'listeners': [l.to_dict() for l in ClientManager.listeners.values()],
                      'workers': [w.to_dict() for w in ClientManager.workers.values()]}}, status=200,
-            dumps=cls._safe_json_dumps)
-
-    @classmethod
-    def _safe_json_dumps(cls, data):
-        return json.dumps(data, default=cls._json_datetime_serializer)
-
-    @classmethod
-    def _json_datetime_serializer(cls, o):
-        if isinstance(o, datetime.datetime):
-            return o.__str__()
+            dumps=safe_json_dumps)

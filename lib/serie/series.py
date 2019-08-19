@@ -1,3 +1,4 @@
+import datetime
 import os
 
 from lib.config.config import Config
@@ -115,5 +116,11 @@ class Series:
 
     @classmethod
     async def from_dict(cls, data_dict):
+        timestamp = data_dict.get('new_forecast_at', None)
+        new_forecast_at = None
+        if timestamp is not None:
+            timestamp = float(timestamp)
+            new_forecast_at = datetime.datetime.fromtimestamp(timestamp)
+
         return Series(data_dict.get('name'), data_dict.get('datapoint_count', None), data_dict.get('model'),
-                      data_dict.get('new_forecast_at', None), data_dict.get('model_parameters', None))
+                      new_forecast_at, data_dict.get('model_parameters', None))
