@@ -47,7 +47,7 @@ class SocketServer:
                 client_id = client_data.get('client_id')
                 print(client_data)
                 if 'client_type' in client_data:
-                    client = Client(client_id, writer)
+                    client = Client(client_id, writer.get_extra_info('peername'), writer)
                     if client_data.get('client_type') == 'listener':
                         await ClientManager.add_listener(client)
                         print(f'New listener with id: {client_id}')

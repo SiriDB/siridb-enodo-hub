@@ -127,7 +127,7 @@ class Handlers:
     @classmethod
     async def build_settings_dict(cls):
         settings = {}
-        fields = ['pipe_path', 'min_data_points', 'analysis_save_path', 'siridb_host', 'siridb_port', 'siridb_user',
+        fields = ['min_data_points', 'analysis_save_path', 'siridb_host', 'siridb_port', 'siridb_user',
                   'siridb_password', 'siridb_database']
         for field in fields:
             settings[field] = getattr(Config, field)
@@ -142,7 +142,7 @@ class Handlers:
         """
         data = await request.json()
 
-        fields = ['pipe_path', 'min_data_points', 'analysis_save_path', 'siridb_host', 'siridb_port', 'siridb_user',
+        fields = ['min_data_points', 'analysis_save_path', 'siridb_host', 'siridb_port', 'siridb_user',
                   'siridb_password', 'siridb_database']
 
         for field in fields:

@@ -3,8 +3,9 @@ import datetime
 
 class Client:
 
-    def __init__(self, client_id, writer, last_seen=None, busy=None):
+    def __init__(self, client_id, ip_address, writer, last_seen=None, busy=None):
         self.client_id = client_id
+        self.ip_address = ip_address
         self.writer = writer
         self.busy = busy
         self.last_seen = last_seen
@@ -13,6 +14,7 @@ class Client:
 
     def to_dict(self):
         return {'client_id': self.client_id,
+                'ip_address': self.ip_address,
                 'writer': self.writer,
                 'busy': self.busy,
                 'last_seen': self.last_seen}
