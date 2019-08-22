@@ -45,9 +45,10 @@ class SocketServer:
             if packet_type == HANDSHAKE:
                 client_data = json.loads(data.decode("utf-8"))
                 client_id = client_data.get('client_id')
-                print(client_data)
+
                 if 'client_type' in client_data:
-                    client = Client(client_id, writer.get_extra_info('peername'), writer)
+                    client = Client(client_id, writer.get_extra_info('peername'), writer,
+                                    client_data.get('version', None))
                     if client_data.get('client_type') == 'listener':
                         await ClientManager.add_listener(client)
                         print(f'New listener with id: {client_id}')
@@ -84,13 +85,6 @@ class SocketServer:
                 else:
                     response = create_header(0, UNKNOW_CLIENT, packet_id)
                     writer.write(response)
-
-            # elif packet_type == LISTENER_ADD_SERIE_COUNT:
-            #     data = json.loads(data.decode("utf-8"))
-            #     print(f'Update from listener with id: {client_id}')
-            #     print(data)
-            #     response = create_header(0, REPONSE_OK, packet_id)
-            #     writer.write(response)
 
             else:
                 if packet_type in self._cbs:
