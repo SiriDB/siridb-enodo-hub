@@ -84,7 +84,10 @@ class Server:
 
             for serie_name in await SerieManager.get_series():
                 serie = await SerieManager.get_serie(serie_name)
-                if serie is not None and not await serie.pending_forecast() and (not await serie.is_forecasted() or (
+                if serie is not None \
+                        and not await serie.ignored()\
+                        and not await serie.pending_forecast() \
+                        and (not await serie.is_forecasted() or (
                         serie.new_forecast_at is not None and serie.new_forecast_at < datetime.datetime.now())):
                     # Should be forecasted if not forecasted yet or new forecast should be made
 

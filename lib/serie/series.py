@@ -13,24 +13,28 @@ class Series:
     _pending_forecast = None
     _model = None
     _model_parameters = None
+    _ignore = None
+    _error = None
 
-    def __init__(self, name, datapoint_count, model, scheduled_forecast=None, model_parameters=None):
+    def __init__(self, name, datapoint_count, model, scheduled_forecast=None, model_parameters=None, ignore=False, error=None):
         self._name = name
         self._datapoint_count = datapoint_count
 
         if model not in MODEL_NAMES.keys():
-            raise Exception()
+            raise Exception('Invalid model')
 
         if model_parameters is None and len(MODEL_PARAMETERS.get(model, [])) > 0:
-            raise Exception()
+            raise Exception('Invalid model parameters')
         for key in MODEL_PARAMETERS.get(model, {}):
             if key not in model_parameters.keys():
-                raise Exception()
+                raise Exception('Invalid model parameters')
 
         self._model = model
         self.new_forecast_at = scheduled_forecast
         self._model_parameters = model_parameters
         self._awaiting_forecast = False
+        self._ignore = ignore
+        self._error = error
 
     async def set_datapoints_counter_lock(self, is_locked):
         """
@@ -42,6 +46,20 @@ class Series:
 
     async def get_datapoints_counter_lock(self):
         return self._datapoint_count_lock
+
+    async def set_error(self, error_message):
+        self._ignore = True
+        self._error = error_message
+
+    async def clear_error(self):
+        self._ignore = False
+        self._error = None
+
+    async def get_error(self):
+        return self._error
+
+    async def ignored(self):
+        return self._ignore
 
     async def get_name(self):
         return self._name
@@ -117,7 +135,9 @@ class Series:
             'analysed': await self.is_forecasted(),
             'new_forecast_at': self.new_forecast_at,
             'model': self._model,
-            'model_parameters': self._model_parameters
+            'model_parameters': self._model_parameters,
+            'ignore': self._ignore,
+            'error': self._error
         }
 
     @classmethod
@@ -129,4 +149,5 @@ class Series:
             new_forecast_at = datetime.datetime.fromtimestamp(timestamp)
 
         return Series(data_dict.get('name'), data_dict.get('datapoint_count', None), data_dict.get('model'),
-                      new_forecast_at, data_dict.get('model_parameters', None))
+                      new_forecast_at, data_dict.get('model_parameters', None), ignore=data_dict.get('ignore', False),
+                      error=data_dict.get('error', None))

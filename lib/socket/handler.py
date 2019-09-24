@@ -5,6 +5,7 @@ import qpack
 
 from lib.analyser.analyserwrapper import AnalyserWrapper
 from lib.config.config import Config
+from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
 from lib.socket.clientmanager import ClientManager
 from lib.socket.package import *
@@ -27,6 +28,7 @@ async def receive_worker_status_update(writer, packet_type, packet_id, data, cli
         if not worker.busy:
             worker.is_going_busy = False
 
+
 async def send_forecast_request(worker, serie):
     try:
         model = await serie.get_model_pkl()
@@ -41,10 +43,16 @@ async def send_forecast_request(worker, serie):
 
 
 async def receive_worker_result(writer, packet_type, packet_id, data, client_id):
-    try:
-        await SerieManager.add_forecast_to_serie(data.get('name'), data.get('points'))
-    except Exception as e:
-        print(e)
+    if data.get('error', None) is not None:
+        EventLogger.log(f"Error returned by worker for series {data.get('name')}", "error")
+        series = await SerieManager.get_serie(data.get('name'))
+        if series is not None:
+            await series.set_error(data.get('error'))
+    else:
+        try:
+            await SerieManager.add_forecast_to_serie(data.get('name'), data.get('points'))
+        except Exception as e:
+            print(e)
 
 
 async def received_worker_refused(writer, packet_type, packet_id, data, client_id):
