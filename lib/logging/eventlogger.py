@@ -1,4 +1,5 @@
 import datetime
+import os
 
 
 class EventLogger:
@@ -30,6 +31,9 @@ class EventLogger:
 
     @classmethod
     def parse(cls):
+        if not os.path.isfile(cls.log_file_path):
+            return
+
         for line in list(open(cls.log_file_path)):
             line = line.rstrip()
             elements = line.split(f' {cls.split_char} ')
@@ -45,8 +49,9 @@ class EventLogger:
     def save_to_disk(cls):
         f = open(cls.log_file_path, "w+")
         for line in cls.log_lines:
-            log_line = f'{line.datetime} {cls.split_char} {line.log_lever} {cls.split_char} \
-                {line.message_type} {cls.split_char} {line.serie_name} {cls.split_char} {line.message} \n'
+            log_line = f'{line.get("datetime")} {cls.split_char} {line.get("log_level")} {cls.split_char} \
+                {line.get("message_type")} {cls.split_char} {line.get("serie_name")} {cls.split_char} \
+                {line.get("message")} \n'
             f.write(log_line)
         f.close()
 

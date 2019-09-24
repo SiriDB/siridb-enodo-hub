@@ -1,153 +1,193 @@
 import psutil as psutil
 from aiohttp import web
 
-from lib.analyser.model.arimamodel import ARIMAModel
+# from lib.analyser.model.arimamodel import ARIMAModel
+from lib.analyser.analyserwrapper import MODEL_NAMES, MODEL_PARAMETERS
 from lib.config.config import Config
 from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
 from lib.siridb.siridb import SiriDB
+from lib.socket.clientmanager import ClientManager
+from lib.util.util import safe_json_dumps
 
 
-async def get_monitored_series(request):
-    """
-    Returns a list of monitored series
-    :param request:
-    :return:
-    """
-    return web.json_response(data={'data': list(await SerieManager.get_series_to_dict())})
+class Handlers:
+    _socket_server = None
 
+    @classmethod
+    async def prepare(cls, socket_server):
+        cls._socket_server = socket_server
 
-async def get_monitored_serie_details(request):
-    """
-    Returns all details and data points of a specific serie.
-    :param request:
-    :return:
-    """
-    serie = await SerieManager.get_serie(request.match_info['serie_name'])
+    @classmethod
+    async def get_monitored_series(cls, request):
+        """
+        Returns a list of monitored series
+        :param request:
+        :return:
+        """
+        return web.json_response(data={'data': list(await SerieManager.get_series_to_dict())},
+                                 dumps=safe_json_dumps)
 
-    if serie is None:
-        return web.json_response(data={'data': ''}, status=404)
+    @classmethod
+    async def get_monitored_serie_details(cls, request):
+        """
+        Returns all details and data points of a specific serie.
+        :param request:
+        :return:
+        """
+        serie = await SerieManager.get_serie(request.match_info['serie_name'])
 
-    serie_data = await serie.to_dict()
-    _siridb_client = SiriDB()
-    serie_points = await _siridb_client.query_serie_data(await serie.get_name(), "*")
-    serie_data['points'] = serie_points.get(await serie.get_name())
-    if await serie.get_analysed():
-        saved_analysis = ARIMAModel.load(await serie.get_name())
-        serie_data['forecast_points'] = saved_analysis.forecast_values
-    else:
-        serie_data['forecast_points'] = []
+        if serie is None:
+            return web.json_response(data={'data': ''}, status=404)
 
-    return web.json_response(data={'data': serie_data})
+        serie_data = await serie.to_dict()
+        _siridb_client = SiriDB(username=Config.siridb_user,
+                                password=Config.siridb_password,
+                                dbname=Config.siridb_database,
+                                hostlist=[(Config.siridb_host, Config.siridb_port)])
+        serie_points = await _siridb_client.query_serie_data(await serie.get_name(), "mean(1h)")
+        serie_data['points'] = serie_points.get(await serie.get_name())
+        if await serie.is_forecasted():
+            serie_data['analysed'] = True
+            serie_data['forecast_points'] = await SerieManager.get_serie_forecast(await serie.get_name())
+        else:
+            serie_data['forecast_points'] = []
 
+        return web.json_response(data={'data': serie_data}, dumps=safe_json_dumps)
 
-async def add_serie(request):
-    """
-    Add new serie to the application.
-    :param request:
-    :return:
-    """
-    required_fields = ['m', 'name', 'unit']
-    data = await request.json()
+    @classmethod
+    async def add_serie(cls, request):
+        """
+        Add new serie to the application.
+        :param request:
+        :return:
+        """
+        required_fields = ['name', 'model']
+        data = await request.json()
+        model = data.get('model')
+        model_parameters = data.get('model_parameters')
 
-    if all(required_field in data for required_field in required_fields):
-        serie_data = {
-            'serie_name': data.get('name'),
-            'parameters': {
-                'm': data.get('m', 12),
-                'd': data.get('d', None),
-                'D': data.get('D', None)}
-        }
+        if model not in MODEL_NAMES.keys():
+            return web.json_response(data={'error': 'Unknown model'}, status=400)
 
-        # Config.db.insert(serie_data)
-        Config.names_enabled_series_for_analysis.append(data.get('name'))
-        Config.enabled_series_for_analysis[data.get('name')] = serie_data
-        await SerieManager.check_for_config_changes()
+        if model_parameters is None and len(MODEL_PARAMETERS.get(model, [])) > 0:
+            return web.json_response(data={'error': 'Missing required fields'}, status=400)
+        for key in MODEL_PARAMETERS.get(model, {}):
+            if key not in model_parameters.keys():
+                return web.json_response(data={'error': 'Missing required fields'}, status=400)
+
+        if all(required_field in data for required_field in required_fields):
+            await SerieManager.add_serie(data)
 
         return web.json_response(data={'data': list(await SerieManager.get_series_to_dict())}, status=201)
 
-    return web.json_response(data={'error': 'missing required fields'}, status=400)
+    @classmethod
+    async def get_possible_analyser_models(cls, request):
+        """
+        Returns list of possible models with corresponding parameters
+        :param request:
+        :return:
+        """
 
+        data = {
+            'models': MODEL_NAMES,
+            'parameters': MODEL_PARAMETERS
+        }
 
-async def remove_serie(request):
-    """
-    Remove serie by it's name
-    :param request:
-    :return:
-    """
-    if await SerieManager.remove_serie(request.match_info['serie_name']):
-        return web.json_response(data={}, status=200)
-    return web.json_response(data={}, status=404)
+        return web.json_response(data={'data': data}, status=200)
 
+    @classmethod
+    async def remove_serie(cls, request):
+        """
+        Remove serie by it's name
+        :param request:
+        :return:
+        """
+        if await SerieManager.remove_serie(request.match_info['serie_name']):
+            return web.json_response(data={}, status=200)
+        return web.json_response(data={}, status=404)
 
-async def get_siridb_status(request):
-    """
-    Get siridb connection status
-    :param request:
-    :return:
-    """
+    @classmethod
+    async def get_siridb_status(cls, request):
+        """
+        Get siridb connection status
+        :param request:
+        :return:
+        """
 
-    return web.json_response(data={'data': {
-        'connected': SiriDB.siridb_connected,
-        'status': SiriDB.siridb_status
-    }}, status=200)
+        return web.json_response(data={'data': {
+            'connected': SiriDB.siridb_connected,
+            'status': SiriDB.siridb_status
+        }}, status=200)
 
+    @classmethod
+    async def get_siridb_enodo_status(cls, request):
+        """
+        Get status of this analyser instance
+        :param request:
+        :return:
+        """
 
-async def get_siridb_enodo_status(request):
-    """
-    Get status of this analyser instance
-    :param request:
-    :return:
-    """
+        cpu_usage = psutil.cpu_percent()
+        return web.json_response(data={'data': {
+            'cpu_usage': cpu_usage
+        }}, status=200)
 
-    cpu_usage = psutil.cpu_percent()
-    return web.json_response(data={'data': {
-        'cpu_usage': cpu_usage
-    }}, status=200)
+    @classmethod
+    async def get_event_log(cls, request):
+        """
+        Returns event log
+        :param request:
+        :return:
+        """
+        log = EventLogger.get()
+        return web.json_response(data={'data': log}, status=200)
 
+    @classmethod
+    async def get_settings(cls, request):
+        settings = await cls.build_settings_dict()
 
-async def get_event_log(request):
-    """
-    Returns event log
-    :param request:
-    :return:
-    """
-    log = EventLogger.get()
-    return web.json_response(data={'data': log}, status=200)
+        return web.json_response(data={'data': settings}, status=200)
 
+    @classmethod
+    async def build_settings_dict(cls):
+        settings = {}
+        fields = ['min_data_points', 'analysis_save_path', 'siridb_host', 'siridb_port', 'siridb_user',
+                  'siridb_password', 'siridb_database']
+        for field in fields:
+            settings[field] = getattr(Config, field)
+        return settings
 
-async def get_settings(request):
-    settings = await build_settings_dict()
+    @classmethod
+    async def set_settings(cls, request):
+        """
+        Override settings.
+        :param request:
+        :return:
+        """
+        data = await request.json()
 
-    return web.json_response(data={'data': settings}, status=200)
+        fields = ['min_data_points', 'analysis_save_path', 'siridb_host', 'siridb_port', 'siridb_user',
+                  'siridb_password', 'siridb_database']
 
+        for field in fields:
+            if field in data:
+                setattr(Config, field, data[field])
 
-async def build_settings_dict():
-    settings = {}
-    fields = ['pipe_path', 'min_data_points', 'analysis_save_path', 'siridb_host', 'siridb_port', 'siridb_user',
-              'siridb_password', 'siridb_database']
-    for field in fields:
-        settings[field] = getattr(Config, field)
-    return settings
+        await Config.save_config()
 
+        settings = await cls.build_settings_dict()
 
-async def set_settings(request):
-    """
-    Override settings.
-    :param request:
-    :return:
-    """
-    data = await request.json()
+        return web.json_response(data={'data': settings}, status=200)
 
-    fields = ['pipe_path', 'min_data_points', 'analysis_save_path', 'siridb_host', 'siridb_port', 'siridb_user',
-              'siridb_password', 'siridb_database']
-
-    for field in fields:
-        if field in data:
-            setattr(Config, field, data[field])
-
-    await Config.save_config()
-
-    settings = await build_settings_dict()
-
-    return web.json_response(data={'data': settings}, status=200)
+    @classmethod
+    async def get_connected_clients(cls, request):
+        """
+        Return connected listeners and workers
+        :param request:
+        :return:
+        """
+        return web.json_response(data={
+            'data': {'listeners': [l.to_dict() for l in ClientManager.listeners.values()],
+                     'workers': [w.to_dict() for w in ClientManager.workers.values()]}}, status=200,
+            dumps=safe_json_dumps)

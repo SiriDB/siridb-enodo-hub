@@ -10,12 +10,12 @@ class SiriDB:
     siridb_connected = False
     siridb_status = ""
 
-    def __init__(self):
+    def __init__(self, hostlist, dbname, username, password):
         self.siri = SiriDBClient(
-            username=Config.siridb_user,
-            password=Config.siridb_password,
-            dbname=Config.siridb_database,
-            hostlist=[(Config.siridb_host, Config.siridb_port)],  # Multiple connections are supported
+            username=username,
+            password=password,
+            dbname=dbname,
+            hostlist=hostlist,  # Multiple connections are supported
             keepalive=True)
 
     # @classmethod
@@ -39,6 +39,28 @@ class SiriDB:
         result = None
         try:
             result = await self.siri.query(f'select {selector} from "{serie_name}"')
+        except (QueryError, InsertError, ServerError, PoolError, AuthenticationError, UserAuthError) as e:
+            print("Connection problem with SiriDB server")
+            pass
+        self.siri.close()
+        return result
+
+    async def drop_serie(self, serie_name):
+        await self.siri.connect()
+        result = None
+        try:
+            result = await self.siri.query(f'drop series "{serie_name}"')
+        except (QueryError, InsertError, ServerError, PoolError, AuthenticationError, UserAuthError) as e:
+            print("Connection problem with SiriDB server")
+            pass
+        self.siri.close()
+        return result
+
+    async def insert_points(self, serie_name, points):
+        await self.siri.connect()
+        result = None
+        try:
+            await self.siri.insert({serie_name: points})
         except (QueryError, InsertError, ServerError, PoolError, AuthenticationError, UserAuthError) as e:
             print("Connection problem with SiriDB server")
             pass
