@@ -10,12 +10,12 @@ class SiriDB:
     siridb_connected = False
     siridb_status = ""
 
-    def __init__(self):
+    def __init__(self, hostlist, dbname, username, password):
         self.siri = SiriDBClient(
-            username=Config.siridb_user,
-            password=Config.siridb_password,
-            dbname=Config.siridb_database,
-            hostlist=[(Config.siridb_host, Config.siridb_port)],  # Multiple connections are supported
+            username=username,
+            password=password,
+            dbname=dbname,
+            hostlist=hostlist,  # Multiple connections are supported
             keepalive=True)
 
     # @classmethod

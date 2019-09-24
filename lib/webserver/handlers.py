@@ -1,10 +1,8 @@
-import datetime
-import json
-
 import psutil as psutil
 from aiohttp import web
 
 # from lib.analyser.model.arimamodel import ARIMAModel
+from lib.analyser.analyserwrapper import MODEL_NAMES, MODEL_PARAMETERS
 from lib.config.config import Config
 from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
@@ -43,8 +41,11 @@ class Handlers:
             return web.json_response(data={'data': ''}, status=404)
 
         serie_data = await serie.to_dict()
-        _siridb_client = SiriDB()
-        serie_points = await _siridb_client.query_serie_data(await serie.get_name(), "*")
+        _siridb_client = SiriDB(username=Config.siridb_user,
+                                password=Config.siridb_password,
+                                dbname=Config.siridb_database,
+                                hostlist=[(Config.siridb_host, Config.siridb_port)])
+        serie_points = await _siridb_client.query_serie_data(await serie.get_name(), "mean(1h)")
         serie_data['points'] = serie_points.get(await serie.get_name())
         if await serie.is_forecasted():
             serie_data['analysed'] = True
@@ -63,13 +64,37 @@ class Handlers:
         """
         required_fields = ['name', 'model']
         data = await request.json()
-        #
+        model = data.get('model')
+        model_parameters = data.get('model_parameters')
+
+        if model not in MODEL_NAMES.keys():
+            return web.json_response(data={'error': 'Unknown model'}, status=400)
+
+        if model_parameters is None and len(MODEL_PARAMETERS.get(model, [])) > 0:
+            return web.json_response(data={'error': 'Missing required fields'}, status=400)
+        for key in MODEL_PARAMETERS.get(model, {}):
+            if key not in model_parameters.keys():
+                return web.json_response(data={'error': 'Missing required fields'}, status=400)
+
         if all(required_field in data for required_field in required_fields):
             await SerieManager.add_serie(data)
 
         return web.json_response(data={'data': list(await SerieManager.get_series_to_dict())}, status=201)
 
-        return web.json_response(data={'error': 'missing required fields'}, status=400)
+    @classmethod
+    async def get_possible_analyser_models(cls, request):
+        """
+        Returns list of possible models with corresponding parameters
+        :param request:
+        :return:
+        """
+
+        data = {
+            'models': MODEL_NAMES,
+            'parameters': MODEL_PARAMETERS
+        }
+
+        return web.json_response(data={'data': data}, status=200)
 
     @classmethod
     async def remove_serie(cls, request):

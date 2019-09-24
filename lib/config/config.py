@@ -20,6 +20,13 @@ class Config:
     siridb_password = None
     siridb_database = None
 
+    # Siridb forecast
+    siridb_forecast_host = None
+    siridb_forecast_port = None
+    siridb_forecast_user = None
+    siridb_forecast_password = None
+    siridb_forecast_database = None
+
     # Enodo
     log_path = None
     client_max_timeout = None
@@ -54,6 +61,13 @@ class Config:
         cls.siridb_user = cls._config['siridb']['user']
         cls.siridb_password = cls._config['siridb']['password']
         cls.siridb_database = cls._config['siridb']['database']
+
+        # SiriDB Forecast
+        cls.siridb_forecast_host = cls._config['siridb_forecast']['host']
+        cls.siridb_forecast_port = await cls.to_int(cls._config['siridb_forecast']['port'])
+        cls.siridb_forecast_user = cls._config['siridb_forecast']['user']
+        cls.siridb_forecast_password = cls._config['siridb_forecast']['password']
+        cls.siridb_forecast_database = cls._config['siridb_forecast']['database']
 
         # Enodo
         cls.log_path = cls._config['enodo']['log_path']

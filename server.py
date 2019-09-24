@@ -1,6 +1,5 @@
 import asyncio
 import datetime
-import signal
 import aiohttp_cors
 from aiohttp import web
 
@@ -10,8 +9,8 @@ from lib.serie.seriemanager import SerieManager
 from lib.siridb.siridb import SiriDB
 from lib.socket.clientmanager import ClientManager
 from lib.socket.handler import update_serie_count, receive_worker_status_update, send_forecast_request, \
-    receive_worker_result
-from lib.socket.package import LISTENER_ADD_SERIE_COUNT, WORKER_UPDATE_BUSY, WORKER_RESULT
+    receive_worker_result, received_worker_refused
+from lib.socket.package import LISTENER_ADD_SERIE_COUNT, WORKER_UPDATE_BUSY, WORKER_RESULT, WORKER_REFUSED
 from lib.socket.socketserver import SocketServer
 from lib.webserver.handlers import Handlers
 
@@ -34,11 +33,10 @@ class Server:
         await Config.read_config(self.config_path)
         await EventLogger.prepare(Config.log_path)
 
-        # TODO MOVE TO LISTENER
-        # if os.path.exists(Config.pipe_path):
-        #     os.unlink(Config.pipe_path)
-
-        _siridb = SiriDB()
+        _siridb = SiriDB(username=Config.siridb_user,
+                         password=Config.siridb_password,
+                         dbname=Config.siridb_database,
+                         hostlist=[(Config.siridb_host, Config.siridb_port)])
         status, connected = await _siridb.test_connection()
         SiriDB.siridb_status = status
         SiriDB.siridb_connected = connected
@@ -46,11 +44,13 @@ class Server:
         self.socket_server = SocketServer(Config.socket_server_host, Config.socket_server_port,
                                           {LISTENER_ADD_SERIE_COUNT: update_serie_count,
                                            WORKER_RESULT: receive_worker_result,
-                                           WORKER_UPDATE_BUSY: receive_worker_status_update})
+                                           WORKER_UPDATE_BUSY: receive_worker_status_update,
+                                           WORKER_REFUSED: received_worker_refused})
         await Handlers.prepare(self.socket_server)
 
         await SerieManager.prepare()
         await SerieManager.read_from_disk()
+        await ClientManager.setup(SerieManager)
         self.watch_series_task = self.loop.create_task(self.watch_series())
         self.check_siridb_connection_task = self.loop.create_task(self.check_siridb_connection())
         self.save_to_disk_task = self.loop.create_task(self.save_to_disk())
@@ -61,7 +61,6 @@ class Server:
         Cleans up before shutdown
         :return:
         """
-        # await self.watch_series_task
         self.watch_series_task.cancel()
         self.check_siridb_connection_task.cancel()
         await self.socket_server.stop()
@@ -69,12 +68,12 @@ class Server:
 
     async def check_siridb_connection(self):
         while self.run:
-            print(f"Checking SiriDB Connection")
             EventLogger.log("Checking SiriDB Connection", "verbose")
-            _siridb = SiriDB()
+            _siridb = SiriDB(username=Config.siridb_user,
+                             password=Config.siridb_password,
+                             dbname=Config.siridb_database,
+                             hostlist=[(Config.siridb_host, Config.siridb_port)])
             status, connected = await _siridb.test_connection()
-            # if not SiriDB.siridb_connected and connected:
-            #     await SerieManager.check_for_config_changes()
             SiriDB.siridb_status = status
             SiriDB.siridb_connected = connected
             await asyncio.sleep(Config.siridb_connection_check_interval)
@@ -90,13 +89,13 @@ class Server:
                     # Should be forecasted if not forecasted yet or new forecast should be made
 
                     if await serie.get_datapoints_count() >= Config.min_data_points:
-                        print(f"Adding serie: {serie_name} to the Analyser queue")
-                        EventLogger.log(f"Adding serie: sending {serie_name} to Worker", "info",
-                                        "serie_add_queue")
                         worker = await ClientManager.get_free_worker()
                         if worker is not None:
+                            EventLogger.log(f"Adding serie: sending {serie_name} to Worker", "info",
+                                            "serie_add_queue")
                             await serie.set_pending_forecast(True)
                             await send_forecast_request(worker, serie)
+                            worker.is_going_busy = True
 
             await asyncio.sleep(Config.watcher_interval)
 
@@ -159,22 +158,12 @@ class Server:
         self.app.router.add_get("/enodo/status", Handlers.get_siridb_enodo_status)
         self.app.router.add_get("/enodo/log", Handlers.get_event_log)
         self.app.router.add_get("/enodo/clients", Handlers.get_connected_clients)
+        self.app.router.add_get("/enodo/models", Handlers.get_possible_analyser_models)
 
         # Configure CORS on all routes.
         for route in list(self.app.router.routes()):
             cors.add(route)
 
         self.loop.run_until_complete(self.start_up())
-
-        # for signame in ('SIGINT', 'SIGTERM'):
-        #     # self.stop_server()
-        #     # self.loop.add_signal_handler(getattr(signal, signame), self.worker_loop.stop)
-        #     self.loop.add_signal_handler(getattr(signal, signame), self.loop.stop)
-
         self.app.on_cleanup.append(self._stop_server_from_aiohttp_cleanup)
-
         web.run_app(self.app)
-
-        # # cleanup signal handlers
-        # for signame in ('SIGINT', 'SIGTERM'):
-        #     self.loop.remove_signal_handler(getattr(signal, signame))

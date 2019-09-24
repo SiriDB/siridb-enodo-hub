@@ -1,6 +1,7 @@
 import json
 import os
 import pickle
+import qpack
 
 from lib.analyser.analyserwrapper import AnalyserWrapper
 from lib.config.config import Config
@@ -19,43 +20,32 @@ async def update_serie_count(writer, packet_type, packet_id, data, client_id):
 
 
 async def receive_worker_status_update(writer, packet_type, packet_id, data, client_id):
-    busy = data.decode('utf-8')
+    busy = data
     worker = await ClientManager.get_worker_by_id(client_id)
     if worker is not None:
         worker.busy = busy == "True"
-
-
-async def receive_worker_result(writer, packet_type, packet_id, data, client_id):
-    pkl = data.decode("utf-8")
-
-    model = pickle.loads(pkl)
-
-    print(model)
-    return
-
-    if not os.path.exists(Config.analysis_save_path):
-        raise Exception()
-    f = open(os.path.join(Config.analysis_save_path, self._serie_name + ".pkl"), "wb")
-    f.write(pkl)
-    f.close()
-
+        if not worker.busy:
+            worker.is_going_busy = False
 
 async def send_forecast_request(worker, serie):
     try:
         model = await serie.get_model_pkl()
-        wrapper = AnalyserWrapper(model, await serie.get_model(), await serie.get_model_parameters())
-        # data = json.dumps({'serie_name': await serie.get_name(), 'wrapper': wrapper}).encode('utf-8')
-        data = pickle.dumps({'serie_name': await serie.get_name(), 'wrapper': wrapper})
+        wrapper = (AnalyserWrapper(model, await serie.get_model(), await serie.get_model_parameters())).__dict__()
+        data = qpack.packb({'serie_name': await serie.get_name(), 'wrapper': wrapper})
         header = create_header(len(data), FORECAST_SERIE, 0)
+        if serie not in worker.pending_series:
+            worker.pending_series.append(await serie.get_name())
         worker.writer.write(header + data)
     except Exception as e:
         print("something when wrong", e)
 
 
 async def receive_worker_result(writer, packet_type, packet_id, data, client_id):
-    print("Received result from worker: ", data)
     try:
-        data = json.loads(data.decode('utf-8'))
         await SerieManager.add_forecast_to_serie(data.get('name'), data.get('points'))
     except Exception as e:
         print(e)
+
+
+async def received_worker_refused(writer, packet_type, packet_id, data, client_id):
+    print("Worker refused, is probably buys")

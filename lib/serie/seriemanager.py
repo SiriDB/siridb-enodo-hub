@@ -12,17 +12,25 @@ from lib.util.util import safe_json_dumps
 
 class SerieManager:
     _series = None
-    _siridb_client = None
+    _siridb_data_client = None
+    _siridb_forecast_client = None
 
     @classmethod
     async def prepare(cls):
         cls._series = {}
-        cls._siridb_client = SiriDB()
+        cls._siridb_data_client = SiriDB(username=Config.siridb_user,
+                                         password=Config.siridb_password,
+                                         dbname=Config.siridb_database,
+                                         hostlist=[(Config.siridb_host, Config.siridb_port)])
+        cls._siridb_forecast_client = SiriDB(username=Config.siridb_forecast_user,
+                                             password=Config.siridb_forecast_password,
+                                             dbname=Config.siridb_forecast_database,
+                                             hostlist=[(Config.siridb_forecast_host, Config.siridb_forecast_port)])
 
     @classmethod
     async def add_serie(cls, serie):
         if serie.get('name') not in cls._series:
-            collected_datapoints = await cls._siridb_client.query_serie_datapoint_count(serie.get('name'))
+            collected_datapoints = await cls._siridb_data_client.query_serie_datapoint_count(serie.get('name'))
             if collected_datapoints:
                 serie['datapoint_count'] = collected_datapoints
                 cls._series[serie.get('name')] = await Series.from_dict(serie)
@@ -63,12 +71,10 @@ class SerieManager:
 
     @classmethod
     async def add_forecast_to_serie(cls, serie_name, points):
-        print("H2", serie_name, points)
         serie = cls._series.get(serie_name, None)
         if serie is not None:
-            print("H3")
-            await cls._siridb_client.drop_serie(f'forecast_{serie_name}')
-            await cls._siridb_client.insert_points(f'forecast_{serie_name}', points)
+            await cls._siridb_forecast_client.drop_serie(f'forecast_{serie_name}')
+            await cls._siridb_forecast_client.insert_points(f'forecast_{serie_name}', points)
             await serie.set_pending_forecast(False)
 
             date_1 = datetime.datetime.now()
@@ -78,7 +84,7 @@ class SerieManager:
 
     @classmethod
     async def get_serie_forecast(cls, serie_name):
-        values = await cls._siridb_client.query_serie_data(f'forecast_{serie_name}')
+        values = await cls._siridb_forecast_client.query_serie_data(f'forecast_{serie_name}')
         if values is not None:
             return values.get(f'forecast_{serie_name}', None)
         return None

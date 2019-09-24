@@ -1,3 +1,6 @@
+
+<p align="center"><img src="..." alt="Enodo"></p>
+
 # Enodo Hub
 
 ## REST API

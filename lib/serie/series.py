@@ -1,9 +1,8 @@
 import datetime
 import os
 
+from lib.analyser.analyserwrapper import MODEL_NAMES, MODEL_PARAMETERS
 from lib.config.config import Config
-
-FORECAST_MODELS = {"ARIMA", "PROPHET"}
 
 
 class Series:
@@ -19,8 +18,15 @@ class Series:
         self._name = name
         self._datapoint_count = datapoint_count
 
-        if model not in FORECAST_MODELS:
+        if model not in MODEL_NAMES.keys():
             raise Exception()
+
+        if model_parameters is None and len(MODEL_PARAMETERS.get(model, [])) > 0:
+            raise Exception()
+        for key in MODEL_PARAMETERS.get(model, {}):
+            if key not in model_parameters.keys():
+                raise Exception()
+
         self._model = model
         self.new_forecast_at = scheduled_forecast
         self._model_parameters = model_parameters
@@ -44,7 +50,7 @@ class Series:
         return self._model
 
     async def set_model(self, model):
-        if model not in FORECAST_MODELS:
+        if model not in MODEL_NAMES.keys():
             raise Exception()
         self._model = model
 

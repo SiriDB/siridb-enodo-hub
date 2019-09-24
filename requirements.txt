@@ -2,3 +2,4 @@ psutil
 siridb-connector
 aiohttp
 aiohttp_cors
+qpack==0.0.17

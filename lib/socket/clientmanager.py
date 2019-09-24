@@ -1,5 +1,7 @@
 import datetime
 
+from lib.logging.eventlogger import EventLogger
+
 
 class Client:
 
@@ -8,8 +10,10 @@ class Client:
         self.ip_address = ip_address
         self.writer = writer
         self.busy = busy
+        self.is_going_busy = False
         self.last_seen = last_seen
         self.version = version
+        self.pending_series = []
         if last_seen is None:
             self.last_seen = datetime.datetime.now()
 
@@ -25,6 +29,11 @@ class Client:
 class ClientManager:
     listeners = {}
     workers = {}
+    serie_manager = None
+
+    @classmethod
+    async def setup(cls, serie_manager):
+        cls.serie_manager = serie_manager
 
     @classmethod
     async def add_listener(cls, client):
@@ -49,8 +58,7 @@ class ClientManager:
     @classmethod
     async def get_free_worker(cls):
         for worker in cls.workers:
-            print(cls.workers.get(worker).busy, not cls.workers.get(worker).busy, cls.workers.get(worker).busy is False)
-            if not cls.workers.get(worker).busy:
+            if not cls.workers.get(worker).busy and not cls.workers.get(worker).is_going_busy:
                 return cls.workers.get(worker)
         return None
 
@@ -74,4 +82,23 @@ class ClientManager:
                 clients_to_remove.append(client)
 
         for client in clients_to_remove:
+            await cls.check_for_pending_series(cls.workers[client])
             del cls.workers[client]
+
+    @classmethod
+    async def remove_worker(cls, client_id):
+        await cls.check_for_pending_series(cls.workers[client_id])
+        del cls.workers[client_id]
+
+    @classmethod
+    async def remove_listener(cls, client_id):
+        del cls.listeners[client_id]
+
+    @classmethod
+    async def check_for_pending_series(cls, client):
+        if len(client.pending_series):
+            for serie_name in client.pending_series:
+                serie = await cls.serie_manager.get_serie(serie_name)
+                if await serie.pending_forecast():
+                    EventLogger.log(f'Setting for serie {serie_name} pending to false...', "info")
+                    await serie.set_pending_forecast(False)
