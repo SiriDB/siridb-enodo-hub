@@ -10,7 +10,8 @@
     ```json
     {
         "name": 'seriename',
-        "unit": 'ms',
+        "model": '1',
+        "model_parameters": []
         ...
     }
     ```
