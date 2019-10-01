@@ -20,10 +20,10 @@ def str2bool(v, default):
 
 @middleware
 async def middleware(request, handler):
-    if request.path.startswith('/api/docs'):
-        return await handler(request)
-    else:
+    if request.path.startswith('/api') and not request.path.startswith('/api/docs'):
         return web.json_response(status=404)
+    else:
+        return await handler(request)
 
 
 if __name__ == '__main__':
