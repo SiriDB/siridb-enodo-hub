@@ -1,7 +1,9 @@
 import asyncio
 import datetime
 import aiohttp_cors
+import socketio
 from aiohttp import web
+from aiohttp_apispec import setup_aiohttp_apispec
 
 from lib.config.config import Config
 from lib.logging.eventlogger import EventLogger
@@ -12,6 +14,7 @@ from lib.socket.handler import update_serie_count, receive_worker_status_update,
     receive_worker_result, received_worker_refused
 from lib.socket.package import LISTENER_ADD_SERIE_COUNT, WORKER_UPDATE_BUSY, WORKER_RESULT, WORKER_REFUSED
 from lib.socket.socketserver import SocketServer
+from lib.socketio.handlers import setup_socketio_handlers, websocket_index
 from lib.webserver.handlers import Handlers
 
 
@@ -29,7 +32,7 @@ class Server:
         self.save_to_disk_task = None
         self._send_for_analyse = []
 
-    async def start_up(self):
+    async def start_up(self, sio):
         await Config.read_config(self.config_path)
         await EventLogger.prepare(Config.log_path)
 
@@ -47,7 +50,7 @@ class Server:
                                            WORKER_UPDATE_BUSY: receive_worker_status_update,
                                            WORKER_REFUSED: received_worker_refused})
         await Handlers.prepare(self.socket_server)
-
+        setup_socketio_handlers(sio)
         await SerieManager.prepare()
         await SerieManager.read_from_disk()
         await ClientManager.setup(SerieManager)
@@ -85,7 +88,7 @@ class Server:
             for serie_name in await SerieManager.get_series():
                 serie = await SerieManager.get_serie(serie_name)
                 if serie is not None \
-                        and not await serie.ignored()\
+                        and not await serie.ignored() \
                         and not await serie.pending_forecast() \
                         and (not await serie.is_forecasted() or (
                         serie.new_forecast_at is not None and serie.new_forecast_at < datetime.datetime.now())):
@@ -150,23 +153,39 @@ class Server:
             )
         })
 
+        self.app.router.add_get("/", websocket_index, allow_head=False)
+
         # Add rest api routes
-        self.app.router.add_get("/series", Handlers.get_monitored_series)
-        self.app.router.add_post("/series", Handlers.add_serie)
-        self.app.router.add_get("/series/{serie_name}", Handlers.get_monitored_serie_details)
-        self.app.router.add_delete("/series/{serie_name}", Handlers.remove_serie)
-        self.app.router.add_get("/settings", Handlers.get_settings)
-        self.app.router.add_post("/settings", Handlers.set_settings)
-        self.app.router.add_get("/siridb/status", Handlers.get_siridb_status)
-        self.app.router.add_get("/enodo/status", Handlers.get_siridb_enodo_status)
-        self.app.router.add_get("/enodo/log", Handlers.get_event_log)
-        self.app.router.add_get("/enodo/clients", Handlers.get_connected_clients)
-        self.app.router.add_get("/enodo/models", Handlers.get_possible_analyser_models)
+        self.app.router.add_get("/api/series", Handlers.get_monitored_series, allow_head=False)
+        self.app.router.add_post("/api/series", Handlers.add_serie)
+        self.app.router.add_get("/api/series/{serie_name}", Handlers.get_monitored_serie_details, allow_head=False)
+        self.app.router.add_delete("/api/series/{serie_name}", Handlers.remove_serie)
+        self.app.router.add_get("/api/enodo/models", Handlers.get_possible_analyser_models, allow_head=False)
+
+        # Add internal api routes
+        self.app.router.add_get("/api/settings", Handlers.get_settings, allow_head=False)
+        self.app.router.add_post("/api/settings", Handlers.set_settings)
+        self.app.router.add_get("/api/siridb/status", Handlers.get_siridb_status, allow_head=False)
+        self.app.router.add_get("/api/enodo/status", Handlers.get_siridb_enodo_status, allow_head=False)
+        self.app.router.add_get("/api/enodo/log", Handlers.get_event_log, allow_head=False)
+        self.app.router.add_get("/api/enodo/clients", Handlers.get_connected_clients, allow_head=False)
+
+        # init docs with all parameters, usual for ApiSpec
+        setup_aiohttp_apispec(
+            app=self.app,
+            title="API references",
+            version="v1",
+            url="/api/docs/swagger.json",
+            swagger_path="/api/docs",
+        )
 
         # Configure CORS on all routes.
         for route in list(self.app.router.routes()):
             cors.add(route)
 
-        self.loop.run_until_complete(self.start_up())
+        sio = socketio.AsyncServer(async_mode='aiohttp')
+        sio.attach(self.app)
+
+        self.loop.run_until_complete(self.start_up(sio))
         self.app.on_cleanup.append(self._stop_server_from_aiohttp_cleanup)
         web.run_app(self.app)

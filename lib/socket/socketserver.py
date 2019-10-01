@@ -109,5 +109,5 @@ class SocketServer:
 
             await writer.drain()
 
-        print("Close the client socket")
+        EventLogger.log(f'Closing socket with client {saved_client_id}', "info")
         writer.close()

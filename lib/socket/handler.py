@@ -12,8 +12,6 @@ from lib.socket.package import *
 
 
 async def update_serie_count(writer, packet_type, packet_id, data, client_id):
-    data = json.loads(data.decode("utf-8"))
-    print(data)
     for serie in data:
         await SerieManager.add_to_datapoint_counter(serie, data.get(serie))
     response = create_header(0, REPONSE_OK, packet_id)
