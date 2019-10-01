@@ -181,7 +181,7 @@ class Server:
         )
 
         if self._docs_only:
-            web.run_app(self.app)
+            web.run_app(self.app, port=80)
         else:
             # Configure CORS on all routes.
             for route in list(self.app.router.routes()):
