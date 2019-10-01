@@ -53,7 +53,7 @@ class Handlers:
         regex_filter = request.rel_url.query['filter'] if 'filter' in request.rel_url.query else None
         # TODO implement filter
 
-        return web.json_response(data=await cls._get_monitored_series(regex_filter),
+        return web.json_response(data=await cls.resp_get_monitored_series(regex_filter),
                                  dumps=safe_json_dumps)
 
     @classmethod
@@ -103,7 +103,7 @@ class Handlers:
             'include_points'] == 'true' else False
 
         return web.json_response(
-            data=await cls._get_monitored_serie_details(request.match_info['serie_name'], include_points),
+            data=await cls.resp_get_monitored_serie_details(request.match_info['serie_name'], include_points),
             dumps=safe_json_dumps)
 
     @classmethod
@@ -144,7 +144,7 @@ class Handlers:
         """
         data = await request.json()
 
-        return web.json_response(data=await cls._add_serie(data), status=201)
+        return web.json_response(data=await cls.resp_add_serie(data), status=201)
 
     @classmethod
     async def resp_remove_serie(cls, serie_name):
@@ -167,7 +167,7 @@ class Handlers:
         :return:
         """
         serie_name = request.match_info['serie_name']
-        return web.json_response(data={}, status=await cls._remove_serie(serie_name))
+        return web.json_response(data={}, status=await cls.resp_remove_serie(serie_name))
 
     @classmethod
     async def resp_get_possible_analyser_models(cls):
@@ -193,7 +193,7 @@ class Handlers:
         :return:
         """
 
-        return web.json_response(data=await cls._get_possible_analyser_models(), status=200)
+        return web.json_response(data=await cls.resp_get_possible_analyser_models(), status=200)
 
     @classmethod
     async def get_siridb_status(cls, request):

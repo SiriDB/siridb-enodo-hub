@@ -20,11 +20,12 @@ from lib.webserver.handlers import Handlers
 
 class Server:
 
-    def __init__(self, loop, app, config_path):
+    def __init__(self, loop, app, config_path, docs_only=False):
         self.run = True
         self.loop = loop
         self.app = app
         self.config_path = config_path
+        self._docs_only = docs_only
         self.socket_server = None
         self.watch_series_task = None
         self.check_siridb_connection_task = None
@@ -179,13 +180,16 @@ class Server:
             swagger_path="/api/docs",
         )
 
-        # Configure CORS on all routes.
-        for route in list(self.app.router.routes()):
-            cors.add(route)
+        if self._docs_only:
+            web.run_app(self.app)
+        else:
+            # Configure CORS on all routes.
+            for route in list(self.app.router.routes()):
+                cors.add(route)
 
-        sio = socketio.AsyncServer(async_mode='aiohttp')
-        sio.attach(self.app)
+            sio = socketio.AsyncServer(async_mode='aiohttp')
+            sio.attach(self.app)
 
-        self.loop.run_until_complete(self.start_up(sio))
-        self.app.on_cleanup.append(self._stop_server_from_aiohttp_cleanup)
-        web.run_app(self.app)
+            self.loop.run_until_complete(self.start_up(sio))
+            self.app.on_cleanup.append(self._stop_server_from_aiohttp_cleanup)
+            web.run_app(self.app)
