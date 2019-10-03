@@ -3,33 +3,13 @@
 
 # Enodo Hub
 
-## REST API
+## API's
 
-- `/series` GET Get list of series
-- `/series` POST Create new serie
-    ```json
-    {
-        "name": 'seriename',
-        "model": '1',
-        "model_parameters": []
-        ...
-    }
-    ```
-- `/series/<name>` GET Get details of a specific serie
-- `/series/<name>` DELETE Remove specific serie
-- `/settings` GET Get current settings
-- `/settings` POST Overwrite settings
-    ```json
-    {
-      "settingName": "value"
-    }
-    ```
-- `/siridb/status` GET Get siriDB connection status
-- `/enodo/status` GET Get Enodo status
-- `/enodo/log` GET Get event log of Enodo
-- `/enodo/clients` GET Get list of connected clients, listeners and workers 
+-   REST API
+    (View API references at http://hostname/api/docs)
+-   Socket.io API
 
-## Deployment and communication
+## Deployment and internal communication
 
 message types:
 

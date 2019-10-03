@@ -50,6 +50,7 @@ class EventLogger:
                 'serie_name': elements[3],
                 'message': elements[4]
             })
+        cls.log_lines = []  # TODO: make neat
 
     @classmethod
     def save_to_disk(cls):
