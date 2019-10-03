@@ -1,5 +1,54 @@
-import configparser
+from configparser import NoOptionError, NoSectionError, RawConfigParser, ConfigParser
 import os
+
+from lib.exceptions.enodoexception import EnodoInvalidConfigException
+
+EMPTY_CONFIG_FILE = config = {
+    'enodo': {
+        'log_path': '',
+        'client_max_timeout': '35',
+        'internal_socket_server_hostname': 'localhost',
+        'internal_socket_server_port': '9103',
+        'model_pkl_save_path': '',
+        'series_save_path': '',
+        'save_to_disk_interval': '120',
+        'enable_rest_api': 'true',
+        'enable_socket_io_api': 'false',
+    },
+    'siridb': {
+        'host': '',
+        'port': '',
+        'user': '',
+        'password': '',
+        'database': '',
+    },
+    'siridb_forecast': {
+        'host': '',
+        'port': '',
+        'user': '',
+        'password': '',
+        'database': '',
+    },
+    'analyser': {
+        'analysis_save_path': '',
+        'min_data_points': '100',
+        'watcher_interval': '2',
+        'siridb_connection_check_interval': '30',
+        'period_to_forecast': '',
+        'interval_schedules_series': '3600',
+    }
+}
+
+
+class EnodoConfigParser(RawConfigParser):
+    def get_r(self, section, option, required=True, default=None):
+        try:
+            return RawConfigParser.get(self, section, option)
+        except (NoOptionError, NoSectionError) as e:
+            if required:
+                raise EnodoInvalidConfigException(f'Invalid config, missing option "{option}" in section "{section}"')
+            else:
+                return default
 
 
 class Config:
@@ -35,48 +84,68 @@ class Config:
     model_pkl_save_path = None
     series_save_path = None
     save_to_disk_interval = None
+    enable_rest_api = None
+    enable_socket_io_api = None
 
     @classmethod
-    async def read_config(cls, path):
+    def create_standard_config_file(cls, path):
+        _config = ConfigParser()
+
+        for section in config:
+            _config.add_section(section)
+            for option in config[section]:
+                _config.set(section, option, config[section][option])
+
+        with open(path, "w") as fh:
+            _config.write(fh)
+
+    @classmethod
+    def read_config(cls, path):
         """
         Read config from conf file and json database
         :return:
         """
 
         cls._path = path
-        cls._config = configparser.ConfigParser()
+        cls._config = EnodoConfigParser()
         cls._config.read(path)
 
-        cls.analysis_save_path = cls._config['analyser']['analysis_save_path']
-        cls.min_data_points = await cls.to_int(cls._config['analyser']['min_data_points'])
-        cls.watcher_interval = await cls.to_int(cls._config['analyser']['watcher_interval'])
-        cls.siridb_connection_check_interval = await cls.to_int(
-            cls._config['analyser']['siridb_connection_check_interval'])
-        cls.period_to_forecast = await cls.to_int(cls._config['analyser']['period_to_forecast'])
-        cls.interval_schedules_series = await cls.to_int(cls._config['analyser']['interval_schedules_series'])
+        cls.analysis_save_path = cls._config.get_r('analyser', 'analysis_save_path')
+        cls.min_data_points = cls.to_int(cls._config.get_r('analyser', 'min_data_points'))
+        cls.watcher_interval = cls.to_int(cls._config.get_r('analyser', 'watcher_interval'))
+        cls.siridb_connection_check_interval = cls.to_int(
+            cls._config.get_r('analyser', 'siridb_connection_check_interval'))
+        cls.period_to_forecast = cls.to_int(cls._config.get_r('analyser', 'period_to_forecast'))
+        cls.interval_schedules_series = cls.to_int(cls._config.get_r('analyser', 'interval_schedules_series'))
 
         # SiriDB
-        cls.siridb_host = cls._config['siridb']['host']
-        cls.siridb_port = await cls.to_int(cls._config['siridb']['port'])
-        cls.siridb_user = cls._config['siridb']['user']
-        cls.siridb_password = cls._config['siridb']['password']
-        cls.siridb_database = cls._config['siridb']['database']
+        cls.siridb_host = cls._config.get_r('siridb', 'host')
+        cls.siridb_port = cls.to_int(cls._config.get_r('siridb', 'port'))
+        cls.siridb_user = cls._config.get_r('siridb', 'user')
+        cls.siridb_password = cls._config.get_r('siridb', 'password')
+        cls.siridb_database = cls._config.get_r('siridb', 'database')
 
         # SiriDB Forecast
-        cls.siridb_forecast_host = cls._config['siridb_forecast']['host']
-        cls.siridb_forecast_port = await cls.to_int(cls._config['siridb_forecast']['port'])
-        cls.siridb_forecast_user = cls._config['siridb_forecast']['user']
-        cls.siridb_forecast_password = cls._config['siridb_forecast']['password']
-        cls.siridb_forecast_database = cls._config['siridb_forecast']['database']
+        cls.siridb_forecast_host = cls._config.get_r('siridb_forecast', 'host')
+        cls.siridb_forecast_port = cls.to_int(cls._config.get_r('siridb_forecast', 'port'))
+        cls.siridb_forecast_user = cls._config.get_r('siridb_forecast', 'user')
+        cls.siridb_forecast_password = cls._config.get_r('siridb_forecast', 'password')
+        cls.siridb_forecast_database = cls._config.get_r('siridb_forecast', 'database')
 
         # Enodo
-        cls.log_path = cls._config['enodo']['log_path']
-        cls.client_max_timeout = await cls.to_int(cls._config['enodo']['client_max_timeout'])
-        cls.socket_server_host = cls._config['enodo']['socket_server_hostname']
-        cls.socket_server_port = await cls.to_int(cls._config['enodo']['socker_server_port'])
-        cls.model_pkl_save_path = cls._config['enodo']['model_pkl_save_path']
-        cls.series_save_path = cls._config['enodo']['series_save_path']
-        cls.save_to_disk_interval = await cls.to_int(cls._config['enodo']['save_to_disk_interval'])
+        cls.log_path = cls._config.get_r('enodo', 'log_path')
+        cls.client_max_timeout = cls.to_int(cls._config.get_r('enodo', 'client_max_timeout'))
+        if cls.client_max_timeout < 35:  # min value enforcement
+            cls.client_max_timeout = 35
+        cls.socket_server_host = cls._config.get_r('enodo', 'internal_socket_server_hostname')
+        cls.socket_server_port = cls.to_int(cls._config.get_r('enodo', 'internal_socket_server_port'))
+        cls.model_pkl_save_path = cls._config.get_r('enodo', 'model_pkl_save_path')
+        cls.series_save_path = cls._config.get_r('enodo', 'series_save_path')
+        cls.save_to_disk_interval = cls.to_int(cls._config.get_r('enodo', 'save_to_disk_interval'))
+        cls.enable_rest_api = cls.to_bool(
+            cls._config.get_r('enodo', 'enable_rest_api', required=False, default='true'), True)
+        cls.enable_socket_io_api = cls.to_bool(
+            cls._config.get_r('enodo', 'enable_socket_io_api', required=False, default='false'), False)
 
         if not os.path.exists(Config.series_save_path):
             os.makedirs(Config.series_save_path)
@@ -86,15 +155,6 @@ class Config:
             os.makedirs(Config.analysis_save_path)
         if not os.path.exists(os.path.join(Config.analysis_save_path, 'db.json')):
             open(os.path.join(Config.analysis_save_path, 'db.json'), 'a').close()
-
-        # cls.db = TinyDB(os.path.join(Config.analysis_save_path, 'db.json'))
-
-        # cls.enabled_series_for_analysis = {}
-        #
-        # for serie in cls.db.all():
-        #     if 'name' in serie:
-        #         cls.enabled_series_for_analysis[serie.get('name')] = serie
-        # cls.names_enabled_series_for_analysis = [serie.get('name') for serie in cls.db.all()]
 
     @classmethod
     async def save_config(cls):
@@ -117,10 +177,21 @@ class Config:
             cls._config.write(fh)
 
     @staticmethod
-    async def to_int(val):
+    def to_int(val):
         return_val = None
         try:
             return_val = int(val)
         except Exception:
             pass
         return return_val
+
+    @staticmethod
+    def to_bool(v, default):
+        if isinstance(v, bool):
+            return v
+        if v.lower() in ('yes', 'true', 't', 'y', '1'):
+            return True
+        elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+            return False
+        else:
+            return default

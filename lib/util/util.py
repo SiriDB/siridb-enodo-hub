@@ -1,6 +1,8 @@
 import datetime
 import json
 
+from lib.logging.eventlogger import EventLogger
+
 
 def _json_datetime_serializer(o):
     if isinstance(o, datetime.datetime):
@@ -9,3 +11,8 @@ def _json_datetime_serializer(o):
 
 def safe_json_dumps(data):
     return json.dumps(data, default=_json_datetime_serializer)
+
+
+def print_custom_aiohttp_startup_message(line):
+    if line.startswith("======== Running on"):
+        EventLogger.log('REST API is up', "info")

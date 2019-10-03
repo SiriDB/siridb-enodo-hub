@@ -4,31 +4,24 @@ from aiohttp import web
 from aiohttp_apispec import (
     docs,
     request_schema,
-    setup_aiohttp_apispec,
     response_schema)
 
-# from lib.analyser.model.arimamodel import ARIMAModel
-from lib.analyser.analyserwrapper import MODEL_NAMES, MODEL_PARAMETERS
 from lib.config.config import Config
 from lib.logging.eventlogger import EventLogger
-from lib.serie.seriemanager import SerieManager
 from lib.siridb.siridb import SiriDB
 from lib.socket.clientmanager import ClientManager
 from lib.util.util import safe_json_dumps
-from lib.webserver.apischemas import SchemaResponseSeries, SchemaResponseError, SchemaResponseSeriesDetails, \
+from lib.api.apischemas import SchemaResponseSeries, SchemaResponseError, SchemaResponseSeriesDetails, \
     SchemaRequestCreateSeries, SchemaSeries, SchemaResponseModels
+from lib.webserver.basehandler import BaseHandler
 
 
-class Handlers:
+class ApiHandlers:
     _socket_server = None
 
     @classmethod
     async def prepare(cls, socket_server):
         cls._socket_server = socket_server
-
-    @classmethod
-    async def resp_get_monitored_series(cls, regex_filter):
-        return {'data': list(await SerieManager.get_series_to_dict())}
 
     @classmethod
     @docs(
@@ -53,31 +46,8 @@ class Handlers:
         regex_filter = request.rel_url.query['filter'] if 'filter' in request.rel_url.query else None
         # TODO implement filter
 
-        return web.json_response(data=await cls.resp_get_monitored_series(regex_filter),
+        return web.json_response(data=await BaseHandler.resp_get_monitored_series(regex_filter),
                                  dumps=safe_json_dumps)
-
-    @classmethod
-    async def resp_get_monitored_serie_details(cls, serie_name, include_points=False):
-        serie = await SerieManager.get_serie(serie_name)
-
-        if serie is None:
-            return web.json_response(data={'data': ''}, status=404)
-
-        serie_data = await serie.to_dict()
-        if include_points:
-            _siridb_client = SiriDB(username=Config.siridb_user,
-                                    password=Config.siridb_password,
-                                    dbname=Config.siridb_database,
-                                    hostlist=[(Config.siridb_host, Config.siridb_port)])
-            serie_points = await _siridb_client.query_serie_data(await serie.get_name(), "mean(1h)")
-            serie_data['points'] = serie_points.get(await serie.get_name())
-        if await serie.is_forecasted():
-            serie_data['analysed'] = True
-            serie_data['forecast_points'] = await SerieManager.get_serie_forecast(await serie.get_name())
-        else:
-            serie_data['forecast_points'] = []
-
-        return {'data': serie_data}
 
     @classmethod
     @docs(
@@ -103,28 +73,8 @@ class Handlers:
             'include_points'] == 'true' else False
 
         return web.json_response(
-            data=await cls.resp_get_monitored_serie_details(request.match_info['serie_name'], include_points),
+            data=await BaseHandler.resp_get_monitored_serie_details(request.match_info['serie_name'], include_points),
             dumps=safe_json_dumps)
-
-    @classmethod
-    async def resp_add_serie(cls, data):
-        required_fields = ['name', 'model']
-        model = data.get('model')
-        model_parameters = data.get('model_parameters')
-
-        if model not in MODEL_NAMES.keys():
-            return web.json_response(data={'error': 'Unknown model'}, status=400)
-
-        if model_parameters is None and len(MODEL_PARAMETERS.get(model, [])) > 0:
-            return web.json_response(data={'error': 'Missing required fields'}, status=400)
-        for key in MODEL_PARAMETERS.get(model, {}):
-            if key not in model_parameters.keys():
-                return web.json_response(data={'error': 'Missing required fields'}, status=400)
-
-        if all(required_field in data for required_field in required_fields):
-            await SerieManager.add_serie(data)
-
-        return {'data': list(await SerieManager.get_series_to_dict())}
 
     @classmethod
     @docs(
@@ -144,13 +94,7 @@ class Handlers:
         """
         data = await request.json()
 
-        return web.json_response(data=await cls.resp_add_serie(data), status=201)
-
-    @classmethod
-    async def resp_remove_serie(cls, serie_name):
-        if await SerieManager.remove_serie(serie_name):
-            return 200
-        return 404
+        return web.json_response(data=await BaseHandler.resp_add_serie(data), status=201)
 
     @classmethod
     @docs(
@@ -167,15 +111,7 @@ class Handlers:
         :return:
         """
         serie_name = request.match_info['serie_name']
-        return web.json_response(data={}, status=await cls.resp_remove_serie(serie_name))
-
-    @classmethod
-    async def resp_get_possible_analyser_models(cls):
-        data = {
-            'models': MODEL_NAMES,
-            'parameters': MODEL_PARAMETERS
-        }
-        return {'data': data}
+        return web.json_response(data={}, status=await BaseHandler.resp_remove_serie(serie_name))
 
     @classmethod
     @docs(
@@ -193,7 +129,7 @@ class Handlers:
         :return:
         """
 
-        return web.json_response(data=await cls.resp_get_possible_analyser_models(), status=200)
+        return web.json_response(data=await BaseHandler.resp_get_possible_analyser_models(), status=200)
 
     @classmethod
     async def get_siridb_status(cls, request):

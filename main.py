@@ -1,21 +1,13 @@
 import argparse
 import asyncio
+import os
 
 from aiohttp import web
 from aiohttp.web_middlewares import middleware
 
+from lib.config.config import Config
+from lib.logging.eventlogger import EventLogger
 from server import Server
-
-
-def str2bool(v, default):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        return default
 
 
 @middleware
@@ -28,10 +20,17 @@ async def middleware(request, handler):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process config')
-    parser.add_argument('--config', help='Config path', required=True)
-    parser.add_argument('--docs_only', help='Host docs only', required=False, default=False)
+    parser.add_argument('--create_config', help='Create standard config file', action='store_true', default=False)
+    if parser.parse_args().create_config:
+        Config.create_standard_config_file(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default.conf'))
+        exit()
 
-    docs_only = str2bool(parser.parse_args().docs_only, False)
+    parser.add_argument('--config', help='Config path', required=True)
+    parser.add_argument('--log_level', help='Log level, error/warning/info/verbose, default: info', required=False,
+                        default='info')
+    parser.add_argument('--docs_only', help='Host docs only', action='store_true', default=False)
+
+    docs_only = parser.parse_args().docs_only
 
     loop = asyncio.get_event_loop()
     # loop = asyncio.new_event_loop()
@@ -40,5 +39,5 @@ if __name__ == '__main__':
     else:
         app = web.Application()
 
-    server = Server(loop, app, parser.parse_args().config, docs_only)
+    server = Server(loop, app, parser.parse_args().config, parser.parse_args().log_level, docs_only)
     server.start_server()
