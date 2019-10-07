@@ -5,6 +5,7 @@ from aiohttp_apispec import (
     docs,
     request_schema,
     response_schema)
+from aiohttp_basicauth import BasicAuthMiddleware
 
 from lib.config.config import Config
 from lib.logging.eventlogger import EventLogger
@@ -13,15 +14,18 @@ from lib.socket.clientmanager import ClientManager
 from lib.util.util import safe_json_dumps
 from lib.api.apischemas import SchemaResponseSeries, SchemaResponseError, SchemaResponseSeriesDetails, \
     SchemaRequestCreateSeries, SchemaSeries, SchemaResponseModels
+from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
+
+auth = BasicAuthMiddleware(username=None, password=None, force=False)
 
 
 class ApiHandlers:
-    _socket_server = None
 
     @classmethod
-    async def prepare(cls, socket_server):
-        cls._socket_server = socket_server
+    async def prepare(cls):
+        EnodoAuth.auth.username = Config.basic_auth_username
+        EnodoAuth.auth.password = Config.basic_auth_password
 
     @classmethod
     @docs(
@@ -37,6 +41,7 @@ class ApiHandlers:
     )
     @response_schema(SchemaResponseSeries(), 200)
     @response_schema(SchemaResponseError(), 400)
+    @EnodoAuth.auth.required
     async def get_monitored_series(cls, request):
         """
         Returns a list of monitored series
@@ -63,6 +68,7 @@ class ApiHandlers:
     )
     @response_schema(SchemaResponseSeriesDetails(), 200)
     @response_schema(SchemaResponseError(), 400)
+    @EnodoAuth.auth.required
     async def get_monitored_serie_details(cls, request):
         """
         Returns all details and data points of a specific serie.
@@ -86,6 +92,7 @@ class ApiHandlers:
     @request_schema(SchemaRequestCreateSeries())
     @response_schema(SchemaSeries(), 201)
     @response_schema(SchemaResponseError(), 400)
+    @EnodoAuth.auth.required
     async def add_serie(cls, request):
         """
         Add new serie to the application.
@@ -104,6 +111,7 @@ class ApiHandlers:
         parameters=[]
     )
     @response_schema(SchemaResponseError(), 400)
+    @EnodoAuth.auth.required
     async def remove_serie(cls, request):
         """
         Remove series with certain name
@@ -122,6 +130,7 @@ class ApiHandlers:
     )
     @response_schema(SchemaResponseModels(), 200)
     @response_schema(SchemaResponseError(), 400)
+    @EnodoAuth.auth.required
     async def get_possible_analyser_models(cls, request):
         """
         Returns list of possible models with corresponding parameters
@@ -132,6 +141,7 @@ class ApiHandlers:
         return web.json_response(data=await BaseHandler.resp_get_possible_analyser_models(), status=200)
 
     @classmethod
+    @EnodoAuth.auth.required
     async def get_siridb_status(cls, request):
         """
         Get siridb connection status
@@ -145,6 +155,7 @@ class ApiHandlers:
         }}, status=200)
 
     @classmethod
+    @EnodoAuth.auth.required
     async def get_siridb_enodo_status(cls, request):
         """
         Get status of this analyser instance
@@ -158,6 +169,7 @@ class ApiHandlers:
         }}, status=200)
 
     @classmethod
+    @EnodoAuth.auth.required
     async def get_event_log(cls, request):
         """
         Returns event log
@@ -168,12 +180,14 @@ class ApiHandlers:
         return web.json_response(data={'data': log}, status=200)
 
     @classmethod
+    @EnodoAuth.auth.required
     async def get_settings(cls, request):
         settings = await cls.build_settings_dict()
 
         return web.json_response(data={'data': settings}, status=200)
 
     @classmethod
+    @EnodoAuth.auth.required
     async def build_settings_dict(cls):
         settings = {}
         fields = ['min_data_points', 'analysis_save_path', 'siridb_host', 'siridb_port', 'siridb_user',
@@ -183,6 +197,7 @@ class ApiHandlers:
         return settings
 
     @classmethod
+    @EnodoAuth.auth.required
     async def set_settings(cls, request):
         """
         Override settings.
@@ -205,6 +220,7 @@ class ApiHandlers:
         return web.json_response(data={'data': settings}, status=200)
 
     @classmethod
+    @EnodoAuth.auth.required
     async def get_connected_clients(cls, request):
         """
         Return connected listeners and workers

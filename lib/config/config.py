@@ -77,6 +77,8 @@ class Config:
     siridb_forecast_database = None
 
     # Enodo
+    basic_auth_username = None
+    basic_auth_password = None
     log_path = None
     client_max_timeout = None
     socket_server_host = None
@@ -133,6 +135,8 @@ class Config:
         cls.siridb_forecast_database = cls._config.get_r('siridb_forecast', 'database')
 
         # Enodo
+        cls.basic_auth_username = cls._config.get_r('enodo', 'basic_auth_username', required=False, default=None)
+        cls.basic_auth_password = cls._config.get_r('enodo', 'basic_auth_password', required=False, default=None)
         cls.log_path = cls._config.get_r('enodo', 'log_path')
         cls.client_max_timeout = cls.to_int(cls._config.get_r('enodo', 'client_max_timeout'))
         if cls.client_max_timeout < 35:  # min value enforcement

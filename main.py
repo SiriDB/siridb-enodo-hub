@@ -2,19 +2,8 @@ import argparse
 import asyncio
 import os
 
-from aiohttp import web
-from aiohttp.web_middlewares import middleware
-
 from lib.config.config import Config
 from server import Server
-
-
-@middleware
-async def middleware(request, handler):
-    if request.path.startswith('/api') and not request.path.startswith('/api/docs'):
-        return web.json_response(status=404)
-    else:
-        return await handler(request)
 
 
 if __name__ == '__main__':
@@ -35,10 +24,5 @@ if __name__ == '__main__':
 
     loop = asyncio.get_event_loop()
 
-    if docs_only:
-        app = web.Application(middlewares=[middleware])
-    else:
-        app = web.Application()
-
-    server = Server(loop, app, parser.parse_args().config, parser.parse_args().log_level, docs_only)
+    server = Server(loop, parser.parse_args().config, parser.parse_args().log_level, docs_only)
     server.start_server()

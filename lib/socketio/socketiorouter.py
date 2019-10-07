@@ -6,6 +6,13 @@ class SocketIoRouter:
     def __init__(self, sio):
         self._sio = sio
 
+        self._sio_on_connect(
+            event='connect',
+            handler=SocketIoHandler.connect)
+        self._sio.on(
+            event='disconnect',
+            handler=SocketIoHandler.disconnect)
+
         self._sio_on(
             event='/api/series',
             handler=SocketIoHandler.get_all_series)
@@ -21,6 +28,14 @@ class SocketIoRouter:
         self._sio_on(
             event='/api/enodo/models',
             handler=SocketIoHandler.get_all_series)
+
+    def _sio_on_connect(self, event, handler):
+        async def fun(sid, environ):
+            return await handler(sid, environ, environ.get('aiohttp.request'))
+
+        self._sio.on(
+            event=event,
+            handler=fun)
 
     def _sio_on(self, event, handler):
         async def fun(sid, data):

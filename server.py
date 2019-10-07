@@ -3,9 +3,11 @@ import datetime
 import aiohttp_cors
 import socketio
 from aiohttp import web
+from aiohttp.web_middlewares import middleware
 from aiohttp_apispec import setup_aiohttp_apispec
+from aiohttp_basicauth import BasicAuthMiddleware
 
-from lib.api.apihandlers import ApiHandlers
+from lib.api.apihandlers import ApiHandlers, auth
 from lib.config.config import Config
 from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
@@ -22,10 +24,11 @@ from lib.util.util import print_custom_aiohttp_startup_message
 
 class Server:
 
-    def __init__(self, loop, app, config_path, log_level=1, docs_only=False):
+    def __init__(self, loop, config_path, log_level=1, docs_only=False):
         self.run = True
         self.loop = loop
-        self.app = app
+        self.app = None
+        self.auth = None
         self.config_path = config_path
         self._log_level = log_level
         self._docs_only = docs_only
@@ -50,7 +53,7 @@ class Server:
                                            WORKER_RESULT: receive_worker_result,
                                            WORKER_UPDATE_BUSY: receive_worker_status_update,
                                            WORKER_REFUSED: received_worker_refused})
-        await ApiHandlers.prepare(self.socket_server)
+        await ApiHandlers.prepare()
 
         if sio is not None:
             SocketIoRouter(sio)
@@ -146,11 +149,25 @@ class Server:
     async def _stop_server_from_aiohttp_cleanup(self, *args, **kwargs):
         await self.stop_server()
 
+    @middleware
+    async def _docs_only_middleware(self, request, handler):
+        if request.path.startswith('/api') and not request.path.startswith('/api/docs'):
+            return web.json_response(status=404)
+        else:
+            return await handler(request)
+
     def start_server(self):
         Config.read_config(self.config_path)
         EventLogger.prepare(Config.log_path, self._log_level)
         EventLogger.log('Starting...', "info")
         EventLogger.log('Loaded Config...', "info")
+
+        if self._docs_only:
+            EventLogger.log('Running in docs_only mode...', "info")
+            self.app = web.Application(middlewares=[self._docs_only_middleware])
+        else:
+            EventLogger.log('Running in secure mode...', "info")
+            self.app = web.Application(middlewares=[auth])
 
         if Config.enable_rest_api:
             EventLogger.log('REST API enabled', "info")

@@ -6,3 +6,4 @@ aiohttp_cors
 qpack==0.0.17
 aiohttp-apispec==1.5.0
 python-socketio
+aiohttp_basicauth
