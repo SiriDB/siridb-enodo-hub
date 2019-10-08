@@ -5,7 +5,6 @@ import socketio
 from aiohttp import web
 from aiohttp.web_middlewares import middleware
 from aiohttp_apispec import setup_aiohttp_apispec
-from aiohttp_basicauth import BasicAuthMiddleware
 
 from lib.api.apihandlers import ApiHandlers, auth
 from lib.config.config import Config
@@ -17,6 +16,7 @@ from lib.socket.handler import update_serie_count, receive_worker_status_update,
     receive_worker_result, received_worker_refused
 from lib.socket.package import LISTENER_ADD_SERIE_COUNT, WORKER_UPDATE_BUSY, WORKER_RESULT, WORKER_REFUSED
 from lib.socket.socketserver import SocketServer
+from lib.socketio.socketiohandlers import SocketIoHandler
 
 from lib.socketio.socketiorouter import SocketIoRouter
 from lib.util.util import print_custom_aiohttp_startup_message
@@ -24,10 +24,11 @@ from lib.util.util import print_custom_aiohttp_startup_message
 
 class Server:
 
-    def __init__(self, loop, config_path, log_level=1, docs_only=False):
+    def __init__(self, loop, config_path, log_level='info', docs_only=False):
         self.run = True
         self.loop = loop
         self.app = None
+        self.sio = None
         self.auth = None
         self.config_path = config_path
         self._log_level = log_level
@@ -39,7 +40,7 @@ class Server:
         self.save_to_disk_task = None
         self._send_for_analyse = []
 
-    async def start_up(self, sio):
+    async def start_up(self):
         _siridb = SiriDB(username=Config.siridb_user,
                          password=Config.siridb_password,
                          dbname=Config.siridb_database,
@@ -48,17 +49,22 @@ class Server:
         SiriDB.siridb_status = status
         SiriDB.siridb_connected = connected
 
+        EventLogger.log('Setting up internal communications token...', "info")
+        Config.setup_internal_security_token()
+
         self.socket_server = SocketServer(Config.socket_server_host, Config.socket_server_port,
+                                          Config.internal_security_token,
                                           {LISTENER_ADD_SERIE_COUNT: update_serie_count,
                                            WORKER_RESULT: receive_worker_result,
                                            WORKER_UPDATE_BUSY: receive_worker_status_update,
                                            WORKER_REFUSED: received_worker_refused})
         await ApiHandlers.prepare()
 
-        if sio is not None:
-            SocketIoRouter(sio)
+        if self.sio is not None:
+            await SocketIoHandler.prepare(self.sio)
+            SocketIoRouter(self.sio)
 
-        await SerieManager.prepare()
+        await SerieManager.prepare(SocketIoHandler.internal_updates_series_subscribers)
         await SerieManager.read_from_disk()
         await ClientManager.setup(SerieManager)
         self.watch_series_task = self.loop.create_task(self.watch_series())
@@ -123,6 +129,30 @@ class Server:
             await self.save_to_disk()
 
     async def stop_server(self):
+
+        if self.sio is not None:
+            clients = []
+            if '/' in self.sio.manager.rooms and None in self.sio.manager.rooms['/']:
+                clients = [client for client in self.sio.manager.rooms['/'][None]]
+
+            # await self.sio.emit(event='disconnect', room=None)
+
+            for sid in clients:
+                if sid is not None:
+                    if sid in self.sio.eio.sockets:
+                        try:
+                            socket = self.sio.eio.sockets[sid]
+                        except KeyError:  # pragma: no cover
+                            # the socket was already closed or gone
+                            pass
+                        else:
+                            await socket.close()
+                            del self.sio.eio.sockets[sid]
+
+            await asyncio.sleep(1)
+            del self.sio
+            self.sio = None
+
         EventLogger.log('Stopping analyser server...', "info")
         EventLogger.log('...Saving log to disk', "info")
         await self.save_to_disk()
@@ -130,12 +160,10 @@ class Server:
         self.run = False
         EventLogger.log('...Doing clean up', "info")
         await self.clean_up()
-        # asyncio.gather(*asyncio.Task.all_tasks()).cancel()
 
         EventLogger.log('...Stopping all running tasks', "info")
-
-        await asyncio.sleep(2)
-
+        await asyncio.sleep(1)
+        # asyncio.gather(*asyncio.Task.all_tasks()).cancel()
         for task in asyncio.Task.all_tasks():
             try:
                 task.cancel()
@@ -204,18 +232,27 @@ class Server:
                 version="v1",
                 url="/api/docs/swagger.json",
                 swagger_path="/api/docs",
+                securityDefinitions={
+                    "user": {"type": "basic", "name": "Authorization", "in": "header"}
+                }
             )
 
             # Configure CORS on all routes.
             for route in list(self.app.router.routes()):
                 cors.add(route)
 
-        sio = None
+        self.sio = None
         if Config.enable_socket_io_api:
             EventLogger.log('Socket.io API enabled', "info")
-            sio = socketio.AsyncServer(async_mode='aiohttp')
-            sio.attach(self.app)
+            self.sio = socketio.AsyncServer(async_mode='aiohttp',
+                                            ping_timeout=60,
+                                            ping_interval=25,
+                                            cookie=None)
+            self.sio.attach(self.app)
 
-        self.loop.run_until_complete(self.start_up(sio))
-        self.app.on_cleanup.append(self._stop_server_from_aiohttp_cleanup)
-        web.run_app(self.app, print=print_custom_aiohttp_startup_message)
+        self.app.on_shutdown.append(self._stop_server_from_aiohttp_cleanup)
+        self.loop.run_until_complete(self.start_up())
+        try:
+            web.run_app(self.app, print=print_custom_aiohttp_startup_message)
+        except asyncio.CancelledError:
+            pass

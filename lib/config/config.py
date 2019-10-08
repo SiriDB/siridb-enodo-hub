@@ -1,7 +1,8 @@
 from configparser import NoOptionError, NoSectionError, RawConfigParser, ConfigParser
 import os
+from secrets import token_urlsafe
 
-from lib.exceptions.enodoexception import EnodoInvalidConfigException
+from lib.exceptions.enodoexception import EnodoInvalidConfigException, EnodoException
 
 EMPTY_CONFIG_FILE = config = {
     'enodo': {
@@ -77,6 +78,7 @@ class Config:
     siridb_forecast_database = None
 
     # Enodo
+    base_dir = None
     basic_auth_username = None
     basic_auth_password = None
     log_path = None
@@ -88,6 +90,7 @@ class Config:
     save_to_disk_interval = None
     enable_rest_api = None
     enable_socket_io_api = None
+    internal_security_token = None
 
     @classmethod
     def create_standard_config_file(cls, path):
@@ -100,6 +103,28 @@ class Config:
 
         with open(path, "w") as fh:
             _config.write(fh)
+
+    @classmethod
+    def setup_internal_security_token(cls):
+        """
+        Method checks if a token is already setup, if not, it will generate one.
+        (used for handshakes in internal communication)
+
+        This method can only be called after the configfile is parsed
+        :return:
+        """
+
+        if cls._config is None:
+            raise EnodoException('Can only setup token when config is parsed')
+
+        if os.path.exists(os.path.join(cls.base_dir, 'internal_token.cred')):
+            f = open(os.path.join(cls.base_dir, 'internal_token.cred'), "r")
+            cls.internal_security_token = f.read()
+        else:
+            f = open(os.path.join(cls.base_dir, 'internal_token.cred'), "w+")
+            cls.internal_security_token = token_urlsafe(16)
+            f.write(cls.internal_security_token)
+        f.close()
 
     @classmethod
     def read_config(cls, path):
@@ -150,6 +175,7 @@ class Config:
             cls._config.get_r('enodo', 'enable_rest_api', required=False, default='true'), True)
         cls.enable_socket_io_api = cls.to_bool(
             cls._config.get_r('enodo', 'enable_socket_io_api', required=False, default='false'), False)
+        cls.base_dir = cls._config.get_r('enodo', 'enodo_base_save_path')
 
         if not os.path.exists(Config.series_save_path):
             os.makedirs(Config.series_save_path)

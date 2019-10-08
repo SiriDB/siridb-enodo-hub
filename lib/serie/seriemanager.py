@@ -14,10 +14,12 @@ class SerieManager:
     _series = None
     _siridb_data_client = None
     _siridb_forecast_client = None
+    _update_cb = None
 
     @classmethod
-    async def prepare(cls):
+    async def prepare(cls, update_cb=None):
         cls._series = {}
+        cls._update_cb = update_cb
         cls._siridb_data_client = SiriDB(username=Config.siridb_user,
                                          password=Config.siridb_password,
                                          dbname=Config.siridb_database,
@@ -28,6 +30,11 @@ class SerieManager:
                                              hostlist=[(Config.siridb_forecast_host, Config.siridb_forecast_port)])
 
     @classmethod
+    async def _series_changed(cls):
+        if cls._update_cb is not None:
+            await cls._update_cb()
+
+    @classmethod
     async def add_serie(cls, serie):
         if serie.get('name') not in cls._series:
             collected_datapoints = await cls._siridb_data_client.query_serie_datapoint_count(serie.get('name'))
@@ -35,7 +42,7 @@ class SerieManager:
                 serie['datapoint_count'] = collected_datapoints
                 cls._series[serie.get('name')] = await Series.from_dict(serie)
                 print(f"Added new serie: {serie.get('name')}")
-
+                await cls._series_changed()
                 await cls.update_listeners(await cls.get_series())
 
     @classmethod
@@ -58,6 +65,7 @@ class SerieManager:
     async def remove_serie(cls, serie_name):
         if serie_name in cls._series:
             del cls._series[serie_name]
+            await cls._series_changed()
             return True
         return False
 

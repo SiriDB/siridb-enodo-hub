@@ -29,6 +29,13 @@ class SocketIoRouter:
             event='/api/enodo/models',
             handler=SocketIoHandler.get_all_series)
 
+        self._setup_listen_events()
+
+    def _setup_listen_events(self):
+        self._sio_on(
+            event='/subscribe/series',
+            handler=SocketIoHandler.subscribe_series)
+
     def _sio_on_connect(self, event, handler):
         async def fun(sid, environ):
             return await handler(sid, environ, environ.get('aiohttp.request'))
