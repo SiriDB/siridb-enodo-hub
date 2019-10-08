@@ -24,9 +24,10 @@ from lib.util.util import print_custom_aiohttp_startup_message
 
 class Server:
 
-    def __init__(self, loop, config_path, log_level='info', docs_only=False):
+    def __init__(self, loop, port, config_path, log_level='info', docs_only=False):
         self.run = True
         self.loop = loop
+        self.port = port
         self.app = None
         self.sio = None
         self.auth = None
@@ -253,6 +254,6 @@ class Server:
         self.app.on_shutdown.append(self._stop_server_from_aiohttp_cleanup)
         self.loop.run_until_complete(self.start_up())
         try:
-            web.run_app(self.app, print=print_custom_aiohttp_startup_message)
+            web.run_app(self.app, print=print_custom_aiohttp_startup_message, port=self.port)
         except asyncio.CancelledError:
             pass

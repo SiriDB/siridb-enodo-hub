@@ -11,6 +11,8 @@ if __name__ == '__main__':
     parser.add_argument('--config', help='Config path', required=False)
     parser.add_argument('--log_level', help='Log level, error/warning/info/verbose, default: info', required=False,
                         default='info')
+    parser.add_argument('--port', help='Port to serve on, default: 80', required=False,
+                        default=80)
     parser.add_argument('--docs_only', help='Host docs only', action='store_true', default=False)
     parser.add_argument('--create_config', help='Create standard config file', action='store_true', default=False)
 
@@ -24,5 +26,5 @@ if __name__ == '__main__':
 
     loop = asyncio.get_event_loop()
 
-    server = Server(loop, parser.parse_args().config, parser.parse_args().log_level, docs_only)
+    server = Server(loop, parser.parse_args().port, parser.parse_args().config, parser.parse_args().log_level, docs_only)
     server.start_server()
