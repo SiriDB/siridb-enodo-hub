@@ -55,6 +55,7 @@ class SocketServer:
                 if client_token is None or client_token != self._token:
                     response = create_header(0, HANDSHAKE_FAIL, packet_id)
                     writer.write(response)
+                    connected = False
                 else:
                     if 'client_type' in client_data:
                         client = Client(client_id, writer.get_extra_info('peername'), writer,
