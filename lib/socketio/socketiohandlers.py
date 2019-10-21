@@ -2,6 +2,7 @@ import functools
 
 from aiohttp.web_response import Response
 
+from lib.socketio.subscriptionmanager import SubscriptionManager
 from lib.util.util import safe_json_dumps
 from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
@@ -54,6 +55,22 @@ class SocketIoHandler:
             cls._sio.leave_room(sid, 'series_updates')
 
     @classmethod
+    async def subscribe_filtered_series(cls, sid, data, event):
+        regex = data.get('regex')
+        if cls._sio is not None and regex is not None:
+            await SubscriptionManager.add_subscriber(sid, regex)
+            await cls._sio.emit('series_updates', await cls.get_all_series(None, regex, None), room=sid)
+
+    @classmethod
+    async def unsubscribe_filtered_series(cls, sid, data, event):
+        if cls._sio is not None:
+            cls._sio.leave_room(sid, 'series_updates')
+
+    @classmethod
     async def internal_updates_series_subscribers(cls):
         if cls._sio is not None:
             await cls._sio.emit('series_updates', await cls.get_all_series(None, None, None), room='series_updates')
+
+        filtered_subs = await SubscriptionManager.get_all_filtered_subscriptions()
+        for sub in filtered_subs:
+            await cls._sio.emit('series_updates', await cls.get_all_series(None, sub.regex, None), room=sub)

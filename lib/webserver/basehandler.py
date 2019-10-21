@@ -1,9 +1,11 @@
+import urllib.parse
 from aiohttp import web
 from lib.analyser.analyserwrapper import MODEL_NAMES, MODEL_PARAMETERS
 from lib.config.config import Config
 from lib.serie.seriemanager import SerieManager
 from lib.serie.series import DETECT_ANOMALIES_STATUS_DONE
 from lib.siridb.siridb import SiriDB
+from lib.util.util import regex_valid
 
 
 class BaseHandler:
@@ -13,8 +15,12 @@ class BaseHandler:
         pass
 
     @classmethod
-    async def resp_get_monitored_series(cls, regex_filter):
-        return {'data': list(await SerieManager.get_series_to_dict())}
+    async def resp_get_monitored_series(cls, regex_filter=None):
+        if regex_filter is not None:
+            regex_filter = urllib.parse.unquote(regex_filter)
+            if not regex_valid(regex_filter):
+                return {'data': []}
+        return {'data': list(await SerieManager.get_series_to_dict(regex_filter))}
 
     @classmethod
     async def resp_get_monitored_serie_details(cls, serie_name, include_points=False):

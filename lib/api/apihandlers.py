@@ -35,7 +35,7 @@ class ApiHandlers:
         parameters=[{
             'in': 'query',
             'name': 'filter',
-            'description': 'regex string for filtering on series names',
+            'description': 'regex string for filtering on series names. Should be URL encoded!',
             'schema': {'type': 'string', 'format': 'regex'}
         }]
     )

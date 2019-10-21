@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import re
 
 from lib.config.config import Config
 from lib.serie.series import Series, DETECT_ANOMALIES_STATUS_DONE
@@ -58,7 +59,10 @@ class SerieManager:
         return list(cls._series.keys())
 
     @classmethod
-    async def get_series_to_dict(cls):
+    async def get_series_to_dict(cls, regex_filter=None):
+        if regex_filter is not None:
+            pattern = re.compile(regex_filter)
+            return [await serie.to_dict() for serie in cls._series.values() if pattern.match(await serie.get_name())]
         return [await serie.to_dict() for serie in cls._series.values()]
 
     @classmethod
