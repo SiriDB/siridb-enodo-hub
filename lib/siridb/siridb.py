@@ -76,6 +76,9 @@ class SiriDB:
         try:
             await self.siri.query(f'show dbname')
         except (QueryError, InsertError, ServerError, PoolError, AuthenticationError, UserAuthError) as e:
-            return repr(e), False
+            resp = repr(e), False
         else:
-            return "", True
+            resp = "", True
+
+        self.siri.close()
+        return resp
