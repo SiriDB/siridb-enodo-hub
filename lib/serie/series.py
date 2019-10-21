@@ -17,8 +17,8 @@ class Series:
     _datapoint_count = None
     _datapoint_count_lock = False
     new_forecast_at = None
-    _detecting_anomalies_status = None
-    _pending_forecast = DETECT_ANOMALIES_STATUS_REQUESTED
+    _detecting_anomalies_status = DETECT_ANOMALIES_STATUS_REQUESTED
+    _pending_forecast = None
     _model = None
     _model_parameters = None
     _ignore = None
