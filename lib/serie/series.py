@@ -4,19 +4,29 @@ import os
 from lib.analyser.analyserwrapper import MODEL_NAMES, MODEL_PARAMETERS
 from lib.config.config import Config
 
+DETECT_ANOMALIES_STATUS_REQUESTED = 1
+DETECT_ANOMALIES_STATUS_PENDING = 2
+DETECT_ANOMALIES_STATUS_DONE = 4
+DETECT_ANOMALIES_STATUS_NONE = None
+DETECT_ANOMALIES_STATUSES = [DETECT_ANOMALIES_STATUS_REQUESTED, DETECT_ANOMALIES_STATUS_PENDING,
+                             DETECT_ANOMALIES_STATUS_DONE, DETECT_ANOMALIES_STATUS_NONE]
+
 
 class Series:
     _name = None
     _datapoint_count = None
     _datapoint_count_lock = False
     new_forecast_at = None
-    _pending_forecast = None
+    _detecting_anomalies_status = None
+    _pending_forecast = DETECT_ANOMALIES_STATUS_REQUESTED
     _model = None
     _model_parameters = None
     _ignore = None
     _error = None
+    _anomalies = None
 
-    def __init__(self, name, datapoint_count, model, scheduled_forecast=None, model_parameters=None, ignore=False, error=None):
+    def __init__(self, name, datapoint_count, model, scheduled_forecast=None, model_parameters=None, ignore=False,
+                 error=None):
         self._name = name
         self._datapoint_count = datapoint_count
 
@@ -92,6 +102,20 @@ class Series:
         f = open(os.path.join(Config.model_pkl_save_path, self._name + ".pkl"), "wb")
         f.write(pkl)
         f.close()
+
+    async def get_detect_anomalies_status(self):
+        return self._detecting_anomalies_status
+
+    async def set_detect_anomalies_status(self, status):
+        if status not in DETECT_ANOMALIES_STATUSES:
+            raise Exception("unknow status")
+        self._detecting_anomalies_status = status
+
+    async def get_anomalies(self):
+        return self._anomalies
+
+    async def set_anomalies(self, anomalies):
+        self._anomalies = anomalies
 
     async def get_datapoints_count(self):
         return self._datapoint_count

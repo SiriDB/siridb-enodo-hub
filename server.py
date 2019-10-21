@@ -8,11 +8,15 @@ from aiohttp_apispec import setup_aiohttp_apispec
 
 from lib.api.apihandlers import ApiHandlers, auth
 from lib.config.config import Config
+from lib.jobmanager.enodojobmanager import EnodoJobManager, EnodoJob, JOB_TYPE_FORECAST_SERIE, \
+    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE
 from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
+from lib.serie.series import DETECT_ANOMALIES_STATUS_REQUESTED
+from lib.serverstate import ServerState
 from lib.siridb.siridb import SiriDB
 from lib.socket.clientmanager import ClientManager
-from lib.socket.handler import update_serie_count, receive_worker_status_update, send_forecast_request, \
+from lib.socket.handler import update_serie_count, receive_worker_status_update, \
     receive_worker_result, received_worker_refused
 from lib.socket.package import LISTENER_ADD_SERIE_COUNT, WORKER_UPDATE_BUSY, WORKER_RESULT, WORKER_REFUSED
 from lib.socket.socketserver import SocketServer
@@ -25,7 +29,6 @@ from lib.util.util import print_custom_aiohttp_startup_message
 class Server:
 
     def __init__(self, loop, port, config_path, log_level='info', docs_only=False):
-        self.run = True
         self.loop = loop
         self.port = port
         self.app = None
@@ -39,9 +42,10 @@ class Server:
         self.check_siridb_connection_task = None
         self.socket_server_task = None
         self.save_to_disk_task = None
-        self._send_for_analyse = []
+        # self._send_for_analyse = []
 
     async def start_up(self):
+        await ServerState.async_setup()
         _siridb = SiriDB(username=Config.siridb_user,
                          password=Config.siridb_password,
                          dbname=Config.siridb_database,
@@ -84,7 +88,7 @@ class Server:
         await self.save_to_disk_task
 
     async def check_siridb_connection(self):
-        while self.run:
+        while ServerState.running:
             _siridb = SiriDB(username=Config.siridb_user,
                              password=Config.siridb_password,
                              dbname=Config.siridb_database,
@@ -96,26 +100,21 @@ class Server:
             await asyncio.sleep(Config.siridb_connection_check_interval)
 
     async def watch_series(self):
-        while self.run:
+        while ServerState.running:
             await ClientManager.check_clients_alive(Config.client_max_timeout)
 
             for serie_name in await SerieManager.get_series():
                 serie = await SerieManager.get_serie(serie_name)
                 if serie is not None \
-                        and not await serie.ignored() \
-                        and not await serie.pending_forecast() \
-                        and (not await serie.is_forecasted() or (
-                        serie.new_forecast_at is not None and serie.new_forecast_at < datetime.datetime.now())):
-                    # Should be forecasted if not forecasted yet or new forecast should be made
+                        and not await serie.ignored():
 
-                    if await serie.get_datapoints_count() >= Config.min_data_points:
-                        worker = await ClientManager.get_free_worker()
-                        if worker is not None:
-                            EventLogger.log(f"Adding serie: sending {serie_name} to Worker", "info",
-                                            "serie_add_queue")
-                            await serie.set_pending_forecast(True)
-                            await send_forecast_request(worker, serie)
-                            worker.is_going_busy = True
+                    if not await serie.pending_forecast() and (not await serie.is_forecasted() or (
+                            serie.new_forecast_at is not None and serie.new_forecast_at < datetime.datetime.now())):
+                        # Should be forecasted if not forecasted yet or new forecast should be made
+                        if await serie.get_datapoints_count() >= Config.min_data_points:
+                            await EnodoJobManager.add_job(EnodoJob(JOB_TYPE_FORECAST_SERIE, serie_name))
+                    elif await serie.get_detect_anomalies_status() is DETECT_ANOMALIES_STATUS_REQUESTED:
+                        await EnodoJobManager.add_job(EnodoJob(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE, serie_name))
 
             await asyncio.sleep(Config.watcher_interval)
 
@@ -124,7 +123,7 @@ class Server:
         await SerieManager.save_to_disk()
 
     async def save_to_disk_on_interval(self):
-        while self.run:
+        while ServerState.running:
             await asyncio.sleep(Config.save_to_disk_interval)
             EventLogger.log('Saving seriemanager state to disk', "verbose")
             await self.save_to_disk()
@@ -158,7 +157,7 @@ class Server:
         EventLogger.log('...Saving log to disk', "info")
         await self.save_to_disk()
         EventLogger.save_to_disk()
-        self.run = False
+        ServerState.running = False
         EventLogger.log('...Doing clean up', "info")
         await self.clean_up()
 

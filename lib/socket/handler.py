@@ -10,6 +10,10 @@ from lib.serie.seriemanager import SerieManager
 from lib.socket.clientmanager import ClientManager
 from lib.socket.package import *
 
+WORKER_JOB_FORECAST = 'forecast'
+WORKER_JOB_DETECT_ANOMALIES = 'detect_anomalies'
+WORKER_JOB_TYPES = [WORKER_JOB_FORECAST, WORKER_JOB_DETECT_ANOMALIES]
+
 
 async def update_serie_count(writer, packet_type, packet_id, data, client_id):
     for serie in data:
@@ -27,11 +31,14 @@ async def receive_worker_status_update(writer, packet_type, packet_id, data, cli
             worker.is_going_busy = False
 
 
-async def send_forecast_request(worker, serie):
+async def send_worker_job_request(worker, serie, job_type):
+    if job_type not in WORKER_JOB_TYPES:
+        raise Exception('Unknown job type')
+
     try:
         model = await serie.get_model_pkl()
         wrapper = (AnalyserWrapper(model, await serie.get_model(), await serie.get_model_parameters())).__dict__()
-        data = qpack.packb({'serie_name': await serie.get_name(), 'wrapper': wrapper})
+        data = qpack.packb({'serie_name': await serie.get_name(), 'wrapper': wrapper, 'job_type': job_type})
         header = create_header(len(data), FORECAST_SERIE, 0)
         if serie not in worker.pending_series:
             worker.pending_series.append(await serie.get_name())

@@ -8,6 +8,10 @@ from lib.siridb.siridb import SiriDB
 class BaseHandler:
 
     @classmethod
+    async def resp_trigger_detect_anomalies(cls, serie_name):
+        pass
+
+    @classmethod
     async def resp_get_monitored_series(cls, regex_filter):
         return {'data': list(await SerieManager.get_series_to_dict())}
 
