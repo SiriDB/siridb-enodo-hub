@@ -42,6 +42,7 @@ class Server:
         self.check_siridb_connection_task = None
         self.socket_server_task = None
         self.save_to_disk_task = None
+        self.check_jobs_task = None
         # self._send_for_analyse = []
 
     async def start_up(self):
@@ -75,6 +76,7 @@ class Server:
         self.watch_series_task = self.loop.create_task(self.watch_series())
         self.check_siridb_connection_task = self.loop.create_task(self.check_siridb_connection())
         self.save_to_disk_task = self.loop.create_task(self.save_to_disk())
+        self.check_jobs_task = self.loop.create_task(EnodoJobManager.check_for_jobs())
         await self.socket_server.create()
 
     async def clean_up(self):
@@ -83,6 +85,7 @@ class Server:
         :return:
         """
         self.watch_series_task.cancel()
+        self.check_jobs_task.cancel()
         self.check_siridb_connection_task.cancel()
         await self.socket_server.stop()
         await self.save_to_disk_task

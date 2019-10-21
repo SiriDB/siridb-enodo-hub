@@ -1,3 +1,6 @@
+import asyncio
+
+from lib.config.config import Config
 from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
 from lib.serie.series import DETECT_ANOMALIES_STATUS_PENDING
@@ -68,3 +71,4 @@ class EnodoJobManager:
                         await cls._remove_job(next_job)
                     else:
                         return False
+            await asyncio.sleep(Config.watcher_interval)
