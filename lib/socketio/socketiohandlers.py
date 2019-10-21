@@ -35,6 +35,7 @@ class SocketIoHandler:
 
     @classmethod
     async def disconnect(cls, sid):
+        await SubscriptionManager.remove_subscriber(sid)
         pass  # TODO verbose logging
 
     @classmethod
@@ -47,7 +48,7 @@ class SocketIoHandler:
     async def subscribe_series(cls, sid, data, event):
         if cls._sio is not None:
             cls._sio.enter_room(sid, 'series_updates')
-            await cls._sio.emit('series_updates', await cls.get_all_series(None, None, None), room=sid)
+            await cls._sio.emit('series_updates', {'data': await cls.get_all_series(None, None, None)}, room=sid)
 
     @classmethod
     async def unsubscribe_series(cls, sid, data, event):
@@ -56,10 +57,16 @@ class SocketIoHandler:
 
     @classmethod
     async def subscribe_filtered_series(cls, sid, data, event):
-        regex = data.get('regex')
+        if isinstance(data, dict):
+            regex = data.get('filter')
+        else:
+            regex = None
+
         if cls._sio is not None and regex is not None:
             await SubscriptionManager.add_subscriber(sid, regex)
-            await cls._sio.emit('series_updates', await cls.get_all_series(None, regex, None), room=sid)
+            await cls._sio.emit('series_updates', {'data': await cls.get_all_series(None, regex, None)}, room=sid)
+        else:
+            await cls._sio.emit('series_updates', {'error': 'incorrect regex'}, room=sid)
 
     @classmethod
     async def unsubscribe_filtered_series(cls, sid, data, event):
@@ -69,8 +76,11 @@ class SocketIoHandler:
     @classmethod
     async def internal_updates_series_subscribers(cls):
         if cls._sio is not None:
-            await cls._sio.emit('series_updates', await cls.get_all_series(None, None, None), room='series_updates')
+            await cls._sio.emit('series_updates', {'data': await cls.get_all_series(None, None, None)},
+                                room='series_updates')
 
         filtered_subs = await SubscriptionManager.get_all_filtered_subscriptions()
         for sub in filtered_subs:
-            await cls._sio.emit('series_updates', await cls.get_all_series(None, sub.regex, None), room=sub)
+            print(sub)
+            await cls._sio.emit('series_updates', {'data': await cls.get_all_series(None, sub.get('regex'), None)},
+                                room=sub.get('sid'))

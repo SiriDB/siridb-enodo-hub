@@ -31,7 +31,7 @@ class SerieManager:
                                              hostlist=[(Config.siridb_forecast_host, Config.siridb_forecast_port)])
 
     @classmethod
-    async def _series_changed(cls):
+    async def series_changed(cls):
         if cls._update_cb is not None:
             await cls._update_cb()
 
@@ -43,7 +43,7 @@ class SerieManager:
                 serie['datapoint_count'] = collected_datapoints
                 cls._series[serie.get('name')] = await Series.from_dict(serie)
                 print(f"Added new serie: {serie.get('name')}")
-                await cls._series_changed()
+                await cls.series_changed()
                 await cls.update_listeners(await cls.get_series())
 
     @classmethod
@@ -69,7 +69,7 @@ class SerieManager:
     async def remove_serie(cls, serie_name):
         if serie_name in cls._series:
             del cls._series[serie_name]
-            await cls._series_changed()
+            await cls.series_changed()
             return True
         return False
 

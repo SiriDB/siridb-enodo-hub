@@ -35,6 +35,9 @@ class SocketIoRouter:
         self._sio_on(
             event='/subscribe/series',
             handler=SocketIoHandler.subscribe_series)
+        self._sio_on(
+            event='/subscribe/filtered/series',
+            handler=SocketIoHandler.subscribe_filtered_series)
 
     def _sio_on_connect(self, event, handler):
         async def fun(sid, environ):

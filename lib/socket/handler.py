@@ -48,11 +48,13 @@ async def receive_worker_result(writer, packet_type, packet_id, data, client_id)
         if job_type is JOB_TYPE_FORECAST_SERIE:
             try:
                 await SerieManager.add_forecast_to_serie(data.get('name'), data.get('points'))
+                await SerieManager.series_changed()
             except Exception as e:
                 print(e)
         elif job_type is JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE:
             try:
                 await SerieManager.add_anomalies_to_serie(data.get('name'), data.get('anomalies'))
+                await SerieManager.series_changed()
             except Exception as e:
                 print(e)
         else:

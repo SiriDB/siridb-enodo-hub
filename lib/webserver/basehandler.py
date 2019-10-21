@@ -1,4 +1,3 @@
-import urllib.parse
 from aiohttp import web
 from lib.analyser.analyserwrapper import MODEL_NAMES, MODEL_PARAMETERS
 from lib.config.config import Config
@@ -17,7 +16,6 @@ class BaseHandler:
     @classmethod
     async def resp_get_monitored_series(cls, regex_filter=None):
         if regex_filter is not None:
-            regex_filter = urllib.parse.unquote(regex_filter)
             if not regex_valid(regex_filter):
                 return {'data': []}
         return {'data': list(await SerieManager.get_series_to_dict(regex_filter))}

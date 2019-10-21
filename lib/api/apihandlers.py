@@ -1,4 +1,5 @@
 import psutil as psutil
+import urllib.parse
 from aiohttp import web
 
 from aiohttp_apispec import (
@@ -48,7 +49,7 @@ class ApiHandlers:
         :param request:
         :return:
         """
-        regex_filter = request.rel_url.query['filter'] if 'filter' in request.rel_url.query else None
+        regex_filter = urllib.parse.unquote(request.rel_url.query['filter']) if 'filter' in request.rel_url.query else None
         # TODO implement filter
 
         return web.json_response(data=await BaseHandler.resp_get_monitored_series(regex_filter),
