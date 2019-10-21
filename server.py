@@ -73,6 +73,7 @@ class Server:
         await SerieManager.prepare(SocketIoHandler.internal_updates_series_subscribers)
         await SerieManager.read_from_disk()
         await ClientManager.setup(SerieManager)
+        await EnodoJobManager.async_setup()
         self.watch_series_task = self.loop.create_task(self.watch_series())
         self.check_siridb_connection_task = self.loop.create_task(self.check_siridb_connection())
         self.save_to_disk_task = self.loop.create_task(self.save_to_disk())
