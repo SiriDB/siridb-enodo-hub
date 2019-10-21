@@ -3,7 +3,7 @@ import json
 import os
 
 from lib.config.config import Config
-from lib.serie.series import Series
+from lib.serie.series import Series, DETECT_ANOMALIES_STATUS_DONE
 from lib.siridb.siridb import SiriDB
 from lib.socket.clientmanager import ClientManager
 from lib.socket.package import create_header, UPDATE_SERIES
@@ -91,10 +91,30 @@ class SerieManager:
             await serie.schedule_forecast(end_date)
 
     @classmethod
+    async def add_anomalies_to_serie(cls, serie_name, points):
+        serie = cls._series.get(serie_name, None)
+        if serie is not None:
+            await cls._siridb_forecast_client.drop_serie(f'anomalies_{serie_name}')
+            await cls._siridb_forecast_client.insert_points(f'anomalies_{serie_name}', points)
+            await serie.set_detect_anomalies_status(DETECT_ANOMALIES_STATUS_DONE)
+
+            # date_1 = datetime.datetime.now()
+            # end_date = date_1 + datetime.timedelta(days=1)
+            # end_date = date_1 + datetime.timedelta(seconds=Config.interval_schedules_series)
+            # await serie.schedule_forecast(end_date)
+
+    @classmethod
     async def get_serie_forecast(cls, serie_name):
         values = await cls._siridb_forecast_client.query_serie_data(f'forecast_{serie_name}')
         if values is not None:
             return values.get(f'forecast_{serie_name}', None)
+        return None
+
+    @classmethod
+    async def get_serie_anomalies(cls, serie_name):
+        values = await cls._siridb_forecast_client.query_serie_data(f'anomalies_{serie_name}')
+        if values is not None:
+            return values.get(f'anomalies_{serie_name}', None)
         return None
 
     @classmethod

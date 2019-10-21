@@ -12,7 +12,7 @@ from lib.jobmanager.enodojobmanager import EnodoJobManager, EnodoJob, JOB_TYPE_F
     JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE
 from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
-from lib.serie.series import DETECT_ANOMALIES_STATUS_REQUESTED
+from lib.serie.series import DETECT_ANOMALIES_STATUS_REQUESTED, DETECT_ANOMALIES_STATUS_PENDING
 from lib.serverstate import ServerState
 from lib.siridb.siridb import SiriDB
 from lib.socket.clientmanager import ClientManager
@@ -117,8 +117,10 @@ class Server:
                         # Should be forecasted if not forecasted yet or new forecast should be made
                         if await serie.get_datapoints_count() >= Config.min_data_points:
                             await EnodoJobManager.add_job(EnodoJob(JOB_TYPE_FORECAST_SERIE, serie_name))
+                            await serie.set_pending_forecast(True)
                     elif await serie.get_detect_anomalies_status() is DETECT_ANOMALIES_STATUS_REQUESTED:
                         await EnodoJobManager.add_job(EnodoJob(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE, serie_name))
+                        await serie.set_detect_anomalies_status(DETECT_ANOMALIES_STATUS_PENDING)
 
             await asyncio.sleep(Config.watcher_interval)
 

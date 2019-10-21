@@ -1,18 +1,11 @@
-import json
-import os
-import pickle
 import qpack
 
 from lib.analyser.analyserwrapper import AnalyserWrapper
-from lib.config.config import Config
+from lib.jobmanager import *
 from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
 from lib.socket.clientmanager import ClientManager
 from lib.socket.package import *
-
-WORKER_JOB_FORECAST = 'forecast'
-WORKER_JOB_DETECT_ANOMALIES = 'detect_anomalies'
-WORKER_JOB_TYPES = [WORKER_JOB_FORECAST, WORKER_JOB_DETECT_ANOMALIES]
 
 
 async def update_serie_count(writer, packet_type, packet_id, data, client_id):
@@ -26,15 +19,12 @@ async def receive_worker_status_update(writer, packet_type, packet_id, data, cli
     busy = data
     worker = await ClientManager.get_worker_by_id(client_id)
     if worker is not None:
-        worker.busy = busy == "True"
+        worker.busy = busy
         if not worker.busy:
             worker.is_going_busy = False
 
 
 async def send_worker_job_request(worker, serie, job_type):
-    if job_type not in WORKER_JOB_TYPES:
-        raise Exception('Unknown job type')
-
     try:
         model = await serie.get_model_pkl()
         wrapper = (AnalyserWrapper(model, await serie.get_model(), await serie.get_model_parameters())).__dict__()
@@ -48,16 +38,25 @@ async def send_worker_job_request(worker, serie, job_type):
 
 
 async def receive_worker_result(writer, packet_type, packet_id, data, client_id):
-    if data.get('error', None) is not None:
+    if data.get('error') is not None:
         EventLogger.log(f"Error returned by worker for series {data.get('name')}", "error")
         series = await SerieManager.get_serie(data.get('name'))
         if series is not None:
             await series.set_error(data.get('error'))
     else:
-        try:
-            await SerieManager.add_forecast_to_serie(data.get('name'), data.get('points'))
-        except Exception as e:
-            print(e)
+        job_type = data.get('job_type')
+        if job_type is JOB_TYPE_FORECAST_SERIE:
+            try:
+                await SerieManager.add_forecast_to_serie(data.get('name'), data.get('points'))
+            except Exception as e:
+                print(e)
+        elif job_type is JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE:
+            try:
+                await SerieManager.add_anomalies_to_serie(data.get('name'), data.get('anomalies'))
+            except Exception as e:
+                print(e)
+        else:
+            print("UNKNOWN")
 
 
 async def received_worker_refused(writer, packet_type, packet_id, data, client_id):

@@ -26,7 +26,7 @@ class Series:
     _anomalies = None
 
     def __init__(self, name, datapoint_count, model, scheduled_forecast=None, model_parameters=None, ignore=False,
-                 error=None):
+                 error=None, detecting_anomalies_status=DETECT_ANOMALIES_STATUS_NONE):
         self._name = name
         self._datapoint_count = datapoint_count
 
@@ -45,6 +45,7 @@ class Series:
         self._awaiting_forecast = False
         self._ignore = ignore
         self._error = error
+        self._detecting_anomalies_status = detecting_anomalies_status
 
     async def set_datapoints_counter_lock(self, is_locked):
         """
@@ -161,7 +162,8 @@ class Series:
             'model': self._model,
             'model_parameters': self._model_parameters,
             'ignore': self._ignore,
-            'error': self._error
+            'error': self._error,
+            'detecting_anomalies_status': self._detecting_anomalies_status
         }
 
     @classmethod
@@ -174,4 +176,5 @@ class Series:
 
         return Series(data_dict.get('name'), data_dict.get('datapoint_count', None), data_dict.get('model'),
                       new_forecast_at, data_dict.get('model_parameters', None), ignore=data_dict.get('ignore', False),
-                      error=data_dict.get('error', None))
+                      error=data_dict.get('error', None),
+                      detecting_anomalies_status=data_dict.get('detecting_anomalies_status', None))

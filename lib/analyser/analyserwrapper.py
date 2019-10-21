@@ -6,6 +6,8 @@ MA_MODEL = 4
 MODEL_NAMES = {ARIMA_MODEL: 'ARIMA', PROPHET_MODEL: 'Prophet', AR_MODEL: 'Autoregression', MA_MODEL: 'Moving average'}
 MODEL_PARAMETERS = {ARIMA_MODEL: ['m', 'd', 'D'], PROPHET_MODEL: [], AR_MODEL: [], MA_MODEL: []}
 
+GENERAL_PARAMETERS = ['min_points_for_forecast', 'anomaly_detection_level', 'use_data_since_timestamp']
+
 
 class AnalyserWrapper:
     _analyser_model = None

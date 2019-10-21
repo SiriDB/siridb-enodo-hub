@@ -1,16 +1,12 @@
 import asyncio
 
 from lib.config.config import Config
+from lib.jobmanager import *
 from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
-from lib.serie.series import DETECT_ANOMALIES_STATUS_PENDING
 from lib.serverstate import ServerState
 from lib.socket.clientmanager import ClientManager
-from lib.socket.handler import send_worker_job_request, WORKER_JOB_FORECAST, WORKER_JOB_DETECT_ANOMALIES
-
-JOB_TYPE_FORECAST_SERIE = 1
-JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE = 2
-JOB_TYPES = [JOB_TYPE_FORECAST_SERIE, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE]
+from lib.socket.handler import send_worker_job_request
 
 
 class EnodoJob:
@@ -58,16 +54,15 @@ class EnodoJobManager:
                         EventLogger.log(f"Adding serie: sending {next_job.serie_name} to Worker for forecasting",
                                         "info",
                                         "serie_add_queue")
-                        await serie.set_pending_forecast(True)
-                        await send_worker_job_request(worker, serie, WORKER_JOB_FORECAST)
+                        await send_worker_job_request(worker, serie, next_job.job_type)
                         worker.is_going_busy = True
                         await cls._remove_job(next_job)
                     elif next_job.job_type is JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE:
                         EventLogger.log(f"Adding serie: sending {next_job.serie_name} to Worker for anomaly detection",
                                         "info",
                                         "serie_add_queue")
-                        await serie.set_detect_anomalies_status(DETECT_ANOMALIES_STATUS_PENDING)
-                        await send_worker_job_request(worker, serie, WORKER_JOB_DETECT_ANOMALIES)
+                        await send_worker_job_request(worker, serie, next_job.job_type)
+                        worker.is_going_busy = True
                         await cls._remove_job(next_job)
                     else:
                         return False

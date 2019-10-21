@@ -2,6 +2,7 @@ from aiohttp import web
 from lib.analyser.analyserwrapper import MODEL_NAMES, MODEL_PARAMETERS
 from lib.config.config import Config
 from lib.serie.seriemanager import SerieManager
+from lib.serie.series import DETECT_ANOMALIES_STATUS_DONE
 from lib.siridb.siridb import SiriDB
 
 
@@ -23,11 +24,11 @@ class BaseHandler:
             return web.json_response(data={'data': ''}, status=404)
 
         serie_data = await serie.to_dict()
+        _siridb_client = SiriDB(username=Config.siridb_user,
+                                password=Config.siridb_password,
+                                dbname=Config.siridb_database,
+                                hostlist=[(Config.siridb_host, Config.siridb_port)])
         if include_points:
-            _siridb_client = SiriDB(username=Config.siridb_user,
-                                    password=Config.siridb_password,
-                                    dbname=Config.siridb_database,
-                                    hostlist=[(Config.siridb_host, Config.siridb_port)])
             serie_points = await _siridb_client.query_serie_data(await serie.get_name(), "mean(1h)")
             serie_data['points'] = serie_points.get(await serie.get_name())
         if await serie.is_forecasted():
@@ -35,6 +36,11 @@ class BaseHandler:
             serie_data['forecast_points'] = await SerieManager.get_serie_forecast(await serie.get_name())
         else:
             serie_data['forecast_points'] = []
+
+        serie_data['anomalies'] = []
+        if await serie.get_detect_anomalies_status() is DETECT_ANOMALIES_STATUS_DONE:
+            anomalies = await SerieManager.get_serie_anomalies(await serie.get_name())
+            serie_data['anomalies'] = anomalies
 
         return {'data': serie_data}
 

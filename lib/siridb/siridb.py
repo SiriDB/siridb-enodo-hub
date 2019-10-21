@@ -28,7 +28,6 @@ class SiriDB:
             print("Connection problem with SiriDB server")
             pass
         else:
-            print(serie_name, result)
             count = result.get(serie_name, [])[0][1]
         self.siri.close()
         return count
