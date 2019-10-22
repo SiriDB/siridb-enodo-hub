@@ -93,7 +93,7 @@ class SocketServer:
                     response = create_header(0, HEARTBEAT, packet_id)
                     writer.write(response)
                 else:
-                    response = create_header(0, UNKNOW_CLIENT, packet_id)
+                    response = create_header(0, UNKNOWN_CLIENT, packet_id)
                     writer.write(response)
             elif packet_type == CLIENT_SHUTDOWN:
                 client_id = saved_client_id

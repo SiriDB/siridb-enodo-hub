@@ -17,8 +17,9 @@ from lib.serverstate import ServerState
 from lib.siridb.siridb import SiriDB
 from lib.socket.clientmanager import ClientManager
 from lib.socket.handler import update_serie_count, receive_worker_status_update, \
-    receive_worker_result, received_worker_refused
-from lib.socket.package import LISTENER_ADD_SERIE_COUNT, WORKER_UPDATE_BUSY, WORKER_RESULT, WORKER_REFUSED
+    received_worker_refused
+from lib.socket.package import LISTENER_ADD_SERIE_COUNT, WORKER_UPDATE_BUSY, WORKER_JOB_RESULT, WORKER_REFUSED, \
+    WORKER_JOB_CANCELLED
 from lib.socket.socketserver import SocketServer
 from lib.socketio.socketiohandlers import SocketIoHandler
 
@@ -61,9 +62,10 @@ class Server:
         self.socket_server = SocketServer(Config.socket_server_host, Config.socket_server_port,
                                           Config.internal_security_token,
                                           {LISTENER_ADD_SERIE_COUNT: update_serie_count,
-                                           WORKER_RESULT: receive_worker_result,
+                                           WORKER_JOB_RESULT: EnodoJobManager.receive_job_result,
                                            WORKER_UPDATE_BUSY: receive_worker_status_update,
-                                           WORKER_REFUSED: received_worker_refused})
+                                           WORKER_REFUSED: received_worker_refused,
+                                           WORKER_JOB_CANCELLED: EnodoJobManager.receive_worker_cancelled_job})
         await ApiHandlers.prepare()
 
         if self.sio is not None:
@@ -116,10 +118,10 @@ class Server:
                             serie.new_forecast_at is not None and serie.new_forecast_at < datetime.datetime.now())):
                         # Should be forecasted if not forecasted yet or new forecast should be made
                         if await serie.get_datapoints_count() >= Config.min_data_points:
-                            await EnodoJobManager.add_job(EnodoJob(JOB_TYPE_FORECAST_SERIE, serie_name))
+                            await EnodoJobManager.create_job(JOB_TYPE_FORECAST_SERIE, serie_name)
                             await serie.set_pending_forecast(True)
                     elif await serie.get_detect_anomalies_status() is DETECT_ANOMALIES_STATUS_REQUESTED:
-                        await EnodoJobManager.add_job(EnodoJob(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE, serie_name))
+                        await EnodoJobManager.create_job(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE, serie_name)
                         await serie.set_detect_anomalies_status(DETECT_ANOMALIES_STATUS_PENDING)
 
             await asyncio.sleep(Config.watcher_interval)
