@@ -34,8 +34,7 @@ class EnodoJobManager:
     _active_jobs = None
     _failed_jobs = None
     _max_job_id = 1000
-    # _max_job_timeout = 60 * 5
-    _max_job_timeout = 5
+    _max_job_timeout = 60 * 5
     _next_job_id = None
     _lock = None
 
