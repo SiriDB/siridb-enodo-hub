@@ -8,6 +8,7 @@ from aiohttp_apispec import setup_aiohttp_apispec
 
 from lib.api.apihandlers import ApiHandlers, auth
 from lib.config.config import Config
+from lib.events.enodoeventmanager import EnodoEventManager
 from lib.jobmanager.enodojobmanager import EnodoJobManager, EnodoJob, JOB_TYPE_FORECAST_SERIE, \
     JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE
 from lib.logging.eventlogger import EventLogger
@@ -16,9 +17,9 @@ from lib.serie.series import DETECT_ANOMALIES_STATUS_REQUESTED, DETECT_ANOMALIES
 from lib.serverstate import ServerState
 from lib.siridb.siridb import SiriDB
 from lib.socket.clientmanager import ClientManager
-from lib.socket.handler import update_serie_count, receive_worker_status_update, \
+from lib.socket.handler import receive_new_series_points, receive_worker_status_update, \
     received_worker_refused
-from lib.socket.package import LISTENER_ADD_SERIE_COUNT, WORKER_UPDATE_BUSY, WORKER_JOB_RESULT, WORKER_REFUSED, \
+from lib.socket.package import LISTENER_NEW_SERIES_POINTS, WORKER_UPDATE_BUSY, WORKER_JOB_RESULT, WORKER_REFUSED, \
     WORKER_JOB_CANCELLED
 from lib.socket.socketserver import SocketServer
 from lib.socketio.socketiohandlers import SocketIoHandler
@@ -61,7 +62,7 @@ class Server:
 
         self.socket_server = SocketServer(Config.socket_server_host, Config.socket_server_port,
                                           Config.internal_security_token,
-                                          {LISTENER_ADD_SERIE_COUNT: update_serie_count,
+                                          {LISTENER_NEW_SERIES_POINTS: receive_new_series_points,
                                            WORKER_JOB_RESULT: EnodoJobManager.receive_job_result,
                                            WORKER_UPDATE_BUSY: receive_worker_status_update,
                                            WORKER_REFUSED: received_worker_refused,
@@ -76,6 +77,9 @@ class Server:
         await SerieManager.read_from_disk()
         await ClientManager.setup(SerieManager)
         await EnodoJobManager.async_setup()
+        await EnodoJobManager.load_from_disk()
+        await EnodoEventManager.async_setup()
+        await EnodoEventManager.load_from_disk()
         self.watch_series_task = self.loop.create_task(self.watch_series())
         self.check_siridb_connection_task = self.loop.create_task(self.check_siridb_connection())
         self.save_to_disk_task = self.loop.create_task(self.save_to_disk())
@@ -113,22 +117,24 @@ class Server:
                 serie = await SerieManager.get_serie(serie_name)
                 if serie is not None \
                         and not await serie.ignored():
-
-                    if not await serie.pending_forecast() and (not await serie.is_forecasted() or (
-                            serie.new_forecast_at is not None and serie.new_forecast_at < datetime.datetime.now())):
-                        # Should be forecasted if not forecasted yet or new forecast should be made
-                        if await serie.get_datapoints_count() >= Config.min_data_points:
-                            await EnodoJobManager.create_job(JOB_TYPE_FORECAST_SERIE, serie_name)
-                            await serie.set_pending_forecast(True)
-                    elif await serie.get_detect_anomalies_status() is DETECT_ANOMALIES_STATUS_REQUESTED:
-                        await EnodoJobManager.create_job(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE, serie_name)
-                        await serie.set_detect_anomalies_status(DETECT_ANOMALIES_STATUS_PENDING)
+                    if not len(await EnodoJobManager.get_failed_job_for_serie(serie_name)):
+                        if not await serie.pending_forecast() and (not await serie.is_forecasted() or (
+                                serie.new_forecast_at is not None and serie.new_forecast_at < datetime.datetime.now())):
+                            # Should be forecasted if not forecasted yet or new forecast should be made
+                            if await serie.get_datapoints_count() >= Config.min_data_points:
+                                await EnodoJobManager.create_job(JOB_TYPE_FORECAST_SERIE, serie_name)
+                                await serie.set_pending_forecast(True)
+                        # elif await serie.get_detect_anomalies_status() is DETECT_ANOMALIES_STATUS_REQUESTED:
+                        #     await EnodoJobManager.create_job(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE, serie_name)
+                        #     await serie.set_detect_anomalies_status(DETECT_ANOMALIES_STATUS_PENDING)
 
             await asyncio.sleep(Config.watcher_interval)
 
     @staticmethod
     async def save_to_disk():
         await SerieManager.save_to_disk()
+        await EnodoJobManager.save_to_disk()
+        await EnodoEventManager.save_to_disk()
 
     async def save_to_disk_on_interval(self):
         while ServerState.running:
@@ -142,8 +148,6 @@ class Server:
             clients = []
             if '/' in self.sio.manager.rooms and None in self.sio.manager.rooms['/']:
                 clients = [client for client in self.sio.manager.rooms['/'][None]]
-
-            # await self.sio.emit(event='disconnect', room=None)
 
             for sid in clients:
                 if sid is not None:
@@ -170,6 +174,7 @@ class Server:
         await self.clean_up()
 
         EventLogger.log('...Stopping all running tasks', "info")
+        EventLogger.log('...Going down in 1', "info")
         await asyncio.sleep(1)
         # asyncio.gather(*asyncio.Task.all_tasks()).cancel()
         for task in asyncio.Task.all_tasks():
@@ -224,6 +229,8 @@ class Server:
                                     allow_head=False)
             self.app.router.add_delete("/api/series/{serie_name}", ApiHandlers.remove_serie)
             self.app.router.add_get("/api/enodo/models", ApiHandlers.get_possible_analyser_models, allow_head=False)
+            self.app.router.add_delete("/api/enodo/event/output/{output_id}", ApiHandlers.remove_enodo_event_output)
+            self.app.router.add_post("/api/enodo/event/output", ApiHandlers.add_enodo_event_output)
 
             # Add internal api routes
             self.app.router.add_get("/api/settings", ApiHandlers.get_settings, allow_head=False)
@@ -255,7 +262,8 @@ class Server:
             self.sio = socketio.AsyncServer(async_mode='aiohttp',
                                             ping_timeout=60,
                                             ping_interval=25,
-                                            cookie=None)
+                                            cookie=None,
+                                            cors_allowed_origins='*')
             self.sio.attach(self.app)
 
         self.app.on_shutdown.append(self._stop_server_from_aiohttp_cleanup)

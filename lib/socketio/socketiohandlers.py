@@ -1,20 +1,18 @@
 import functools
 
-from aiohttp.web_response import Response
-
 from lib.socketio.subscriptionmanager import SubscriptionManager
 from lib.util.util import safe_json_dumps
 from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
 
 
-def socketio_auth_wrapper(handler):
+def socketio_auth_required(handler):
     @functools.wraps(handler)
-    async def wrapper(*args):
-        resp = await handler(*args)
-        if isinstance(resp, Response):
-            if resp.status == 401:
-                raise ConnectionRefusedError('authentication failed')
+    async def wrapper(cls, sid, data, event):
+        async with cls._sio.session(sid) as session:
+            if not session['auth']:
+                raise ConnectionRefusedError('unauthorized')
+            resp = await handler(cls, sid, data, event)
         return resp
 
     return wrapper
@@ -28,10 +26,20 @@ class SocketIoHandler:
         cls._sio = sio
 
     @classmethod
-    @socketio_auth_wrapper
-    @EnodoAuth.auth.required
-    async def connect(cls, sid, environ, request):
+    async def connect(cls, sid, environ):
+        await cls._sio.save_session(sid, {'auth': False})
         pass  # TODO verbose logging
+
+    @classmethod
+    async def authenticate(cls, sid, data):
+        user = data.get('username')
+        password = data.get('password')
+
+        if not await EnodoAuth.auth.check_credentials(user, password):
+            raise ConnectionRefusedError('authentication failed')
+
+        async with cls._sio.session(sid) as session:
+            session['auth'] = True
 
     @classmethod
     async def disconnect(cls, sid):
@@ -39,23 +47,39 @@ class SocketIoHandler:
         pass  # TODO verbose logging
 
     @classmethod
+    @socketio_auth_required
     async def get_all_series(cls, sid, regex_filter, event):
+        return await cls._get_all_series(sid, regex_filter, event)
+
+    @classmethod
+    async def _get_all_series(cls, sid, regex_filter, event):
         regex_filter = regex_filter if regex_filter else None
         resp = await BaseHandler.resp_get_monitored_series(regex_filter)
         return safe_json_dumps(resp)
 
     @classmethod
-    async def subscribe_series(cls, sid, data, event):
-        if cls._sio is not None:
-            cls._sio.enter_room(sid, 'series_updates')
-            await cls._sio.emit('series_updates', {'data': await cls.get_all_series(None, None, None)}, room=sid)
+    @socketio_auth_required
+    async def get_serie_details(cls, sid, data, event):
+        serie_name = data.get('serie_name')
+        resp = await BaseHandler.resp_get_monitored_serie_details(serie_name, include_points=True)
+        return safe_json_dumps(resp)
 
     @classmethod
+    @socketio_auth_required
+    async def subscribe_series(cls, sid, data, event=None):
+        print(cls, sid, data, event)
+        if cls._sio is not None:
+            cls._sio.enter_room(sid, 'series_updates')
+            return await cls._get_all_series(None, None, None)
+
+    @classmethod
+    @socketio_auth_required
     async def unsubscribe_series(cls, sid, data, event):
         if cls._sio is not None:
             cls._sio.leave_room(sid, 'series_updates')
 
     @classmethod
+    @socketio_auth_required
     async def subscribe_filtered_series(cls, sid, data, event):
         if isinstance(data, dict):
             regex = data.get('filter')
@@ -64,23 +88,29 @@ class SocketIoHandler:
 
         if cls._sio is not None and regex is not None:
             await SubscriptionManager.add_subscriber(sid, regex)
-            await cls._sio.emit('series_updates', {'data': await cls.get_all_series(None, regex, None)}, room=sid)
+            return await cls._get_all_series(None, regex, None)
         else:
-            await cls._sio.emit('series_updates', {'error': 'incorrect regex'}, room=sid)
+            return {'error': 'incorrect regex'}
 
     @classmethod
+    @socketio_auth_required
     async def unsubscribe_filtered_series(cls, sid, data, event):
         if cls._sio is not None:
             cls._sio.leave_room(sid, 'series_updates')
 
     @classmethod
-    async def internal_updates_series_subscribers(cls):
+    async def internal_updates_series_subscribers(cls, change_type, series_name, series_data):
         if cls._sio is not None:
-            await cls._sio.emit('series_updates', {'data': await cls.get_all_series(None, None, None)},
-                                room='series_updates')
+            await cls._sio.emit('series_updates', {
+                'change_type': change_type,
+                'series_name': series_name,
+                'series_data': series_data
+            }, room='series_updates')
 
-        filtered_subs = await SubscriptionManager.get_all_filtered_subscriptions()
+        filtered_subs = await SubscriptionManager.get_subscriptions_for_serie_name(series_name)
         for sub in filtered_subs:
-            print(sub)
-            await cls._sio.emit('series_updates', {'data': await cls.get_all_series(None, sub.get('regex'), None)},
-                                room=sub.get('sid'))
+            await cls._sio.emit('series_updates', {
+                'change_type': change_type,
+                'series_name': series_name,
+                'series_data': series_data
+            }, room=sub.get('sid'))

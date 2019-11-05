@@ -6,9 +6,12 @@ class SocketIoRouter:
     def __init__(self, sio):
         self._sio = sio
 
-        self._sio_on_connect(
+        self._sio.on(
             event='connect',
             handler=SocketIoHandler.connect)
+        self._sio.on(
+            event='authorize',
+            handler=SocketIoHandler.authenticate)
         self._sio.on(
             event='disconnect',
             handler=SocketIoHandler.disconnect)
@@ -21,7 +24,7 @@ class SocketIoRouter:
             handler=SocketIoHandler.get_all_series)
         self._sio_on(
             event='/api/series/details',
-            handler=SocketIoHandler.get_all_series)
+            handler=SocketIoHandler.get_serie_details)
         self._sio_on(
             event='/api/series/delete',
             handler=SocketIoHandler.get_all_series)
@@ -38,14 +41,6 @@ class SocketIoRouter:
         self._sio_on(
             event='/subscribe/filtered/series',
             handler=SocketIoHandler.subscribe_filtered_series)
-
-    def _sio_on_connect(self, event, handler):
-        async def fun(sid, environ):
-            return await handler(sid, environ, environ.get('aiohttp.request'))
-
-        self._sio.on(
-            event=event,
-            handler=fun)
 
     def _sio_on(self, event, handler):
         async def fun(sid, data):

@@ -1,6 +1,7 @@
 from aiohttp import web
 from lib.analyser.analyserwrapper import MODEL_NAMES, MODEL_PARAMETERS
 from lib.config.config import Config
+from lib.events import EnodoEventManager
 from lib.serie.seriemanager import SerieManager
 from lib.serie.series import DETECT_ANOMALIES_STATUS_DONE
 from lib.siridb.siridb import SiriDB
@@ -33,7 +34,8 @@ class BaseHandler:
                                 dbname=Config.siridb_database,
                                 hostlist=[(Config.siridb_host, Config.siridb_port)])
         if include_points:
-            serie_points = await _siridb_client.query_serie_data(await serie.get_name(), "mean(1h)")
+            # serie_points = await _siridb_client.query_serie_data(await serie.get_name(), "mean(1h)")
+            serie_points = await _siridb_client.query_serie_data(await serie.get_name(), "*")
             serie_data['points'] = serie_points.get(await serie.get_name())
         if await serie.is_forecasted():
             serie_data['analysed'] = True
@@ -49,8 +51,19 @@ class BaseHandler:
         return {'data': serie_data}
 
     @classmethod
+    async def resp_add_event_output(cls, output_type, data):
+        await EnodoEventManager.create_event_output(output_type, data)
+        return {'data': [await output.to_dict() for output in EnodoEventManager.outputs]}, 201
+
+    @classmethod
+    async def resp_remove_event_output(cls, output_id):
+        await EnodoEventManager.remove_event_output(output_id)
+        return {'data': None}, 200
+
+    @classmethod
     async def resp_add_serie(cls, data):
         required_fields = ['name', 'model']
+        print(data)
         model = data.get('model')
         model_parameters = data.get('model_parameters')
 

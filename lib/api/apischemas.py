@@ -40,6 +40,11 @@ class SchemaRequestCreateSeries(Schema):
     model_parameters = fields.List(fields.String())
 
 
+class SchemaRequestCreateEnodoEventOutput(Schema):
+    output_type = fields.String()
+    data = fields.Dict()
+
+
 class _SchemaModelNameListItem(Schema):
     model_id = fields.Integer()
     model_name = fields.String()

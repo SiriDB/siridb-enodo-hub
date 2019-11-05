@@ -31,7 +31,6 @@ EMPTY_CONFIG_FILE = config = {
         'database': '',
     },
     'analyser': {
-        'analysis_save_path': '',
         'min_data_points': '100',
         'watcher_interval': '2',
         'siridb_connection_check_interval': '30',
@@ -55,7 +54,6 @@ class EnodoConfigParser(RawConfigParser):
 class Config:
     _config = None
     _path = None
-    analysis_save_path = None
     min_data_points = None
     watcher_interval = None
     siridb_connection_check_interval = None
@@ -87,10 +85,12 @@ class Config:
     socket_server_port = None
     model_pkl_save_path = None
     series_save_path = None
+    event_outputs_save_path = None
     save_to_disk_interval = None
     enable_rest_api = None
     enable_socket_io_api = None
     internal_security_token = None
+    jobs_save_path = None
 
     @classmethod
     def create_standard_config_file(cls, path):
@@ -137,7 +137,6 @@ class Config:
         cls._config = EnodoConfigParser()
         cls._config.read(path)
 
-        cls.analysis_save_path = cls._config.get_r('analyser', 'analysis_save_path')
         cls.min_data_points = cls.to_int(cls._config.get_r('analyser', 'min_data_points'))
         cls.watcher_interval = cls.to_int(cls._config.get_r('analyser', 'watcher_interval'))
         cls.siridb_connection_check_interval = cls.to_int(
@@ -162,34 +161,31 @@ class Config:
         # Enodo
         cls.basic_auth_username = cls._config.get_r('enodo', 'basic_auth_username', required=False, default=None)
         cls.basic_auth_password = cls._config.get_r('enodo', 'basic_auth_password', required=False, default=None)
-        cls.log_path = cls._config.get_r('enodo', 'log_path')
+
         cls.client_max_timeout = cls.to_int(cls._config.get_r('enodo', 'client_max_timeout'))
         if cls.client_max_timeout < 35:  # min value enforcement
             cls.client_max_timeout = 35
         cls.socket_server_host = cls._config.get_r('enodo', 'internal_socket_server_hostname')
         cls.socket_server_port = cls.to_int(cls._config.get_r('enodo', 'internal_socket_server_port'))
-        cls.model_pkl_save_path = cls._config.get_r('enodo', 'model_pkl_save_path')
-        cls.series_save_path = cls._config.get_r('enodo', 'series_save_path')
+        cls.model_pkl_save_path = cls._config.get_r('enodo', 'model_pkl_save_path') # TODO Redo saving models
         cls.save_to_disk_interval = cls.to_int(cls._config.get_r('enodo', 'save_to_disk_interval'))
         cls.enable_rest_api = cls.to_bool(
             cls._config.get_r('enodo', 'enable_rest_api', required=False, default='true'), True)
         cls.enable_socket_io_api = cls.to_bool(
             cls._config.get_r('enodo', 'enable_socket_io_api', required=False, default='false'), False)
         cls.base_dir = cls._config.get_r('enodo', 'enodo_base_save_path')
+        cls.log_path = os.path.join(cls.base_dir, 'log.log')
+        cls.series_save_path = os.path.join(cls.base_dir, 'data/series.json')
+        cls.jobs_save_path = os.path.join(cls.base_dir, 'data/series.json')
+        cls.event_outputs_save_path = os.path.join(cls.base_dir, 'data/outputs.json')
 
-        if not os.path.exists(Config.series_save_path):
-            os.makedirs(Config.series_save_path)
+        if not os.path.exists(os.path.join(cls.base_dir, 'data')):
+            os.makedirs(os.path.join(cls.base_dir, 'data'))
         if not os.path.exists(Config.model_pkl_save_path):
             os.makedirs(Config.model_pkl_save_path)
-        if not os.path.exists(Config.analysis_save_path):
-            os.makedirs(Config.analysis_save_path)
-        if not os.path.exists(os.path.join(Config.analysis_save_path, 'db.json')):
-            open(os.path.join(Config.analysis_save_path, 'db.json'), 'a').close()
 
     @classmethod
     async def save_config(cls):
-        cls._config.set('analyser', 'pipe_path', cls.pipe_path)
-        cls._config.set('analyser', 'analysis_save_path', cls.analysis_save_path)
         cls._config.set('analyser', 'min_data_points', str(cls.min_data_points))
         cls._config.set('analyser', 'watcher_interval', str(cls.watcher_interval))
         cls._config.set('analyser', 'siridb_connection_check_interval', str(cls.siridb_connection_check_interval))

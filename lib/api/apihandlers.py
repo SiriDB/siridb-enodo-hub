@@ -14,7 +14,7 @@ from lib.siridb.siridb import SiriDB
 from lib.socket.clientmanager import ClientManager
 from lib.util.util import safe_json_dumps
 from lib.api.apischemas import SchemaResponseSeries, SchemaResponseError, SchemaResponseSeriesDetails, \
-    SchemaRequestCreateSeries, SchemaSeries, SchemaResponseModels
+    SchemaRequestCreateSeries, SchemaSeries, SchemaResponseModels, SchemaRequestCreateEnodoEventOutput
 from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
 
@@ -121,6 +121,49 @@ class ApiHandlers:
         """
         serie_name = request.match_info['serie_name']
         return web.json_response(data={}, status=await BaseHandler.resp_remove_serie(serie_name))
+
+    @classmethod
+    @docs(
+        tags=["public_api"],
+        summary="Add an new event output",
+        description="Add an output for enodo events",
+        parameters=[]
+    )
+    @request_schema(SchemaRequestCreateEnodoEventOutput())
+    @response_schema(SchemaResponseError(), 400)
+    @EnodoAuth.auth.required
+    async def add_enodo_event_output(cls, request):
+        """
+        Add a new event output.
+        :param request:
+        :return:
+        """
+        data = await request.json()
+        output_type = data.get('output_type')
+        output_data = data.get('data')
+
+        resp, status = await BaseHandler.resp_add_event_output(output_type, output_data)
+        return web.json_response(data=resp, status=status)
+
+    @classmethod
+    @docs(
+        tags=["public_api"],
+        summary="Remove an event output",
+        description="Remove an event output",
+        parameters=[]
+    )
+    @response_schema(SchemaResponseError(), 400)
+    @EnodoAuth.auth.required
+    async def remove_enodo_event_output(cls, request):
+        """
+        Add a new event output.
+        :param request:
+        :return:
+        """
+        output_id = request.match_info['output_id']
+
+        resp, status = await BaseHandler.resp_remove_event_output(output_id)
+        return web.json_response(data=resp, status=status)
 
     @classmethod
     @docs(

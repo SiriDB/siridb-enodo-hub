@@ -1,13 +1,17 @@
 import datetime
 import json
 import os
+import qpack
 import re
 
 from lib.config.config import Config
+from lib.events import EnodoEvent
+from lib.events.enodoeventmanager import ENODO_EVENT_ANOMALY_DETECTED, EnodoEventManager
 from lib.serie.series import Series, DETECT_ANOMALIES_STATUS_DONE
 from lib.siridb.siridb import SiriDB
 from lib.socket.clientmanager import ClientManager
 from lib.socket.package import create_header, UPDATE_SERIES
+from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_DELETE
 from lib.util.util import safe_json_dumps
 
 
@@ -31,9 +35,11 @@ class SerieManager:
                                              hostlist=[(Config.siridb_forecast_host, Config.siridb_forecast_port)])
 
     @classmethod
-    async def series_changed(cls):
+    async def series_changed(cls, change_type, series_name):
         if cls._update_cb is not None:
-            await cls._update_cb()
+            series = await cls.get_serie(series_name)
+            if series is not None:
+                await cls._update_cb(change_type, series_name, await series.to_dict())
 
     @classmethod
     async def add_serie(cls, serie):
@@ -43,7 +49,7 @@ class SerieManager:
                 serie['datapoint_count'] = collected_datapoints
                 cls._series[serie.get('name')] = await Series.from_dict(serie)
                 print(f"Added new serie: {serie.get('name')}")
-                await cls.series_changed()
+                await cls.series_changed(SUBSCRIPTION_CHANGE_TYPE_ADD, serie.get('name'))
                 await cls.update_listeners(await cls.get_series())
 
     @classmethod
@@ -69,7 +75,7 @@ class SerieManager:
     async def remove_serie(cls, serie_name):
         if serie_name in cls._series:
             del cls._series[serie_name]
-            await cls.series_changed()
+            await cls.series_changed(SUBSCRIPTION_CHANGE_TYPE_DELETE, serie_name)
             return True
         return False
 
@@ -98,14 +104,13 @@ class SerieManager:
     async def add_anomalies_to_serie(cls, serie_name, points):
         serie = cls._series.get(serie_name, None)
         if serie is not None:
+            print(points)
+            event = EnodoEvent('Anomaly detected!', f'{len(points)} anomalies detected for series {serie_name}',
+                               ENODO_EVENT_ANOMALY_DETECTED)
+            await EnodoEventManager.handle_event(event)
             await cls._siridb_forecast_client.drop_serie(f'anomalies_{serie_name}')
             await cls._siridb_forecast_client.insert_points(f'anomalies_{serie_name}', points)
             await serie.set_detect_anomalies_status(DETECT_ANOMALIES_STATUS_DONE)
-
-            # date_1 = datetime.datetime.now()
-            # end_date = date_1 + datetime.timedelta(days=1)
-            # end_date = date_1 + datetime.timedelta(seconds=Config.interval_schedules_series)
-            # await serie.schedule_forecast(end_date)
 
     @classmethod
     async def get_serie_forecast(cls, serie_name):
@@ -124,22 +129,21 @@ class SerieManager:
     @classmethod
     async def update_listeners(cls, series):
         for listener in ClientManager.listeners.values():
-            update = json.dumps(series)
+            update = qpack.packb(series)
             series_update = create_header(len(update), UPDATE_SERIES, 0)
-            listener.writer.write(series_update + update.encode("utf-8"))
+            listener.writer.write(series_update + update)
 
     @classmethod
     async def read_from_disk(cls):
-        if not os.path.exists(os.path.join(Config.series_save_path, "series.json")):
-            print("No saved series")
+        if not os.path.exists(Config.series_save_path):
+            pass
         else:
-            f = open(os.path.join(Config.series_save_path, "series.json"), "r")
+            f = open(Config.series_save_path, "r")
             data = f.read()
             f.close()
-            if len(data):
-                series_data = json.loads(data)
-                for s in series_data:
-                    cls._series[s.get('name')] = await Series.from_dict(s)
+            series_data = json.loads(data)
+            for s in series_data:
+                cls._series[s.get('name')] = await Series.from_dict(s)
 
     @classmethod
     async def save_to_disk(cls):
@@ -150,7 +154,7 @@ class SerieManager:
 
             if not os.path.exists(Config.series_save_path):
                 raise Exception()
-            f = open(os.path.join(Config.series_save_path, "series.json"), "w")
+            f = open(Config.series_save_path, "w")
             f.write(json.dumps(serialized_series, default=safe_json_dumps))
             f.close()
         except Exception as e:
