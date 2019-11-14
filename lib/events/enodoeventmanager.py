@@ -1,3 +1,4 @@
+import logging
 import time
 
 import aiohttp
@@ -5,7 +6,6 @@ import json
 import os
 
 from lib.config.config import Config
-from lib.logging.eventlogger import EventLogger
 
 ENODO_EVENT_ANOMALY_DETECTED = 1
 ENODO_EVENT_TYPES = [ENODO_EVENT_ANOMALY_DETECTED]
@@ -70,11 +70,11 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
 
     async def send_event(self, event):
         try:
-            EventLogger.log(f'Calling EnodoEventOutput webhook {self.url}', "verbose")
+            logging.debug(f'Calling EnodoEventOutput webhook {self.url}')
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as session:
                 await session.post(self.url, json=await event.to_dict(), headers=self.headers)
         except Exception:
-            EventLogger.log('Calling EnodoEventOutput webhook failed', "warning")
+            logging.warning('Calling EnodoEventOutput webhook failed')
 
     async def to_dict(self):
         return {
@@ -161,9 +161,6 @@ class EnodoEventManager:
             serialized_outputs = []
             for output in cls.outputs:
                 serialized_outputs.append(await output.to_dict())
-
-            if not os.path.exists(Config.event_outputs_save_path):
-                raise Exception()  # TODO nice exception
 
             output_data = {
                 'next_output_id': cls._next_output_id,

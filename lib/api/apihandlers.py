@@ -9,8 +9,6 @@ from aiohttp_apispec import (
 from aiohttp_basicauth import BasicAuthMiddleware
 
 from lib.config.config import Config
-from lib.logging.eventlogger import EventLogger
-from lib.siridb.siridb import SiriDB
 from lib.socket.clientmanager import ClientManager
 from lib.util.util import safe_json_dumps
 from lib.api.apischemas import SchemaResponseSeries, SchemaResponseError, SchemaResponseSeriesDetails, \
@@ -220,7 +218,7 @@ class ApiHandlers:
         :param request:
         :return:
         """
-        log = EventLogger.get()
+        log = ""
         return web.json_response(data={'data': log}, status=200)
 
     @classmethod

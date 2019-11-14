@@ -6,7 +6,20 @@ MA_MODEL = 4
 MODEL_NAMES = {ARIMA_MODEL: 'ARIMA', PROPHET_MODEL: 'Prophet', AR_MODEL: 'Autoregression', MA_MODEL: 'Moving average'}
 MODEL_PARAMETERS = {ARIMA_MODEL: ['m', 'd', 'D'], PROPHET_MODEL: [], AR_MODEL: [], MA_MODEL: []}
 
-GENERAL_PARAMETERS = ['min_points_for_forecast', 'anomaly_detection_level', 'use_data_since_timestamp']
+GENERAL_PARAMETERS = {
+    'forecast_points_in_future': 10,
+    'min_points_for_forecast': 100,
+    # 'anomaly_detection_level': '',
+    'use_data_since_timestamp': None,
+}
+
+
+async def setup_default_model_arguments(model_arguments):
+    for key in GENERAL_PARAMETERS.keys():
+        if key not in model_arguments:
+            model_arguments[key] = GENERAL_PARAMETERS[key]
+
+    return model_arguments
 
 
 class AnalyserWrapper:

@@ -1,9 +1,10 @@
 import asyncio
 import datetime
 import json
+import logging
+
 import qpack
 
-from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
 from lib.socket.clientmanager import ClientManager, Client
 from lib.socket.package import *
@@ -43,7 +44,7 @@ class SocketServer:
                 data = qpack.unpackb(data, decode='utf-8')
 
             addr = writer.get_extra_info('peername')
-            EventLogger.log("Received %r from %r" % (packet_id, addr), "verbose")
+            logging.debug("Received %r from %r" % (packet_id, addr))
             if packet_id == 0:
                 connected = False
 
@@ -62,10 +63,10 @@ class SocketServer:
                                         client_data.get('version', None), busy=client_data.get('busy', None))
                         if client_data.get('client_type') == 'listener':
                             await ClientManager.add_listener(client)
-                            EventLogger.log(f'New listener with id: {client_id}', "info")
+                            logging.info(f'New listener with id: {client_id}')
                         elif client_data.get('client_type') == 'worker':
                             await ClientManager.add_worker(client)
-                            EventLogger.log(f'New worker with id: {client_id}', "info")
+                            logging.info(f'New worker with id: {client_id}')
 
                         response = create_header(0, HANDSHAKE_OK, packet_id)
                         writer.write(response)
@@ -83,12 +84,12 @@ class SocketServer:
                 l_client = await ClientManager.get_listener_by_id(client_id)
                 w_client = await ClientManager.get_worker_by_id(client_id)
                 if l_client is not None:
-                    EventLogger.log(f'Heartbeat from listener with id: {client_id}', "verbose")
+                    logging.debug(f'Heartbeat from listener with id: {client_id}')
                     l_client.last_seen = datetime.datetime.now()
                     response = create_header(0, HEARTBEAT, packet_id)
                     writer.write(response)
                 elif w_client is not None:
-                    EventLogger.log(f'Heartbeat from worker with id: {client_id}', "verbose")
+                    logging.debug(f'Heartbeat from worker with id: {client_id}')
                     w_client.last_seen = datetime.datetime.now()
                     response = create_header(0, HEARTBEAT, packet_id)
                     writer.write(response)
@@ -100,10 +101,10 @@ class SocketServer:
                 l_client = await ClientManager.get_listener_by_id(client_id)
                 w_client = await ClientManager.get_worker_by_id(client_id)
                 if l_client is not None:
-                    EventLogger.log(f'Listener {client_id} is going down, removing from client list...', "info")
+                    logging.info(f'Listener {client_id} is going down, removing from client list...')
                     await ClientManager.remove_listener(client_id)
                 elif w_client is not None:
-                    EventLogger.log(f'Worker {client_id} is going down, removing from client list...', "info")
+                    logging.info(f'Worker {client_id} is going down, removing from client list...')
                     await ClientManager.remove_worker(client_id)
 
                 connected = False
@@ -111,9 +112,9 @@ class SocketServer:
                 if packet_type in self._cbs:
                     await self._cbs.get(packet_type)(writer, packet_type, packet_id, data, saved_client_id)
                 else:
-                    EventLogger.log(f'Package type {packet_type} not implemented', "verbose")
+                    logging.debug(f'Package type {packet_type} not implemented')
 
             await writer.drain()
 
-        EventLogger.log(f'Closing socket with client {saved_client_id}', "info")
+        logging.info(f'Closing socket with client {saved_client_id}')
         writer.close()

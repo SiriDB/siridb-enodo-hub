@@ -176,7 +176,7 @@ class Config:
         cls.base_dir = cls._config.get_r('enodo', 'enodo_base_save_path')
         cls.log_path = os.path.join(cls.base_dir, 'log.log')
         cls.series_save_path = os.path.join(cls.base_dir, 'data/series.json')
-        cls.jobs_save_path = os.path.join(cls.base_dir, 'data/series.json')
+        cls.jobs_save_path = os.path.join(cls.base_dir, 'data/jobs.json')
         cls.event_outputs_save_path = os.path.join(cls.base_dir, 'data/outputs.json')
 
         if not os.path.exists(os.path.join(cls.base_dir, 'data')):

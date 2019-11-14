@@ -39,7 +39,7 @@ class TestSerie(TestCase):
         async def async_test_get_name():
             serie_name = 'test_serie123'
             serie = Serie(serie_name, 123456)
-            self.assertEqual(await serie.get_name(), serie_name)
+            self.assertEqual(serie.name, serie_name)
 
         coro = asyncio.coroutine(async_test_get_name)
         self.loop.run_until_complete(coro())

@@ -1,6 +1,6 @@
 import datetime
+import logging
 
-from lib.logging.eventlogger import EventLogger
 from lib.serie.series import DETECT_ANOMALIES_STATUS_PENDING, DETECT_ANOMALIES_STATUS_REQUESTED
 
 
@@ -101,8 +101,8 @@ class ClientManager:
             for serie_name in client.pending_series:
                 serie = await cls.serie_manager.get_serie(serie_name)
                 if await serie.pending_forecast():
-                    EventLogger.log(f'Setting for serie {serie_name} pending to false...', "info")
+                    logging.info(f'Setting for serie {serie_name} pending to false...')
                     await serie.set_pending_forecast(False)
                 if await serie.get_detect_anomalies_status() is DETECT_ANOMALIES_STATUS_PENDING:
-                    EventLogger.log(f'Setting for serie {serie_name} anomaly detection pending to false...', "info")
+                    logging.info(f'Setting for serie {serie_name} anomaly detection pending to false...')
                     await serie.set_detect_anomalies_status(DETECT_ANOMALIES_STATUS_REQUESTED)

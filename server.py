@@ -1,5 +1,7 @@
 import asyncio
 import datetime
+import logging
+
 import aiohttp_cors
 import socketio
 from aiohttp import web
@@ -9,13 +11,10 @@ from aiohttp_apispec import setup_aiohttp_apispec
 from lib.api.apihandlers import ApiHandlers, auth
 from lib.config.config import Config
 from lib.events.enodoeventmanager import EnodoEventManager
-from lib.jobmanager.enodojobmanager import EnodoJobManager, EnodoJob, JOB_TYPE_FORECAST_SERIE, \
-    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE
-from lib.logging.eventlogger import EventLogger
+from lib.jobmanager.enodojobmanager import EnodoJobManager, JOB_TYPE_FORECAST_SERIE
+from lib.logging import prepare_logger
 from lib.serie.seriemanager import SerieManager
-from lib.serie.series import DETECT_ANOMALIES_STATUS_REQUESTED, DETECT_ANOMALIES_STATUS_PENDING
 from lib.serverstate import ServerState
-from lib.siridb.siridb import SiriDB
 from lib.socket.clientmanager import ClientManager
 from lib.socket.handler import receive_new_series_points, receive_worker_status_update, \
     received_worker_refused
@@ -41,23 +40,24 @@ class Server:
         self._docs_only = docs_only
         self.socket_server = None
         self.watch_series_task = None
-        self.check_siridb_connection_task = None
         self.socket_server_task = None
         self.save_to_disk_task = None
         self.check_jobs_task = None
         # self._send_for_analyse = []
 
     async def start_up(self):
-        await ServerState.async_setup()
-        _siridb = SiriDB(username=Config.siridb_user,
-                         password=Config.siridb_password,
-                         dbname=Config.siridb_database,
-                         hostlist=[(Config.siridb_host, Config.siridb_port)])
-        status, connected = await _siridb.test_connection()
-        SiriDB.siridb_status = status
-        SiriDB.siridb_connected = connected
+        await ServerState.async_setup(siridb_data_username=Config.siridb_user,
+                                      siridb_data_password=Config.siridb_password,
+                                      siridb_data_dbname=Config.siridb_database,
+                                      siridb_data_hostlist=[(Config.siridb_host, Config.siridb_port)],
+                                      siridb_forecast_username=Config.siridb_forecast_user,
+                                      siridb_forecast_password=Config.siridb_forecast_password,
+                                      siridb_forecast_dbname=Config.siridb_forecast_database,
+                                      siridb_forecast_hostlist=[
+                                          (Config.siridb_forecast_host, Config.siridb_forecast_port)]
+                                      )
 
-        EventLogger.log('Setting up internal communications token...', "info")
+        logging.info('Setting up internal communications token...')
         Config.setup_internal_security_token()
 
         self.socket_server = SocketServer(Config.socket_server_host, Config.socket_server_port,
@@ -81,7 +81,6 @@ class Server:
         await EnodoEventManager.async_setup()
         await EnodoEventManager.load_from_disk()
         self.watch_series_task = self.loop.create_task(self.watch_series())
-        self.check_siridb_connection_task = self.loop.create_task(self.check_siridb_connection())
         self.save_to_disk_task = self.loop.create_task(self.save_to_disk())
         self.check_jobs_task = self.loop.create_task(EnodoJobManager.check_for_jobs())
         await self.socket_server.create()
@@ -93,21 +92,8 @@ class Server:
         """
         self.watch_series_task.cancel()
         self.check_jobs_task.cancel()
-        self.check_siridb_connection_task.cancel()
+        self.save_to_disk_task.cancel()
         await self.socket_server.stop()
-        await self.save_to_disk_task
-
-    async def check_siridb_connection(self):
-        while ServerState.running:
-            _siridb = SiriDB(username=Config.siridb_user,
-                             password=Config.siridb_password,
-                             dbname=Config.siridb_database,
-                             hostlist=[(Config.siridb_host, Config.siridb_port)])
-            status, connected = await _siridb.test_connection()
-            SiriDB.siridb_status = status
-            SiriDB.siridb_connected = connected
-            EventLogger.log(f"Checking SiriDB Connection, connected: {connected}", "verbose")
-            await asyncio.sleep(Config.siridb_connection_check_interval)
 
     async def watch_series(self):
         while ServerState.running:
@@ -131,16 +117,16 @@ class Server:
             await asyncio.sleep(Config.watcher_interval)
 
     @staticmethod
-    async def save_to_disk():
+    async def _save_to_disk():
         await SerieManager.save_to_disk()
         await EnodoJobManager.save_to_disk()
         await EnodoEventManager.save_to_disk()
 
-    async def save_to_disk_on_interval(self):
+    async def save_to_disk(self):
         while ServerState.running:
             await asyncio.sleep(Config.save_to_disk_interval)
-            EventLogger.log('Saving seriemanager state to disk', "verbose")
-            await self.save_to_disk()
+            logging.debug('Saving seriemanager state to disk')
+            await self._save_to_disk()
 
     async def stop_server(self):
 
@@ -165,16 +151,15 @@ class Server:
             del self.sio
             self.sio = None
 
-        EventLogger.log('Stopping analyser server...', "info")
-        EventLogger.log('...Saving log to disk', "info")
-        await self.save_to_disk()
-        EventLogger.save_to_disk()
+        logging.info('Stopping analyser server...')
+        logging.info('...Saving data to disk')
+        await self._save_to_disk()
         ServerState.running = False
-        EventLogger.log('...Doing clean up', "info")
+        logging.info('...Doing clean up')
         await self.clean_up()
 
-        EventLogger.log('...Stopping all running tasks', "info")
-        EventLogger.log('...Going down in 1', "info")
+        logging.info('...Stopping all running tasks')
+        logging.info('...Going down in 1')
         await asyncio.sleep(1)
         # asyncio.gather(*asyncio.Task.all_tasks()).cancel()
         for task in asyncio.Task.all_tasks():
@@ -198,20 +183,20 @@ class Server:
             return await handler(request)
 
     def start_server(self):
+        prepare_logger(self._log_level)
         Config.read_config(self.config_path)
-        EventLogger.prepare(Config.log_path, self._log_level)
-        EventLogger.log('Starting...', "info")
-        EventLogger.log('Loaded Config...', "info")
+        logging.info('Starting...')
+        logging.info('Loaded Config...')
 
         if self._docs_only:
-            EventLogger.log('Running in docs_only mode...', "info")
+            logging.info('Running in docs_only mode...')
             self.app = web.Application(middlewares=[self._docs_only_middleware])
         else:
-            EventLogger.log('Running in secure mode...', "info")
+            logging.info('Running in secure mode...')
             self.app = web.Application(middlewares=[auth])
 
         if Config.enable_rest_api:
-            EventLogger.log('REST API enabled', "info")
+            logging.info('REST API enabled')
             cors = aiohttp_cors.setup(self.app, defaults={
                 "*": aiohttp_cors.ResourceOptions(
                     allow_credentials=True,
@@ -258,7 +243,7 @@ class Server:
 
         self.sio = None
         if Config.enable_socket_io_api:
-            EventLogger.log('Socket.io API enabled', "info")
+            logging.info('Socket.io API enabled')
             self.sio = socketio.AsyncServer(async_mode='aiohttp',
                                             ping_timeout=60,
                                             ping_interval=25,

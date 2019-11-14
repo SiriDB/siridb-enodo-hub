@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import json
+import logging
 import os
 
 import qpack
@@ -8,7 +9,6 @@ import qpack
 from lib.analyser.analyserwrapper import AnalyserWrapper
 from lib.config.config import Config
 from lib.jobmanager import *
-from lib.logging.eventlogger import EventLogger
 from lib.serie.seriemanager import SerieManager
 from lib.serverstate import ServerState
 from lib.socket.clientmanager import ClientManager
@@ -237,17 +237,12 @@ class EnodoJobManager:
                         if serie is None:
                             pass
                         elif next_job.job_type is JOB_TYPE_FORECAST_SERIE:
-                            EventLogger.log(f"Adding serie: sending {next_job.serie_name} to Worker for forecasting",
-                                            "info",
-                                            "serie_add_queue")
+                            logging.info(f"Adding serie: sending {next_job.serie_name} to Worker for forecasting")
                             await cls._send_worker_job_request(worker, serie, next_job)
                             worker.is_going_busy = True
                             await cls._activate_job(next_job, worker.client_id)
                         elif next_job.job_type is JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE:
-                            EventLogger.log(
-                                f"Adding serie: sending {next_job.serie_name} to Worker for anomaly detection",
-                                "info",
-                                "serie_add_queue")
+                            logging.info(f"Adding serie: sending {next_job.serie_name} to Worker for anomaly detection")
                             await cls._send_worker_job_request(worker, serie, next_job)
                             worker.is_going_busy = True
                             await cls._activate_job(next_job, worker.client_id)
@@ -264,7 +259,7 @@ class EnodoJobManager:
         job_id = data.get('job_id')
 
         if data.get('error') is not None:
-            EventLogger.log(f"Error returned by worker for series {data.get('name')}", "error")
+            logging.error(f"Error returned by worker for series {data.get('name')}")
             series = await SerieManager.get_serie(data.get('name'))
             if series is not None:
                 await series.set_error(data.get('error'))
@@ -294,11 +289,11 @@ class EnodoJobManager:
             model = await serie.get_model_pkl()
             wrapper = (AnalyserWrapper(model, await serie.get_model(), await serie.get_model_parameters())).__dict__()
             data = qpack.packb(
-                {'serie_name': await serie.get_name(), 'wrapper': wrapper, 'job_type': job.job_type,
+                {'serie_name': serie.name, 'wrapper': wrapper, 'job_type': job.job_type,
                  'job_id': job.job_id, 'job_data': job.job_data})
             header = create_header(len(data), WORKER_JOB, 0)
             if serie not in worker.pending_series:
-                worker.pending_series.append(await serie.get_name())
+                worker.pending_series.append(serie.name)
             worker.writer.write(header + data)
         except Exception as e:
             print("something when wrong", e)
@@ -309,7 +304,7 @@ class EnodoJobManager:
         if worker is None:
             return
         try:
-            EventLogger.log(f"Asking worker {worker_id} to cancel job {job_id}", "error")
+            logging.error(f"Asking worker {worker_id} to cancel job {job_id}")
             data = qpack.packb(
                 {'job_id': job_id})
             header = create_header(len(data), WORKER_JOB_CANCEL, 0)
@@ -323,7 +318,7 @@ class EnodoJobManager:
         worker = await ClientManager.get_worker_by_id(client_id)
         if job_id in cls._active_jobs_index:
             await cls.set_job_failed(job_id)
-        EventLogger.log(f"Worker {client_id} cancelled job {job_id}", "error")
+        logging.error(f"Worker {client_id} cancelled job {job_id}")
         if worker is None:
             return
         try:
@@ -343,10 +338,7 @@ class EnodoJobManager:
                 'failed_jobs': [await EnodoJob.to_dict(job) for job in cls._failed_jobs],
                 'finished_jobs': [await EnodoJob.to_dict(job) for job in cls._finished_jobs],
             }
-
-            if not os.path.exists(Config.jobs_save_path):
-                raise Exception()
-            f = open(Config.series_save_path, "w")
+            f = open(Config.jobs_save_path, "w")
             f.write(json.dumps(job_data, default=safe_json_dumps))
             f.close()
         except Exception as e:
@@ -387,8 +379,6 @@ class EnodoJobManager:
 
         await cls._build_index()
 
-        EventLogger.log(
-            f'Loaded {loaded_active_jobs} active jobs, {loaded_failed_jobs} failed jobs and {loaded_finished_jobs} finished jobs from disk',
-            "info")
+        logging.info(f'Loaded {loaded_active_jobs} active jobs, {loaded_failed_jobs} failed jobs and {loaded_finished_jobs} finished jobs from disk')
 
         cls._lock = False

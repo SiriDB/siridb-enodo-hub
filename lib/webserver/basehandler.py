@@ -1,10 +1,10 @@
 from aiohttp import web
-from lib.analyser.analyserwrapper import MODEL_NAMES, MODEL_PARAMETERS
-from lib.config.config import Config
+from lib.analyser.analyserwrapper import MODEL_NAMES, MODEL_PARAMETERS, setup_default_model_arguments
 from lib.events import EnodoEventManager
 from lib.serie.seriemanager import SerieManager
 from lib.serie.series import DETECT_ANOMALIES_STATUS_DONE
-from lib.siridb.siridb import SiriDB
+from lib.serverstate import ServerState
+from lib.siridb.siridb import query_serie_data
 from lib.util.util import regex_valid
 
 
@@ -29,23 +29,18 @@ class BaseHandler:
             return web.json_response(data={'data': ''}, status=404)
 
         serie_data = await serie.to_dict()
-        _siridb_client = SiriDB(username=Config.siridb_user,
-                                password=Config.siridb_password,
-                                dbname=Config.siridb_database,
-                                hostlist=[(Config.siridb_host, Config.siridb_port)])
         if include_points:
-            # serie_points = await _siridb_client.query_serie_data(await serie.get_name(), "mean(1h)")
-            serie_points = await _siridb_client.query_serie_data(await serie.get_name(), "*")
-            serie_data['points'] = serie_points.get(await serie.get_name())
+            serie_points = await query_serie_data(ServerState.siridb_data_client, serie.name, "*")
+            serie_data['points'] = serie_points.get(serie.name)
         if await serie.is_forecasted():
             serie_data['analysed'] = True
-            serie_data['forecast_points'] = await SerieManager.get_serie_forecast(await serie.get_name())
+            serie_data['forecast_points'] = await SerieManager.get_serie_forecast(serie.name)
         else:
             serie_data['forecast_points'] = []
 
         serie_data['anomalies'] = []
         if await serie.get_detect_anomalies_status() is DETECT_ANOMALIES_STATUS_DONE:
-            anomalies = await SerieManager.get_serie_anomalies(await serie.get_name())
+            anomalies = await SerieManager.get_serie_anomalies(serie.name)
             serie_data['anomalies'] = anomalies
 
         return {'data': serie_data}
@@ -63,7 +58,6 @@ class BaseHandler:
     @classmethod
     async def resp_add_serie(cls, data):
         required_fields = ['name', 'model']
-        print(data)
         model = data.get('model')
         model_parameters = data.get('model_parameters')
 
@@ -75,6 +69,8 @@ class BaseHandler:
         for key in MODEL_PARAMETERS.get(model, {}):
             if key not in model_parameters.keys():
                 return web.json_response(data={'error': 'Missing required fields'}, status=400)
+
+        data['model_parameters'] = await setup_default_model_arguments(model_parameters)
 
         if all(required_field in data for required_field in required_fields):
             await SerieManager.add_serie(data)
