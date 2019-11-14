@@ -7,3 +7,9 @@ test/*
 *.pyc
 *.pyo
 *.conf
+
+connector/python/.idea
+connector/python/build
+connector/python/dist
+*.egg-info
+*.egg
