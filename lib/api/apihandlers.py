@@ -117,7 +117,7 @@ class ApiHandlers:
         :param request:
         :return:
         """
-        serie_name = request.match_info['serie_name']
+        serie_name = urllib.parse.unquote(request.match_info['serie_name'])
         return web.json_response(data={}, status=await BaseHandler.resp_remove_serie(serie_name))
 
     @classmethod

@@ -66,6 +66,38 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
+    async def create_series(cls, sid, data, event):
+        if not isinstance(data, dict):
+            resp = {'error': 'Incorrect data'}
+        else:
+            series_name = data.get('name')
+            series_model = data.get('model')
+            if series_name is not None and series_model is not None:
+                resp = await BaseHandler.resp_add_serie(data)
+            else:
+                resp = {'error': 'Missing required field(s)'}
+        return safe_json_dumps(resp)
+
+    @classmethod
+    @socketio_auth_required
+    async def remove_series(cls, sid, data, event):
+        if not isinstance(data, dict):
+            resp = {'error': 'Incorrect data'}
+        else:
+            series_name = data.get('name')
+            if series_name is not None:
+                resp = {'status': await BaseHandler.resp_remove_serie(series_name)}
+            else:
+                resp = {'error': 'Missing required field(s)'}
+        return safe_json_dumps(resp)
+
+    @classmethod
+    @socketio_auth_required
+    async def get_enodo_models(cls, sid, data, event=None):
+        return await BaseHandler.resp_get_possible_analyser_models()
+
+    @classmethod
+    @socketio_auth_required
     async def subscribe_series(cls, sid, data, event=None):
         print(cls, sid, data, event)
         if cls._sio is not None:

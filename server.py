@@ -103,7 +103,7 @@ class Server:
                 serie = await SerieManager.get_serie(serie_name)
                 if serie is not None \
                         and not await serie.ignored():
-                    if not len(await EnodoJobManager.get_failed_job_for_serie(serie_name)):
+                    if not len(await EnodoJobManager.get_failed_jobs_for_series(serie_name)):
                         if not await serie.pending_forecast() and (not await serie.is_forecasted() or (
                                 serie.new_forecast_at is not None and serie.new_forecast_at < datetime.datetime.now())):
                             # Should be forecasted if not forecasted yet or new forecast should be made
@@ -248,8 +248,12 @@ class Server:
                                             ping_timeout=60,
                                             ping_interval=25,
                                             cookie=None,
-                                            cors_allowed_origins='*')
+                                            cors_allowed_origins='*',
+                                            logger=False)
             self.sio.attach(self.app)
+
+            logging.getLogger('socketio').setLevel(logging.ERROR)
+            logging.getLogger('engineio').setLevel(logging.ERROR)
 
         self.app.on_shutdown.append(self._stop_server_from_aiohttp_cleanup)
         self.loop.run_until_complete(self.start_up())

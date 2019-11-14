@@ -8,7 +8,7 @@ import re
 from lib.config.config import Config
 from lib.events import EnodoEvent
 from lib.events.enodoeventmanager import ENODO_EVENT_ANOMALY_DETECTED, EnodoEventManager
-from lib.serie.series import Series, DETECT_ANOMALIES_STATUS_DONE
+from lib.serie import DETECT_ANOMALIES_STATUS_DONE
 from lib.serverstate import ServerState
 from lib.siridb.siridb import query_serie_datapoint_count, drop_serie, insert_points, query_serie_data
 from lib.socket.clientmanager import ClientManager
@@ -43,6 +43,8 @@ class SerieManager:
                 logging.info(f"Added new serie: {serie.get('name')}")
                 await cls.series_changed(SUBSCRIPTION_CHANGE_TYPE_ADD, serie.get('name'))
                 await cls.update_listeners(await cls.get_series())
+                return True
+        return False
 
     @classmethod
     async def get_serie(cls, serie_name):
@@ -142,9 +144,11 @@ class SerieManager:
         try:
             serialized_series = []
             for serie in cls._series.values():
-                serialized_series.append(await serie.to_dict())
+                serialized_series.append(await serie.to_dict(static_only=True))
             f = open(Config.series_save_path, "w")
             f.write(json.dumps(serialized_series, default=safe_json_dumps))
             f.close()
         except Exception as e:
             print(e)
+
+from lib.serie.series import Series

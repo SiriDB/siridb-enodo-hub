@@ -1,6 +1,6 @@
 from lib.jobmanager.enodojobmanager import EnodoJobManager, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE
 from lib.serie.seriemanager import SerieManager
-from lib.serie.series import DETECT_ANOMALIES_STATUS_PENDING
+from lib.serie import DETECT_ANOMALIES_STATUS_PENDING
 from lib.socket.clientmanager import ClientManager
 from lib.socket.package import *
 

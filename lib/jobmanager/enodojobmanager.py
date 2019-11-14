@@ -107,12 +107,26 @@ class EnodoJobManager:
         cls._new_jobs.append(job)
 
     @classmethod
-    async def get_failed_job_for_serie(cls, serie_name):
+    async def has_series_failed_jobs(cls, serie_name):
+        for job in cls._failed_jobs:
+            if job.serie_name == serie_name:
+                return True
+        return False
+
+    @classmethod
+    async def get_failed_jobs_for_series(cls, serie_name):
         jobs = []
         for job in cls._failed_jobs:
             if job.serie_name == serie_name:
                 jobs.append(job)
         return jobs
+
+    @classmethod
+    async def remove_failed_jobs_for_series(cls, serie_name):
+        jobs = await cls.get_failed_jobs_for_series(serie_name)
+
+        for job in jobs:
+            cls._failed_jobs.remove(job)
 
     @classmethod
     async def activate_job(cls, job_id, worker_id):

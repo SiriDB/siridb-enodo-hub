@@ -8,6 +8,7 @@ async def query_serie_datapoint_count(siridb_client, serie_name):
     try:
         result = await siridb_client.query(f'select count() from "{serie_name}"')
     except (QueryError, InsertError, ServerError, PoolError, AuthenticationError, UserAuthError) as e:
+        print(e)
         print("Connection problem with SiriDB server")
         pass
     else:

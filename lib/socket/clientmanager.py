@@ -1,7 +1,7 @@
 import datetime
 import logging
 
-from lib.serie.series import DETECT_ANOMALIES_STATUS_PENDING, DETECT_ANOMALIES_STATUS_REQUESTED
+from lib.serie import DETECT_ANOMALIES_STATUS_PENDING, DETECT_ANOMALIES_STATUS_REQUESTED
 
 
 class Client:

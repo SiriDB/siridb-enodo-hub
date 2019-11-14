@@ -21,16 +21,16 @@ class SocketIoRouter:
             handler=SocketIoHandler.get_all_series)
         self._sio_on(
             event='/api/series/create',
-            handler=SocketIoHandler.get_all_series)
+            handler=SocketIoHandler.create_series)
         self._sio_on(
             event='/api/series/details',
             handler=SocketIoHandler.get_serie_details)
         self._sio_on(
             event='/api/series/delete',
-            handler=SocketIoHandler.get_all_series)
+            handler=SocketIoHandler.remove_series)
         self._sio_on(
             event='/api/enodo/models',
-            handler=SocketIoHandler.get_all_series)
+            handler=SocketIoHandler.get_enodo_models)
 
         self._setup_listen_events()
 

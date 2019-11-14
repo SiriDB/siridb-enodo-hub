@@ -2,7 +2,7 @@ from aiohttp import web
 from lib.analyser.analyserwrapper import MODEL_NAMES, MODEL_PARAMETERS, setup_default_model_arguments
 from lib.events import EnodoEventManager
 from lib.serie.seriemanager import SerieManager
-from lib.serie.series import DETECT_ANOMALIES_STATUS_DONE
+from lib.serie import DETECT_ANOMALIES_STATUS_DONE
 from lib.serverstate import ServerState
 from lib.siridb.siridb import query_serie_data
 from lib.util.util import regex_valid
@@ -73,12 +73,14 @@ class BaseHandler:
         data['model_parameters'] = await setup_default_model_arguments(model_parameters)
 
         if all(required_field in data for required_field in required_fields):
-            await SerieManager.add_serie(data)
+            if not await SerieManager.add_serie(data):
+                return {'error': 'Something went wrong when adding the serie. Are you sure the serie exists?'}
 
         return {'data': list(await SerieManager.get_series_to_dict())}
 
     @classmethod
     async def resp_remove_serie(cls, serie_name):
+        # TODO: REMOVE JOBS, EVENTS ETC
         if await SerieManager.remove_serie(serie_name):
             return 200
         return 404

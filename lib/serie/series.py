@@ -1,19 +1,8 @@
 import datetime
-import os
 
-from lib.analyser.analyserwrapper import MODEL_NAMES, MODEL_PARAMETERS
-from lib.config.config import Config
-
-DETECT_ANOMALIES_STATUS_REQUESTED = 1
-DETECT_ANOMALIES_STATUS_PENDING = 2
-DETECT_ANOMALIES_STATUS_DONE = 4
-DETECT_ANOMALIES_STATUS_NONE = None
-DETECT_ANOMALIES_STATUSES = [DETECT_ANOMALIES_STATUS_REQUESTED, DETECT_ANOMALIES_STATUS_PENDING,
-                             DETECT_ANOMALIES_STATUS_DONE, DETECT_ANOMALIES_STATUS_NONE]
-
-FORECAST_STATUS_NONE = 1
-FORECAST_STATUS_PENDING = 2
-FORECAST_STATUS_DONE = 3
+from lib.analyser.analyserwrapper import MODEL_NAMES
+from lib.serie import DETECT_ANOMALIES_STATUS_NONE, FORECAST_STATUS_NONE, DETECT_ANOMALIES_STATUSES, \
+    FORECAST_STATUS_DONE
 
 
 class Series:
@@ -48,13 +37,14 @@ class Series:
         return self._datapoint_count_lock
 
     async def clear_errors(self):
-        pass
+        await EnodoJobManager.remove_failed_jobs_for_series(self.name)
 
     async def get_errors(self):
-        return []
+        errors = [job.error for job in (await EnodoJobManager.get_failed_jobs_for_series(self.name))]
+        return errors
 
     async def is_ignored(self):
-        return False
+        return await EnodoJobManager.has_series_failed_jobs(self.name)
 
     async def get_model(self):
         return self._model
@@ -90,7 +80,17 @@ class Series:
     async def is_forecasted(self):
         return self.forecast_status is FORECAST_STATUS_DONE
 
-    async def to_dict(self):
+    async def to_dict(self, static_only=False):
+        if static_only:
+            return {
+                'name': self.name,
+                'datapoint_count': self._datapoint_count,
+                'analysed': await self.is_forecasted(),
+                'new_forecast_at': self.new_forecast_at,
+                'model': self._model,
+                'model_parameters': self.model_parameters,
+                'detecting_anomalies_status': self._detecting_anomalies_status
+            }
         return {
             'name': self.name,
             'datapoint_count': self._datapoint_count,
@@ -115,3 +115,6 @@ class Series:
                       new_forecast_at, data_dict.get('model_parameters', None),
                       detecting_anomalies_status=data_dict.get('detecting_anomalies_status', None),
                       forecast_status=data_dict.get('forecast_status', None))
+
+
+from lib.jobmanager.enodojobmanager import EnodoJobManager
