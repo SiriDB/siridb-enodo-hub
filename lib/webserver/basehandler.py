@@ -1,5 +1,7 @@
 from aiohttp import web
-from lib.analyser.analyserwrapper import MODEL_NAMES, MODEL_PARAMETERS, setup_default_model_arguments
+from lib.analyser.analyserwrapper import setup_default_model_arguments
+from enodo import EnodoModel
+from lib.analyser.model import EnodoModelManager
 from lib.events import EnodoEventManager
 from lib.serie.seriemanager import SerieManager
 from lib.serie import DETECT_ANOMALIES_STATUS_DONE
@@ -58,15 +60,16 @@ class BaseHandler:
     @classmethod
     async def resp_add_serie(cls, data):
         required_fields = ['name', 'model']
-        model = data.get('model')
+        model_name = data.get('model')
         model_parameters = data.get('model_parameters')
 
-        if model not in MODEL_NAMES.keys():
+        model = await EnodoModelManager.get_model(model_name)
+        if model is None:
             return web.json_response(data={'error': 'Unknown model'}, status=400)
 
-        if model_parameters is None and len(MODEL_PARAMETERS.get(model, [])) > 0:
+        if model_parameters is None and len(model.model_arguments.keys()) > 0:
             return web.json_response(data={'error': 'Missing required fields'}, status=400)
-        for key in MODEL_PARAMETERS.get(model, {}):
+        for key in model_name.model_arguments:
             if key not in model_parameters.keys():
                 return web.json_response(data={'error': 'Missing required fields'}, status=400)
 
@@ -88,7 +91,17 @@ class BaseHandler:
     @classmethod
     async def resp_get_possible_analyser_models(cls):
         data = {
-            'models': MODEL_NAMES,
-            'parameters': MODEL_PARAMETERS
+            'models': [await EnodoModel.to_dict(model) for model in EnodoModelManager.models]
         }
         return {'data': data}
+
+    @classmethod
+    async def resp_add_model(cls, data):
+        try:
+            await EnodoModelManager.add_model(data['model_name'],
+                                              data['model_arguments'],
+                                              data['supports_forecasting'],
+                                              data['supports_anomaly_detection'])
+            return {'data': [await EnodoModel.to_dict(model) for model in EnodoModelManager.models]}, 201
+        except Exception:
+            return {'error': 'Incorrect model data'}, 400

@@ -39,7 +39,8 @@ class Client:
         self._cbs = cbs
         if cbs is None:
             self._cbs = {}
-        self._handshake_data_cb = handshake_cb
+        if handshake_cb is not None:
+            self._handshake_data_cb = handshake_cb
 
         await self._handshake()
 

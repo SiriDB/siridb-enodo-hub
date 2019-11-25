@@ -6,6 +6,7 @@ import os
 
 import qpack
 
+from enodo.jobs import EnodoJobDataModel
 from lib.analyser.analyserwrapper import AnalyserWrapper
 from lib.config.config import Config
 from lib.jobmanager import *
@@ -22,7 +23,11 @@ class EnodoJob:
 
     def __init__(self, job_id, job_type, serie_name, job_data=None, send_at=None, error=None, worker_id=None):
         if job_type not in JOB_TYPES:
-            raise Exception('unknow job type')
+            raise Exception('unknown job type')
+        if isinstance(job_data, EnodoJobDataModel):
+            job_data = job_data.to_dict()
+        elif job_data is not None:
+            raise Exception('Unknown job data value')
         self.job_id = job_id
         self.job_type = job_type
         self.serie_name = serie_name
@@ -94,7 +99,9 @@ class EnodoJobManager:
         return cls._next_job_id
 
     @classmethod
-    async def create_job(cls, job_type, serie_name, job_data=None):
+    async def create_job(cls, job_type, serie_name, job_data):
+        if not isinstance(job_data, EnodoJobDataModel):
+            raise Exception('Incorrect job data')
         job_id = await cls._get_next_job_id()
         job = EnodoJob(job_id, job_type, serie_name, job_data=job_data)  # TODO: Catch exception
         await cls._add_job(job)
@@ -393,6 +400,7 @@ class EnodoJobManager:
 
         await cls._build_index()
 
-        logging.info(f'Loaded {loaded_active_jobs} active jobs, {loaded_failed_jobs} failed jobs and {loaded_finished_jobs} finished jobs from disk')
+        logging.info(
+            f'Loaded {loaded_active_jobs} active jobs, {loaded_failed_jobs} failed jobs and {loaded_finished_jobs} finished jobs from disk')
 
         cls._lock = False

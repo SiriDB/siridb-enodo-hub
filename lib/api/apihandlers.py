@@ -12,7 +12,8 @@ from lib.config.config import Config
 from lib.socket.clientmanager import ClientManager
 from lib.util.util import safe_json_dumps
 from lib.api.apischemas import SchemaResponseSeries, SchemaResponseError, SchemaResponseSeriesDetails, \
-    SchemaRequestCreateSeries, SchemaSeries, SchemaResponseModels, SchemaRequestCreateEnodoEventOutput
+    SchemaRequestCreateSeries, SchemaSeries, SchemaResponseModels, SchemaRequestCreateEnodoEventOutput, \
+    SchemaRequestCreateEnodoModel
 from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
 
@@ -47,7 +48,8 @@ class ApiHandlers:
         :param request:
         :return:
         """
-        regex_filter = urllib.parse.unquote(request.rel_url.query['filter']) if 'filter' in request.rel_url.query else None
+        regex_filter = urllib.parse.unquote(
+            request.rel_url.query['filter']) if 'filter' in request.rel_url.query else None
         # TODO implement filter
 
         return web.json_response(data=await BaseHandler.resp_get_monitored_series(regex_filter),
@@ -181,6 +183,27 @@ class ApiHandlers:
         """
 
         return web.json_response(data=await BaseHandler.resp_get_possible_analyser_models(), status=200)
+
+    @classmethod
+    @docs(
+        tags=["public_api"],
+        summary="Add a new model",
+        description="Add a new Enodo analyse model with arguments",
+        parameters=[]
+    )
+    @request_schema(SchemaRequestCreateEnodoModel())
+    @response_schema(SchemaResponseModels(), 200)
+    @response_schema(SchemaResponseError(), 400)
+    @EnodoAuth.auth.required
+    async def add_analyser_models(cls, request):
+        """
+        Returns list of possible models with corresponding parameters
+        :param request:
+        :return:
+        """
+        data = await request.json()
+        resp, status = await BaseHandler.resp_add_model(data)
+        return web.json_response(data=resp, status=status)
 
     @classmethod
     @EnodoAuth.auth.required

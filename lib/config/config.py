@@ -91,6 +91,7 @@ class Config:
     enable_socket_io_api = None
     internal_security_token = None
     jobs_save_path = None
+    model_save_path = None
 
     @classmethod
     def create_standard_config_file(cls, path):
@@ -178,6 +179,7 @@ class Config:
         cls.series_save_path = os.path.join(cls.base_dir, 'data/series.json')
         cls.jobs_save_path = os.path.join(cls.base_dir, 'data/jobs.json')
         cls.event_outputs_save_path = os.path.join(cls.base_dir, 'data/outputs.json')
+        cls.model_save_path = os.path.join(cls.base_dir, 'data/models.json')
 
         if not os.path.exists(os.path.join(cls.base_dir, 'data')):
             os.makedirs(os.path.join(cls.base_dir, 'data'))

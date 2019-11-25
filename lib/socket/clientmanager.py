@@ -1,20 +1,20 @@
 import datetime
 import logging
 
+from enodo import EnodoModel
+
+from lib.analyser.model import EnodoModelManager
 from lib.serie import DETECT_ANOMALIES_STATUS_PENDING, DETECT_ANOMALIES_STATUS_REQUESTED
 
 
-class Client:
+class EnodoClient:
 
-    def __init__(self, client_id, ip_address, writer, version="unknown", last_seen=None, busy=None):
+    def __init__(self, client_id, ip_address, writer, version="unknown", last_seen=None):
         self.client_id = client_id
         self.ip_address = ip_address
         self.writer = writer
-        self.busy = busy
-        self.is_going_busy = False
         self.last_seen = last_seen
         self.version = version
-        self.pending_series = []
         if last_seen is None:
             self.last_seen = datetime.datetime.now()
 
@@ -22,9 +22,31 @@ class Client:
         return {'client_id': self.client_id,
                 'ip_address': self.ip_address,
                 'writer': self.writer,
-                'busy': self.busy,
                 'last_seen': self.last_seen,
                 'version': self.version}
+
+
+class ListenerClient(EnodoClient):
+    def __init__(self, client_id, ip_address, writer, version="unknown", last_seen=None):
+        super().__init__(client_id, ip_address, writer, version, last_seen)
+
+
+class WorkerClient(EnodoClient):
+    def __init__(self, client_id, ip_address, writer, supported_models, version="unknown", last_seen=None, busy=False):
+        super().__init__(client_id, ip_address, writer, version, last_seen)
+        self.busy = busy
+        self.pending_series = []
+        self.is_going_busy = False
+        self.supported_models = supported_models
+
+    def to_dict(self):
+        return {'client_id': self.client_id,
+                'ip_address': self.ip_address,
+                'writer': self.writer,
+                'busy': self.busy,
+                'last_seen': self.last_seen,
+                'version': self.version,
+                'models': self.supported_models}
 
 
 class ClientManager:
@@ -37,12 +59,13 @@ class ClientManager:
         cls.serie_manager = serie_manager
 
     @classmethod
-    async def add_listener(cls, client):
-        cls.listeners[client.client_id] = client
-
-    @classmethod
-    async def add_worker(cls, client):
-        cls.workers[client.client_id] = client
+    async def add_client(cls, client):
+        if isinstance(client, ListenerClient):
+            cls.listeners[client.client_id] = client
+        elif isinstance(client, WorkerClient):
+            for model in client.supported_models:
+                await EnodoModelManager.add_model_from_dict(model)
+            cls.workers[client.client_id] = client
 
     @classmethod
     async def get_listener_by_id(cls, client_id):

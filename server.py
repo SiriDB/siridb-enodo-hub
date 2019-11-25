@@ -8,6 +8,8 @@ from aiohttp import web
 from aiohttp.web_middlewares import middleware
 from aiohttp_apispec import setup_aiohttp_apispec
 
+from enodo.jobs import EnodoForecastJobDataModel
+from lib.analyser.model import EnodoModelManager
 from lib.api.apihandlers import ApiHandlers, auth
 from lib.config.config import Config
 from lib.events.enodoeventmanager import EnodoEventManager
@@ -80,6 +82,8 @@ class Server:
         await EnodoJobManager.load_from_disk()
         await EnodoEventManager.async_setup()
         await EnodoEventManager.load_from_disk()
+        await EnodoModelManager.async_setup()
+        await EnodoModelManager.load_from_disk()
         self.watch_series_task = self.loop.create_task(self.watch_series())
         self.save_to_disk_task = self.loop.create_task(self.save_to_disk())
         self.check_jobs_task = self.loop.create_task(EnodoJobManager.check_for_jobs())
@@ -108,7 +112,7 @@ class Server:
                                 serie.new_forecast_at is not None and serie.new_forecast_at < datetime.datetime.now())):
                             # Should be forecasted if not forecasted yet or new forecast should be made
                             if await serie.get_datapoints_count() >= Config.min_data_points:
-                                await EnodoJobManager.create_job(JOB_TYPE_FORECAST_SERIE, serie_name)
+                                await EnodoJobManager.create_job(JOB_TYPE_FORECAST_SERIE, serie_name, EnodoForecastJobDataModel())
                                 await serie.set_pending_forecast(True)
                         # elif await serie.get_detect_anomalies_status() is DETECT_ANOMALIES_STATUS_REQUESTED:
                         #     await EnodoJobManager.create_job(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE, serie_name)
@@ -121,6 +125,7 @@ class Server:
         await SerieManager.save_to_disk()
         await EnodoJobManager.save_to_disk()
         await EnodoEventManager.save_to_disk()
+        await EnodoModelManager.save_to_disk()
 
     async def save_to_disk(self):
         while ServerState.running:
@@ -213,7 +218,8 @@ class Server:
             self.app.router.add_get("/api/series/{serie_name}", ApiHandlers.get_monitored_serie_details,
                                     allow_head=False)
             self.app.router.add_delete("/api/series/{serie_name}", ApiHandlers.remove_serie)
-            self.app.router.add_get("/api/enodo/models", ApiHandlers.get_possible_analyser_models, allow_head=False)
+            self.app.router.add_get("/api/enodo/model", ApiHandlers.get_possible_analyser_models, allow_head=False)
+            self.app.router.add_post("/api/enodo/model", ApiHandlers.add_analyser_models)
             self.app.router.add_delete("/api/enodo/event/output/{output_id}", ApiHandlers.remove_enodo_event_output)
             self.app.router.add_post("/api/enodo/event/output", ApiHandlers.add_enodo_event_output)
 

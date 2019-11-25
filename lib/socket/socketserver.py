@@ -6,7 +6,7 @@ import logging
 import qpack
 
 from lib.serie.seriemanager import SerieManager
-from lib.socket.clientmanager import ClientManager, Client
+from lib.socket.clientmanager import ClientManager, ListenerClient, WorkerClient
 from lib.socket.package import *
 
 
@@ -59,13 +59,23 @@ class SocketServer:
                     connected = False
                 else:
                     if 'client_type' in client_data:
-                        client = Client(client_id, writer.get_extra_info('peername'), writer,
-                                        client_data.get('version', None), busy=client_data.get('busy', None))
                         if client_data.get('client_type') == 'listener':
-                            await ClientManager.add_listener(client)
+                            client = ListenerClient(client_id, writer.get_extra_info('peername'), writer,
+                                                    client_data.get('version', None))
+                            await ClientManager.add_client(client)
                             logging.info(f'New listener with id: {client_id}')
                         elif client_data.get('client_type') == 'worker':
-                            await ClientManager.add_worker(client)
+                            supported_models = client_data.get('models')
+                            if supported_models is None or len(supported_models) < 1:
+                                response = create_header(0, HANDSHAKE_FAIL, packet_id)
+                                writer.write(response)
+                                connected = False
+
+                            client = WorkerClient(client_id, writer.get_extra_info('peername'), writer,
+                                                  supported_models,
+                                                  client_data.get('version', None),
+                                                  busy=client_data.get('busy', None))
+                            await ClientManager.add_client(client)
                             logging.info(f'New worker with id: {client_id}')
 
                         response = create_header(0, HANDSHAKE_OK, packet_id)

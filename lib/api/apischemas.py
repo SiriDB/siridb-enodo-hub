@@ -45,6 +45,13 @@ class SchemaRequestCreateEnodoEventOutput(Schema):
     data = fields.Dict()
 
 
+class SchemaRequestCreateEnodoModel(Schema):
+    model_name = fields.String()
+    model_arguments = fields.List(fields.Dict())
+    supports_forecasting = fields.Boolean()
+    supports_anomaly_detection = fields.Boolean()
+
+
 class _SchemaModelNameListItem(Schema):
     model_id = fields.Integer()
     model_name = fields.String()
