@@ -1,6 +1,5 @@
 import datetime
 
-from lib.analyser.analyserwrapper import MODEL_NAMES
 from lib.serie import DETECT_ANOMALIES_STATUS_NONE, FORECAST_STATUS_NONE, DETECT_ANOMALIES_STATUSES, \
     FORECAST_STATUS_DONE
 

@@ -1,11 +1,3 @@
-ARIMA_MODEL = 1
-PROPHET_MODEL = 2
-AR_MODEL = 3
-MA_MODEL = 4
-
-MODEL_NAMES = {ARIMA_MODEL: 'ARIMA', PROPHET_MODEL: 'Prophet', AR_MODEL: 'Autoregression', MA_MODEL: 'Moving average'}
-MODEL_PARAMETERS = {ARIMA_MODEL: ['m', 'd', 'D'], PROPHET_MODEL: [], AR_MODEL: [], MA_MODEL: []}
-
 GENERAL_PARAMETERS = {
     'forecast_points_in_future': 10,
     'min_points_for_forecast': 100,
