@@ -31,6 +31,9 @@ class SocketIoRouter:
         self._sio_on(
             event='/api/enodo/models',
             handler=SocketIoHandler.get_enodo_models)
+        self._sio_on(
+            event='/api/enodo/status',
+            handler=SocketIoHandler.get_enodo_hub_status)
 
         self._setup_listen_events()
 

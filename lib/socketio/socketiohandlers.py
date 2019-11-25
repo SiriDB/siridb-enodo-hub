@@ -131,6 +131,12 @@ class SocketIoHandler:
             cls._sio.leave_room(sid, 'series_updates')
 
     @classmethod
+    @socketio_auth_required
+    async def get_enodo_hub_status(cls, sid, data, event):
+        resp = await BaseHandler.resp_get_enodo_hub_status()
+        return resp
+
+    @classmethod
     async def internal_updates_series_subscribers(cls, change_type, series_name, series_data):
         if cls._sio is not None:
             await cls._sio.emit('series_updates', {

@@ -8,6 +8,7 @@ from lib.serie import DETECT_ANOMALIES_STATUS_DONE
 from lib.serverstate import ServerState
 from lib.siridb.siridb import query_serie_data
 from lib.util.util import regex_valid
+from version import VERSION
 
 
 class BaseHandler:
@@ -105,3 +106,8 @@ class BaseHandler:
             return {'data': [await EnodoModel.to_dict(model) for model in EnodoModelManager.models]}, 201
         except Exception:
             return {'error': 'Incorrect model data'}, 400
+
+    @classmethod
+    async def resp_get_enodo_hub_status(cls):
+        data = {'version': VERSION}
+        return {'data': data}

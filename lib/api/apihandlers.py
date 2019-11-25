@@ -1,4 +1,3 @@
-import psutil as psutil
 import urllib.parse
 from aiohttp import web
 
@@ -207,31 +206,14 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
-    async def get_siridb_status(cls, request):
-        """
-        Get siridb connection status
-        :param request:
-        :return:
-        """
-
-        return web.json_response(data={'data': {
-            'connected': SiriDB.siridb_connected,
-            'status': SiriDB.siridb_status
-        }}, status=200)
-
-    @classmethod
-    @EnodoAuth.auth.required
     async def get_siridb_enodo_status(cls, request):
         """
         Get status of this analyser instance
         :param request:
         :return:
         """
-
-        cpu_usage = psutil.cpu_percent()
-        return web.json_response(data={'data': {
-            'cpu_usage': cpu_usage
-        }}, status=200)
+        resp = await BaseHandler.resp_get_enodo_hub_status()
+        return web.json_response(data=resp, status=200)
 
     @classmethod
     @EnodoAuth.auth.required

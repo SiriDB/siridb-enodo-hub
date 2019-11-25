@@ -226,7 +226,6 @@ class Server:
             # Add internal api routes
             self.app.router.add_get("/api/settings", ApiHandlers.get_settings, allow_head=False)
             self.app.router.add_post("/api/settings", ApiHandlers.set_settings)
-            self.app.router.add_get("/api/siridb/status", ApiHandlers.get_siridb_status, allow_head=False)
             self.app.router.add_get("/api/enodo/status", ApiHandlers.get_siridb_enodo_status, allow_head=False)
             self.app.router.add_get("/api/enodo/log", ApiHandlers.get_event_log, allow_head=False)
             self.app.router.add_get("/api/enodo/clients", ApiHandlers.get_connected_clients, allow_head=False)
