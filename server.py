@@ -257,6 +257,7 @@ class Server:
                                             logger=False)
             self.sio.attach(self.app)
 
+            logging.getLogger('aiohttp').setLevel(logging.ERROR)
             logging.getLogger('socketio').setLevel(logging.ERROR)
             logging.getLogger('engineio').setLevel(logging.ERROR)
 

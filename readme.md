@@ -11,40 +11,34 @@
 
 ## Deployment and internal communication
 
-message types:
-
- type        | desc           |
-|:------------- |:-------------|
-| HANDSHAKE      | General type for sending handshake |
-| UNKNOW_CLIENT  | General type for sending server has received handshake from unknown client |
-| SHUTDOWN      | General type for sender is shutingdown      |
-| ADD_SERIE | General type for adding serie      |
-| REMOVE_SERIE | General type for removing serie      |
-| UPDATE_SERIES | Type for complete new list of series to watch      |
-| HANDSHAKE_OK | General type for successful received handshake      |
-| HANDSHAKE_FAIL | General type for a not succesful handshake      |
-| HEARTBEAT | General type for sending heartbeat      |
-| LISTENER_ADD_SERIE_COUNT | Type send by listener for serie datapoint count update      |
-| RESPONSE_OK | General ok response      |
-| TRAIN_MODEL | Type to execute training for certain model for certain serie |
-| FIT_MODEL   | Type to fit model for certain serie |
-| FORECAST_SERIE | Type to calculate forecast for a certain serie |
-
 ### Listener
 
 The enode listener listens to pipe socket with siridb server. It sums up the totals of added datapoints to each serie. 
-It periodically sends an update to the enode hub. The listener only keeps track of series that are registered via an ADD_SERIE of the UPDATE_SERIE message. The listener is seperated from the enode hub, so that it can be placed close to the siridb server, so it can locally access the pipe socket.
-Every interval for heartbeat and update can be configured with the listener.conf file next to the main.py
+It periodically sends an update to the enode hub. The listener only keeps track of series that are registered via the hub. The listener is seperated from the enode hub, so that it can be placed close to the siridb server, so it can locally access the pipe socket.
+Every interval for heartbeat and update can be configured in the .conf file
 
 ### Worker
 
 The enode worker executes fitting and forecasting models/algorithms. The worker uses significant CPU and thus should be placed on a machine that has low CPU usage.
-The worker can create different models (ARIMA/prophet) for series, train models with new data and calculate forecasts for a certain serie.
+The worker can create different models (ARIMA/prophet) for series, train models with new data and calculate forecasts for a certain serie. A worker can implement multiple models. This can be different per worker version. The implemented models should be communicated to the hub during the handshake.
 
 ### Hub
 
-The enode hub communicateds and guides both the listener as the worker. The hub tells the listener to which series it needs to pay attention to, and it tells the worker which serie should be analysed.
+The enode hub communicates and guides both the listener as the worker. The hub tells the listener to which series it needs to pay attention to, and it tells the worker which serie should be analysed.
 Clients can connect to the hub for receiving updates, and polling for data. Also a client can use the hub to alter the data about which series should be watched.
 
 
 
+## Getting started
+
+To get the Enodo Hub setup you need to following the following steps:
+
+### Locally
+
+1. Install dependencies via `pip3 install -r requirements.txt`
+2. Setup a .conf file file `python3 main.py --create_config` There will be made a `default.conf` next to the main.py.
+3. Fill in the `default.conf` file
+4. Call `python3 main.py --config=default.conf` to start the hub.
+
+### Docker
+....
