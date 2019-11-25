@@ -65,21 +65,21 @@ class BaseHandler:
 
         model = await EnodoModelManager.get_model(model_name)
         if model is None:
-            return web.json_response(data={'error': 'Unknown model'}, status=400)
+            return {'error': 'Unknown model'}, 400
 
         if model_parameters is None and len(model.model_arguments.keys()) > 0:
-            return web.json_response(data={'error': 'Missing required fields'}, status=400)
-        for key in model_name.model_arguments:
+            return {'error': 'Missing required fields'}, 400
+        for key in model.model_arguments:
             if key not in model_parameters.keys():
-                return web.json_response(data={'error': 'Missing required fields'}, status=400)
+                return {'error': 'Missing required fields'}, 400
 
         data['model_parameters'] = await setup_default_model_arguments(model_parameters)
 
         if all(required_field in data for required_field in required_fields):
             if not await SerieManager.add_serie(data):
-                return {'error': 'Something went wrong when adding the serie. Are you sure the serie exists?'}
+                return {'error': 'Something went wrong when adding the serie. Are you sure the serie exists?'}, 400
 
-        return {'data': list(await SerieManager.get_series_to_dict())}
+        return {'data': list(await SerieManager.get_series_to_dict())}, 201
 
     @classmethod
     async def resp_remove_serie(cls, serie_name):

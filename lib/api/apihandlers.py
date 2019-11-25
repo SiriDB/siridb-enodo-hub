@@ -101,8 +101,8 @@ class ApiHandlers:
         :return:
         """
         data = await request.json()
-
-        return web.json_response(data=await BaseHandler.resp_add_serie(data), status=201)
+        resp, status = await BaseHandler.resp_add_serie(data)
+        return web.json_response(data=resp, status=status)
 
     @classmethod
     @docs(

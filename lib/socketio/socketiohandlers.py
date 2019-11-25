@@ -73,7 +73,7 @@ class SocketIoHandler:
             series_name = data.get('name')
             series_model = data.get('model')
             if series_name is not None and series_model is not None:
-                resp = await BaseHandler.resp_add_serie(data)
+                resp, status = await BaseHandler.resp_add_serie(data)
             else:
                 resp = {'error': 'Missing required field(s)'}
         return safe_json_dumps(resp)

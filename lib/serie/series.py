@@ -15,9 +15,6 @@ class Series:
         self.name = name
         self._datapoint_count = datapoint_count
 
-        if model not in MODEL_NAMES.keys():
-            raise Exception('Invalid model')
-
         self._model = model
         self._datapoint_count_lock = False
         self.new_forecast_at = scheduled_forecast
