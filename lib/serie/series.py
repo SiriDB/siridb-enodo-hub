@@ -1,6 +1,7 @@
 import datetime
 
-from lib.serie import DETECT_ANOMALIES_STATUS_NONE, FORECAST_STATUS_NONE, DETECT_ANOMALIES_STATUSES, \
+from lib.serie import DETECT_ANOMALIES_STATUS_NONE, FORECAST_STATUS_NONE, FORECAST_STATUS_PENDING, \
+    DETECT_ANOMALIES_STATUSES, \
     FORECAST_STATUS_DONE
 
 
@@ -75,6 +76,12 @@ class Series:
 
     async def is_forecasted(self):
         return self.forecast_status is FORECAST_STATUS_DONE
+
+    async def is_forecast_pending(self):
+        return self.forecast_status is FORECAST_STATUS_PENDING
+
+    async def set_forecast_pending(self):
+        self.forecast_status = FORECAST_STATUS_PENDING
 
     async def to_dict(self, static_only=False):
         if static_only:

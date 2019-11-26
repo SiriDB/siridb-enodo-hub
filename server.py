@@ -106,14 +106,14 @@ class Server:
             for serie_name in await SerieManager.get_series():
                 serie = await SerieManager.get_serie(serie_name)
                 if serie is not None \
-                        and not await serie.ignored():
+                        and not await serie.is_ignored():
                     if not len(await EnodoJobManager.get_failed_jobs_for_series(serie_name)):
-                        if not await serie.pending_forecast() and (not await serie.is_forecasted() or (
+                        if not await serie.is_forecast_pending() and (not await serie.is_forecasted() or (
                                 serie.new_forecast_at is not None and serie.new_forecast_at < datetime.datetime.now())):
                             # Should be forecasted if not forecasted yet or new forecast should be made
                             if await serie.get_datapoints_count() >= Config.min_data_points:
                                 await EnodoJobManager.create_job(JOB_TYPE_FORECAST_SERIE, serie_name, EnodoForecastJobDataModel())
-                                await serie.set_pending_forecast(True)
+                                await serie.set_forecast_pending()
                         # elif await serie.get_detect_anomalies_status() is DETECT_ANOMALIES_STATUS_REQUESTED:
                         #     await EnodoJobManager.create_job(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE, serie_name)
                         #     await serie.set_detect_anomalies_status(DETECT_ANOMALIES_STATUS_PENDING)
