@@ -160,6 +160,7 @@ class Server:
         logging.info('...Saving data to disk')
         await self._save_to_disk()
         ServerState.running = False
+        ServerState.stop()
         logging.info('...Doing clean up')
         await self.clean_up()
 
@@ -265,5 +266,5 @@ class Server:
         self.loop.run_until_complete(self.start_up())
         try:
             web.run_app(self.app, print=print_custom_aiohttp_startup_message, port=self.port)
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, RuntimeError):
             pass

@@ -31,3 +31,8 @@ class ServerState:
             hostlist=siridb_forecast_hostlist,  # Multiple connections are supported
             keepalive=True)
         await cls.siridb_data_client.connect()
+
+    @classmethod
+    def stop(cls):
+        cls.siridb_data_client.close()
+        cls.siridb_forecast_client.close()
