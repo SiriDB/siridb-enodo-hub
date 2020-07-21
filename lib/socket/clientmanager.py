@@ -4,7 +4,7 @@ import logging
 from enodo import EnodoModel
 
 from lib.analyser.model import EnodoModelManager
-from lib.serie import DETECT_ANOMALIES_STATUS_PENDING, DETECT_ANOMALIES_STATUS_REQUESTED
+from lib.serie import DETECT_ANOMALIES_STATUS_PENDING, DETECT_ANOMALIES_STATUS_REQUESTED, FORECAST_STATUS_NONE
 
 
 class EnodoClient:
@@ -32,12 +32,19 @@ class ListenerClient(EnodoClient):
 
 
 class WorkerClient(EnodoClient):
-    def __init__(self, client_id, ip_address, writer, supported_models, version="unknown", last_seen=None, busy=False):
+    def __init__(self, client_id, ip_address, writer, supported_jobs_and_models, version="unknown", last_seen=None, busy=False):
         super().__init__(client_id, ip_address, writer, version, last_seen)
         self.busy = busy
         self.pending_series = []
         self.is_going_busy = False
-        self.supported_models = supported_models
+        self.supported_jobs_and_models = supported_jobs_and_models
+
+    def support_model_for_job(self, job_type, model_name):
+        if job_type in self.supported_jobs_and_models.keys():
+            for model in self.supported_jobs_and_models[job_type]:
+                if model.get('model_name') == 'prophet':
+                    return True
+        return False
 
     def to_dict(self):
         return {'client_id': self.client_id,
@@ -46,7 +53,7 @@ class WorkerClient(EnodoClient):
                 'busy': self.busy,
                 'last_seen': self.last_seen,
                 'version': self.version,
-                'models': self.supported_models}
+                'jobs_and_models': self.supported_jobs_and_models}
 
 
 class ClientManager:
@@ -63,8 +70,9 @@ class ClientManager:
         if isinstance(client, ListenerClient):
             cls.listeners[client.client_id] = client
         elif isinstance(client, WorkerClient):
-            for model in client.supported_models:
-                await EnodoModelManager.add_model_from_dict(model)
+            for job in client.supported_jobs_and_models:
+                for model in client.supported_jobs_and_models[job]:
+                    await EnodoModelManager.add_model_from_dict(model)
             cls.workers[client.client_id] = client
 
     @classmethod
@@ -80,10 +88,11 @@ class ClientManager:
         return None
 
     @classmethod
-    async def get_free_worker(cls):
+    async def get_free_worker(cls, job_type=None, model_name=None):
         for worker in cls.workers:
             if not cls.workers.get(worker).busy and not cls.workers.get(worker).is_going_busy:
-                return cls.workers.get(worker)
+                if (job_type is None or model_name is None) or cls.workers.get(worker).support_model_for_job(job_type, model_name):
+                    return cls.workers.get(worker)
         return None
 
     @classmethod
@@ -123,9 +132,9 @@ class ClientManager:
         if len(client.pending_series):
             for serie_name in client.pending_series:
                 serie = await cls.serie_manager.get_serie(serie_name)
-                if await serie.pending_forecast():
+                if await serie.is_forecast_pending():
                     logging.info(f'Setting for serie {serie_name} pending to false...')
-                    await serie.set_pending_forecast(False)
+                    serie.forecast_status = FORECAST_STATUS_NONE
                 if await serie.get_detect_anomalies_status() is DETECT_ANOMALIES_STATUS_PENDING:
                     logging.info(f'Setting for serie {serie_name} anomaly detection pending to false...')
                     await serie.set_detect_anomalies_status(DETECT_ANOMALIES_STATUS_REQUESTED)

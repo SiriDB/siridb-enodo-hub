@@ -1,7 +1,7 @@
 import functools
 
 from lib.socketio.subscriptionmanager import SubscriptionManager
-from lib.util.util import safe_json_dumps
+from lib.util import safe_json_dumps
 from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
 
@@ -35,7 +35,7 @@ class SocketIoHandler:
         user = data.get('username')
         password = data.get('password')
 
-        if not await EnodoAuth.auth.check_credentials(user, password):
+        if not await EnodoAuth.auth.check_credentials(user, password, None):
             raise ConnectionRefusedError('authentication failed')
 
         async with cls._sio.session(sid) as session:
@@ -132,6 +132,19 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
+    async def subscribe_enodo_models(cls, sid, data, event):
+        if cls._sio is not None:
+            cls._sio.enter_room(sid, 'enodo_model_updates')
+            return await BaseHandler.resp_get_possible_analyser_models()
+
+    @classmethod
+    @socketio_auth_required
+    async def unsubscribe_enodo_models(cls, sid, data, event):
+        if cls._sio is not None:
+            cls._sio.leave_room(sid, 'enodo_model_updates')
+
+    @classmethod
+    @socketio_auth_required
     async def get_enodo_hub_status(cls, sid, data, event):
         resp = await BaseHandler.resp_get_enodo_hub_status()
         return resp
@@ -152,3 +165,12 @@ class SocketIoHandler:
                 'series_name': series_name,
                 'series_data': series_data
             }, room=sub.get('sid'))
+
+    @classmethod
+    async def internal_updates_enodo_models_subscribers(cls, change_type, model_name, model_data):
+        if cls._sio is not None:
+            await cls._sio.emit('enodo_model_updates', {
+                'change_type': change_type,
+                'model_name': model_name,
+                'model_data': model_data
+            }, room='enodo_model_updates')

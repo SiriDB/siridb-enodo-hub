@@ -11,10 +11,10 @@ from lib.events.enodoeventmanager import ENODO_EVENT_ANOMALY_DETECTED, EnodoEven
 from lib.serie import DETECT_ANOMALIES_STATUS_DONE
 from lib.serverstate import ServerState
 from lib.siridb.siridb import query_serie_datapoint_count, drop_serie, insert_points, query_serie_data
-from lib.socket.clientmanager import ClientManager
+from lib.socket import ClientManager
 from lib.socket.package import create_header, UPDATE_SERIES
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_DELETE
-from lib.util.util import safe_json_dumps
+from lib.util import safe_json_dumps
 
 
 class SerieManager:
@@ -87,7 +87,7 @@ class SerieManager:
         if serie is not None:
             await drop_serie(ServerState.siridb_forecast_client, f'forecast_{serie_name}')
             await insert_points(ServerState.siridb_forecast_client, f'forecast_{serie_name}', points)
-            await serie.set_pending_forecast(False)
+            await serie.set_forecast_done()
 
             date_1 = datetime.datetime.now()
             # end_date = date_1 + datetime.timedelta(days=1)

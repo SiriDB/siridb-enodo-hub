@@ -6,8 +6,8 @@ import logging
 import qpack
 
 from lib.serie.seriemanager import SerieManager
-from lib.socket.clientmanager import ClientManager, ListenerClient, WorkerClient
-from lib.socket.package import *
+from . import ClientManager, ListenerClient, WorkerClient
+from .package import *
 
 
 class SocketServer:
@@ -65,18 +65,18 @@ class SocketServer:
                             await ClientManager.add_client(client)
                             logging.info(f'New listener with id: {client_id}')
                         elif client_data.get('client_type') == 'worker':
-                            supported_models = client_data.get('models')
-                            if supported_models is None or len(supported_models) < 1:
+                            supported_jobs_and_models = client_data.get('jobs_and_models')
+                            if supported_jobs_and_models is None or len(supported_jobs_and_models) < 1:
                                 response = create_header(0, HANDSHAKE_FAIL, packet_id)
                                 writer.write(response)
                                 connected = False
-
-                            client = WorkerClient(client_id, writer.get_extra_info('peername'), writer,
-                                                  supported_models,
-                                                  client_data.get('version', None),
-                                                  busy=client_data.get('busy', None))
-                            await ClientManager.add_client(client)
-                            logging.info(f'New worker with id: {client_id}')
+                            else:
+                                client = WorkerClient(client_id, writer.get_extra_info('peername'), writer,
+                                                    supported_jobs_and_models,
+                                                    client_data.get('version', None),
+                                                    busy=client_data.get('busy', None))
+                                await ClientManager.add_client(client)
+                                logging.info(f'New worker with id: {client_id}')
 
                         response = create_header(0, HANDSHAKE_OK, packet_id)
                         writer.write(response)

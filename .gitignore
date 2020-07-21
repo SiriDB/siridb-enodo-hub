@@ -3,6 +3,7 @@ test/*
 .idea
 .idea/*
 .idea/vcs.xml
+todo.txt
 
 *.pyc
 *.pyo
@@ -13,3 +14,6 @@ connector/python/build
 connector/python/dist
 *.egg-info
 *.egg
+.DS_Store
+.vscode
+*.txt

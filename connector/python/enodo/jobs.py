@@ -1,22 +1,5 @@
-class EnodoJobDataModel:
-    def __init__(self):
-        pass
+JOB_TYPE_FORECAST_SERIE = 1
+JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE = 2
+JOB_TYPE_BASE_SERIE_ANALYSES = 3
 
-    def to_dict(self):
-        return None
-
-
-class EnodoForecastJobDataModel(EnodoJobDataModel):
-    def __init__(self):
-        super().__init__()
-
-
-class EnodoAnomalyDetectionJobDataModel(EnodoJobDataModel):
-    def __init__(self, points_since):
-        super().__init__()
-        self.points_since = points_since
-
-    def to_dict(self):
-        return {
-            'points_since': self.points_since
-        }
+JOB_TYPES = [JOB_TYPE_BASE_SERIE_ANALYSES, JOB_TYPE_FORECAST_SERIE, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE]

@@ -1,17 +1,17 @@
 import datetime
 
-from lib.serie import DETECT_ANOMALIES_STATUS_NONE, FORECAST_STATUS_NONE, FORECAST_STATUS_PENDING, \
-    DETECT_ANOMALIES_STATUSES, \
-    FORECAST_STATUS_DONE
+from . import DETECT_ANOMALIES_STATUS_NONE, FORECAST_STATUS_NONE, FORECAST_STATUS_PENDING, \
+    DETECT_ANOMALIES_STATUSES, FORECAST_STATUS_DONE, SERIES_ANALYSED_STATUS_NONE, SERIES_ANALYSED_STATUS_PENDING, \
+        SERIES_ANALYSED_STATUS_DONE
 
 
 class Series:
     __slots__ = (
         'name', 'forecast_status', 'model_parameters', 'new_forecast_at', '_datapoint_count', '_datapoint_count_lock',
-        '_detecting_anomalies_status', '_model')
+        '_detecting_anomalies_status', '_model', 'series_analysed_status', 'series_characteristics')
 
     def __init__(self, name, datapoint_count, model, scheduled_forecast=None, model_parameters=None,
-                 detecting_anomalies_status=DETECT_ANOMALIES_STATUS_NONE, forecast_status=FORECAST_STATUS_NONE):
+                 detecting_anomalies_status=DETECT_ANOMALIES_STATUS_NONE, forecast_status=FORECAST_STATUS_NONE, series_analysed_status=SERIES_ANALYSED_STATUS_NONE, series_characteristics=None):
         self.name = name
         self._datapoint_count = datapoint_count
 
@@ -21,7 +21,9 @@ class Series:
         self.model_parameters = model_parameters
         self._detecting_anomalies_status = detecting_anomalies_status
         self.forecast_status = forecast_status
-
+        self.series_analysed_status = series_analysed_status
+        self.series_characteristics = series_characteristics
+        
     async def set_datapoints_counter_lock(self, is_locked):
         """
         Set lock so it can or can not be changed
@@ -47,8 +49,6 @@ class Series:
         return self._model
 
     async def set_model(self, model):
-        if model not in MODEL_NAMES.keys():
-            raise Exception()
         self._model = model
 
     async def get_detect_anomalies_status(self):
@@ -83,6 +83,9 @@ class Series:
     async def set_forecast_pending(self):
         self.forecast_status = FORECAST_STATUS_PENDING
 
+    async def set_forecast_done(self):
+        self.forecast_status = FORECAST_STATUS_DONE
+
     async def to_dict(self, static_only=False):
         if static_only:
             return {
@@ -92,7 +95,9 @@ class Series:
                 'new_forecast_at': self.new_forecast_at,
                 'model': self._model,
                 'model_parameters': self.model_parameters,
-                'detecting_anomalies_status': self._detecting_anomalies_status
+                'detecting_anomalies_status': self._detecting_anomalies_status,
+                'series_analysed_status': self.series_analysed_status,
+                'series_characteristics': self.series_characteristics
             }
         return {
             'name': self.name,
@@ -103,7 +108,9 @@ class Series:
             'model_parameters': self.model_parameters,
             'ignore': await self.is_ignored(),
             'error': await self.get_errors(),
-            'detecting_anomalies_status': self._detecting_anomalies_status
+            'detecting_anomalies_status': self._detecting_anomalies_status,
+            'series_analysed_status': self.series_analysed_status,
+            'series_characteristics': self.series_characteristics
         }
 
     @classmethod
@@ -116,8 +123,10 @@ class Series:
 
         return Series(data_dict.get('name'), data_dict.get('datapoint_count', None), data_dict.get('model'),
                       new_forecast_at, data_dict.get('model_parameters', None),
-                      detecting_anomalies_status=data_dict.get('detecting_anomalies_status', None),
-                      forecast_status=data_dict.get('forecast_status', None))
+                      detecting_anomalies_status=data_dict.get('detecting_anomalies_status', DETECT_ANOMALIES_STATUS_NONE),
+                      forecast_status=data_dict.get('forecast_status', FORECAST_STATUS_NONE),
+                      series_analysed_status=data_dict.get('series_analysed_status', SERIES_ANALYSED_STATUS_NONE),
+                      series_characteristics=data_dict.get('forecast_status', None))
 
 
-from lib.jobmanager.enodojobmanager import EnodoJobManager
+from ..enodojobmanager import EnodoJobManager

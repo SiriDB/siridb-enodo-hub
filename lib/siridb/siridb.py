@@ -55,5 +55,6 @@ async def insert_points(siridb_client, serie_name, points):
         await siridb_client.insert({serie_name: points})
     except (QueryError, InsertError, ServerError, PoolError, AuthenticationError, UserAuthError) as e:
         print("Connection problem with SiriDB server")
+        print(e)
         pass
     return result

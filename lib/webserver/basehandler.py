@@ -7,7 +7,7 @@ from lib.serie.seriemanager import SerieManager
 from lib.serie import DETECT_ANOMALIES_STATUS_DONE
 from lib.serverstate import ServerState
 from lib.siridb.siridb import query_serie_data
-from lib.util.util import regex_valid
+from lib.util import regex_valid
 from version import VERSION
 
 

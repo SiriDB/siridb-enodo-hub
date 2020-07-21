@@ -6,16 +6,17 @@ import os
 
 import qpack
 
-from enodo.jobs import EnodoJobDataModel
-from lib.analyser.analyserwrapper import AnalyserWrapper
-from lib.config.config import Config
-from lib.jobmanager import *
-from lib.serie.seriemanager import SerieManager
-from lib.serverstate import ServerState
-from lib.socket.clientmanager import ClientManager
-from lib.socket.package import create_header, WORKER_JOB, WORKER_JOB_CANCEL
-from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
-from lib.util.util import safe_json_dumps
+from enodo.jobs import *
+from enodo.protocol.packagedata import EnodoJobDataModel, EnodoForecastJobRequestDataModel, EnodoDetectAnomaliesJobRequestDataModel
+from .analyser.analyserwrapper import AnalyserWrapper
+from .config.config import Config
+from .serie.seriemanager import SerieManager
+from .serie import SERIES_ANALYSED_STATUS_DONE
+from .serverstate import ServerState
+from .socket import ClientManager
+from .socket.package import create_header, WORKER_JOB, WORKER_JOB_CANCEL
+from .socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
+from .util import safe_json_dumps
 
 
 class EnodoJob:
@@ -25,7 +26,7 @@ class EnodoJob:
         if job_type not in JOB_TYPES:
             raise Exception('unknown job type')
         if isinstance(job_data, EnodoJobDataModel):
-            job_data = job_data.to_dict()
+            job_data = job_data
         elif job_data is not None:
             raise Exception('Unknown job data value')
         self.job_id = job_id
@@ -99,9 +100,19 @@ class EnodoJobManager:
         return cls._next_job_id
 
     @classmethod
-    async def create_job(cls, job_type, serie_name, job_data):
-        if not isinstance(job_data, EnodoJobDataModel):
-            raise Exception('Incorrect job data')
+    async def create_job(cls, job_type, serie_name):
+        job_data = None
+        serie = await SerieManager.get_serie(serie_name)
+        if job_type == JOB_TYPE_FORECAST_SERIE:
+            job_data = EnodoForecastJobRequestDataModel(serie_name=serie_name, \
+                                                            model_name=await serie.get_model(), \
+                                                             model_parameters=serie.model_parameters)
+
+        if job_type == JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE:
+            job_data = EnodoDetectAnomaliesJobRequestDataModel(serie_name=serie_name, \
+                                                            model_name=await serie.get_model(), \
+                                                             model_parameters=serie.model_parameters)
+
         job_id = await cls._get_next_job_id()
         job = EnodoJob(job_id, job_type, serie_name, job_data=job_data)  # TODO: Catch exception
         await cls._add_job(job)
@@ -207,7 +218,7 @@ class EnodoJobManager:
             cls._new_jobs.remove(job)
 
     @classmethod
-    async def set_job_failed(cls, job_id):
+    async def set_job_failed(cls, job_id, error):
         while cls._lock is True:
             await asyncio.sleep(0.1)
         cls._lock = True
@@ -217,12 +228,13 @@ class EnodoJobManager:
             if job.job_id == job_id:
                 j = job
                 break
-        await cls._set_job_failed(j)
+        await cls._set_job_failed(j, error)
         cls._lock = False
 
     @classmethod
-    async def _set_job_failed(cls, job):
+    async def _set_job_failed(cls, job, error):
         if job is not None:
+            job.error = error
             await cls._cancel_jobs_for_serie(job.serie_name)
             cls._active_jobs.remove(job)
             del cls._active_jobs_index[job.job_id]
@@ -237,8 +249,7 @@ class EnodoJobManager:
 
         for job in cls._active_jobs:
             if (datetime.datetime.now() - job.send_at).total_seconds() > cls._max_job_timeout:
-                job.error = "Job timed-out"
-                await cls._set_job_failed(job)
+                await cls._set_job_failed(job, "Job timed-out")
                 await cls._send_worker_cancel_job(job.worker_id, job.job_id)
         cls._lock = False
 
@@ -247,29 +258,41 @@ class EnodoJobManager:
         while ServerState.running:
             if len(cls._new_jobs) > 0:
                 try:
-                    worker = await ClientManager.get_free_worker()
-                    if worker is not None:
-                        while cls._lock is True:
-                            print("here1")
-                            await asyncio.sleep(0.1)
-                        cls._lock = True
-                        next_job = cls._new_jobs[0]
-                        serie = await SerieManager.get_serie(next_job.serie_name)
-                        if serie is None:
-                            pass
-                        elif next_job.job_type is JOB_TYPE_FORECAST_SERIE:
+                    # worker = await ClientManager.get_free_worker()
+                    # if worker is not None:
+                    while cls._lock is True:
+                        await asyncio.sleep(0.1)
+                    cls._lock = True
+                    next_job = cls._new_jobs[0]
+                    serie = await SerieManager.get_serie(next_job.serie_name)
+                    if serie is None:
+                        pass
+                    elif next_job.job_type is JOB_TYPE_BASE_SERIE_ANALYSES:
+                        worker = await ClientManager.get_free_worker()
+                        if worker is not None:
+                            logging.info(f"Adding serie: sending {next_job.serie_name} to Worker for base analysis")
+                            await cls._send_worker_job_request(worker, serie, next_job)
+                            worker.is_going_busy = True
+                            await cls._activate_job(next_job, worker.client_id)
+                    elif next_job.job_type is JOB_TYPE_FORECAST_SERIE:
+                        model_name = next_job.job_data.get('model_name')
+                        worker = await ClientManager.get_free_worker(JOB_TYPE_FORECAST_SERIE, model_name)
+                        if worker is not None:
                             logging.info(f"Adding serie: sending {next_job.serie_name} to Worker for forecasting")
                             await cls._send_worker_job_request(worker, serie, next_job)
                             worker.is_going_busy = True
                             await cls._activate_job(next_job, worker.client_id)
-                        elif next_job.job_type is JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE:
+                    elif next_job.job_type is JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE:
+                        model_name = next_job.job_data.get('model_name')
+                        worker = await ClientManager.get_free_worker(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE, model_name)
+                        if worker is not None:
                             logging.info(f"Adding serie: sending {next_job.serie_name} to Worker for anomaly detection")
                             await cls._send_worker_job_request(worker, serie, next_job)
                             worker.is_going_busy = True
                             await cls._activate_job(next_job, worker.client_id)
-                        else:
-                            pass
-                        cls._lock = False
+                    else:
+                        pass
+                    cls._lock = False
                 except Exception as e:
                     print(e)
             await cls.clean_jobs()
@@ -281,10 +304,7 @@ class EnodoJobManager:
 
         if data.get('error') is not None:
             logging.error(f"Error returned by worker for series {data.get('name')}")
-            series = await SerieManager.get_serie(data.get('name'))
-            if series is not None:
-                await series.set_error(data.get('error'))
-            await cls.set_job_failed(job_id)
+            await cls.set_job_failed(job_id, data.get('error'))
         else:
             job_type = data.get('job_type')
             await cls.deactivate_job(job_id)
@@ -301,23 +321,29 @@ class EnodoJobManager:
                         await SerieManager.series_changed(SUBSCRIPTION_CHANGE_TYPE_UPDATE, data.get('name'))
                     except Exception as e:
                         print(e)
+            if job_type is JOB_TYPE_BASE_SERIE_ANALYSES:
+                try:
+                    serie = await SerieManager.get_serie(data.get('name'))
+                    serie.series_characteristics = data.get('characteristics')
+                    serie.series_analysed_status = SERIES_ANALYSED_STATUS_DONE
+                    await SerieManager.series_changed(SUBSCRIPTION_CHANGE_TYPE_UPDATE, data.get('name'))
+                except Exception as e:
+                    print(e)
             else:
                 print("UNKNOWN")
 
     @classmethod
     async def _send_worker_job_request(cls, worker, serie, job):
         try:
-            model = await serie.get_model_pkl()
-            wrapper = (AnalyserWrapper(model, await serie.get_model(), await serie.get_model_parameters())).__dict__()
             data = qpack.packb(
-                {'serie_name': serie.name, 'wrapper': wrapper, 'job_type': job.job_type,
-                 'job_id': job.job_id, 'job_data': job.job_data})
+                {'serie_name': serie.name, 'job_type': job.job_type,
+                 'job_id': job.job_id, 'job_data': None if job.job_data is None else job.job_data.serialize()})
             header = create_header(len(data), WORKER_JOB, 0)
             if serie not in worker.pending_series:
                 worker.pending_series.append(serie.name)
             worker.writer.write(header + data)
         except Exception as e:
-            print("something when wrong", e)
+            print("something went wrong", e)
 
     @classmethod
     async def _send_worker_cancel_job(cls, worker_id, job_id):
@@ -331,21 +357,21 @@ class EnodoJobManager:
             header = create_header(len(data), WORKER_JOB_CANCEL, 0)
             worker.writer.write(header + data)
         except Exception as e:
-            print("something when wrong", e)
+            print("something went wrong", e)
 
     @classmethod
     async def receive_worker_cancelled_job(cls, writer, packet_type, packet_id, data, client_id):
         job_id = data.get('job_id')
         worker = await ClientManager.get_worker_by_id(client_id)
         if job_id in cls._active_jobs_index:
-            await cls.set_job_failed(job_id)
+            await cls.set_job_failed(job_id, "")
         logging.error(f"Worker {client_id} cancelled job {job_id}")
         if worker is None:
             return
         try:
             await ClientManager.check_for_pending_series(worker)
         except Exception as e:
-            print("something when wrong", e)
+            print("something went wrong", e)
 
     @classmethod
     async def save_to_disk(cls):
