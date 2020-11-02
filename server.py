@@ -1,11 +1,9 @@
 import asyncio
-import datetime
 import logging
 
 import aiohttp_cors
 import socketio
 from aiohttp import web
-from aiohttp.web_middlewares import middleware
 from aiohttp_apispec import setup_aiohttp_apispec
 from enodo.protocol.packagedata import *
 
@@ -13,11 +11,10 @@ from lib.analyser.model import EnodoModelManager
 from lib.api.apihandlers import ApiHandlers, auth
 from lib.config.config import Config
 from lib.events.enodoeventmanager import EnodoEventManager
-from lib.enodojobmanager import EnodoJobManager, JOB_TYPE_FORECAST_SERIE, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE
-from enodo.jobs import JOB_TYPE_BASE_SERIE_ANALYSES
+from lib.enodojobmanager import EnodoJobManager
+from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_STATUS_NONE, JOB_STATUS_OPEN, JOB_STATUS_PENDING, JOB_STATUS_DONE, JOB_STATUS_FAILED
 from lib.logging import prepare_logger
-from lib.serie import FORECAST_STATUS_PENDING, SERIES_ANALYSED_STATUS_NONE, SERIES_ANALYSED_STATUS_PENDING, SERIES_ANALYSED_STATUS_DONE, DETECT_ANOMALIES_STATUS_REQUESTED, DETECT_ANOMALIES_STATUS_PENDING
-from lib.serie.seriemanager import SerieManager
+from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
 from lib.socket import ClientManager
 from lib.socket.handler import receive_new_series_points, receive_worker_status_update, \
@@ -32,7 +29,7 @@ from lib.util import print_custom_aiohttp_startup_message
 
 class Server:
 
-    def __init__(self, loop, port, config_path, log_level='info', docs_only=False):
+    def __init__(self, loop, port, config_path, log_level='info'):
         self.loop = loop
         self.port = port
         self.app = None
@@ -46,7 +43,6 @@ class Server:
         self._check_jobs_task = None
         self._cleanup_clients_task = None
         self._log_level = log_level
-        self._docs_only = docs_only
 
     async def start_up(self):
         # Setup server state object
@@ -84,10 +80,10 @@ class Server:
             SocketIoRouter(self.sio)
 
         # Setup internal managers for handling and managing series, clients, jobs, events and models
-        await SerieManager.prepare(SocketIoHandler.internal_updates_series_subscribers)
-        await SerieManager.read_from_disk()
-        await ClientManager.setup(SerieManager)
-        await EnodoJobManager.async_setup()
+        await SeriesManager.prepare(SocketIoHandler.internal_updates_series_subscribers)
+        await SeriesManager.read_from_disk()
+        await ClientManager.setup(SeriesManager)
+        await EnodoJobManager.async_setup(SocketIoHandler.internal_updates_queue_subscribers)
         await EnodoJobManager.load_from_disk()
         await EnodoEventManager.async_setup()
         await EnodoEventManager.load_from_disk()
@@ -124,37 +120,49 @@ class Server:
 
     async def watch_series(self):
         while ServerState.running:
-            for serie_name in await SerieManager.get_series():
-                serie = await SerieManager.get_serie(serie_name)
-                if serie is not None \
-                        and not await serie.is_ignored():
+            series_names = await SeriesManager.get_all_series()
+            for series_name in series_names:
+                series = await SeriesManager.get_series(series_name)
+                
+                # Check if series is valid and not ignored
+                if series is not None \
+                        and not await series.is_ignored():
 
-                    if serie.series_analysed_status is SERIES_ANALYSED_STATUS_NONE:
-                        await EnodoJobManager.create_job(JOB_TYPE_BASE_SERIE_ANALYSES, serie_name)
-                        serie.series_analysed_status = SERIES_ANALYSED_STATUS_PENDING
-                    else:
-                        try:
+                    # Check if requirement of min amount of datapoints is met
+                    if await series.get_datapoints_count() >= Config.min_data_points or (
+                        series.series_config.min_data_points is not None and series.get_datapoints_count() >= series.series_config.min_data_points):
+                        
+                        # Check if base analysis is still open
+                        if await series.get_job_status(JOB_TYPE_BASE_SERIES_ANALYSIS) == JOB_STATUS_NONE:
+                            await EnodoJobManager.create_job(JOB_TYPE_BASE_SERIES_ANALYSIS, series_name)
+                        else:
+                            try:
+                                # Check if base analysis is done and series does not have any failed jobs
+                                if await series.get_job_status(JOB_TYPE_BASE_SERIES_ANALYSIS) == JOB_STATUS_DONE and \
+                                    not len(await EnodoJobManager.get_failed_jobs_for_series(series_name)):
 
-                            if serie.series_analysed_status is SERIES_ANALYSED_STATUS_DONE and not len(await EnodoJobManager.get_failed_jobs_for_series(serie_name)):
-                                
-                                    if not await serie.is_forecast_pending() and (not await serie.is_forecasted() or (
-                                            serie.new_forecast_at is not None and serie.new_forecast_at < datetime.datetime.now())):
-                                        # Should be forecasted if not forecasted yet or new forecast should be made
-                                        if await serie.get_datapoints_count() >= Config.min_data_points:
-                                            await EnodoJobManager.create_job(JOB_TYPE_FORECAST_SERIE, serie_name)
-                                            serie.forecast_status = FORECAST_STATUS_PENDING
-                                    # elif await serie.is_forecasted() and await serie.get_detect_anomalies_status() is DETECT_ANOMALIES_STATUS_REQUESTED:
-                                    #     print("HHHHERERE")
-                                    #     await EnodoJobManager.create_job(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE, serie_name)
-                                    #     await serie.set_detect_anomalies_status(DETECT_ANOMALIES_STATUS_PENDING)
-                        except Exception as e:
-                            print(e)
+                                    # If forecast job is not pending and job is due
+                                    if (await series.get_job_status(JOB_TYPE_FORECAST_SERIES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
+                                        await series.is_job_due(JOB_TYPE_FORECAST_SERIES):
+
+                                        await EnodoJobManager.create_job(JOB_TYPE_FORECAST_SERIES, series_name)
+                                    
+                                    # If anomaly detect job is not pending and job is due
+                                    if (await series.get_job_status(JOB_TYPE_FORECAST_SERIES) == JOB_STATUS_DONE) and \
+                                        (await series.get_job_status(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
+                                        await series.is_job_due(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES):
+                                        
+                                        await EnodoJobManager.create_job(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, series_name)
+
+                            except Exception as e:
+                                logging.error(f"Something went wrong when trying to create new job")
+                                logging.debug(f"Corresponding error: {e}")
 
             await asyncio.sleep(Config.watcher_interval)
 
     @staticmethod
     async def _save_to_disk():
-        await SerieManager.save_to_disk()
+        await SeriesManager.save_to_disk()
         await EnodoJobManager.save_to_disk()
         await EnodoEventManager.save_to_disk()
         await EnodoModelManager.save_to_disk()
@@ -162,7 +170,7 @@ class Server:
     async def save_to_disk(self):
         while ServerState.running:
             await asyncio.sleep(Config.save_to_disk_interval)
-            logging.debug('Saving seriemanager state to disk')
+            logging.debug('Saving seriesmanager state to disk')
             await self._save_to_disk()
 
     async def stop_server(self):
@@ -214,26 +222,14 @@ class Server:
     async def _stop_server_from_aiohttp_cleanup(self, *args, **kwargs):
         await self.stop_server()
 
-    @middleware
-    async def _docs_only_middleware(self, request, handler):
-        if request.path.startswith('/api') and not request.path.startswith('/api/docs'):
-            return web.json_response(status=404)
-        else:
-            return await handler(request)
-
     def start_server(self):
         prepare_logger(self._log_level)
         Config.read_config(self._config_path)
         logging.info('Starting...')
         logging.info('Loaded Config...')
 
-        if self._docs_only:
-            logging.info('Running in docs_only mode...')
-            self.app = web.Application(
-                middlewares=[self._docs_only_middleware])
-        else:
-            logging.info('Running in secure mode...')
-            self.app = web.Application(middlewares=[auth])
+        logging.info('Running API\'s in secure mode...')
+        self.app = web.Application(middlewares=[auth])
 
         if Config.enable_rest_api:
             logging.info('REST API enabled')
@@ -250,11 +246,11 @@ class Server:
             # Add rest api routes
             self.app.router.add_get(
                 "/api/series", ApiHandlers.get_monitored_series, allow_head=False)
-            self.app.router.add_post("/api/series", ApiHandlers.add_serie) 
-            self.app.router.add_get("/api/series/{serie_name}", ApiHandlers.get_monitored_serie_details,
+            self.app.router.add_post("/api/series", ApiHandlers.add_series) 
+            self.app.router.add_get("/api/series/{series_name}", ApiHandlers.get_monitored_series_details,
                                     allow_head=False)
             self.app.router.add_delete(
-                "/api/series/{serie_name}", ApiHandlers.remove_serie)
+                "/api/series/{series_name}", ApiHandlers.remove_series)
             self.app.router.add_get(
                 "/api/enodo/model", ApiHandlers.get_possible_analyser_models, allow_head=False)
             self.app.router.add_post(
@@ -267,29 +263,12 @@ class Server:
             # Add internal api routes
             self.app.router.add_get(
                 "/api/settings", ApiHandlers.get_settings, allow_head=False)
-            self.app.router.add_post("/api/settings", ApiHandlers.set_settings)
             self.app.router.add_get(
                 "/api/enodo/status", ApiHandlers.get_siridb_enodo_status, allow_head=False)
             self.app.router.add_get(
                 "/api/enodo/log", ApiHandlers.get_event_log, allow_head=False)
             self.app.router.add_get(
                 "/api/enodo/clients", ApiHandlers.get_connected_clients, allow_head=False)
-
-            # init docs with all parameters, usual for ApiSpec
-            setup_aiohttp_apispec(
-                app=self.app,
-                title="API references",
-                version="v1",
-                url="/api/docs/swagger.json",
-                swagger_path="/api/docs",
-                securityDefinitions={
-                    "user": {
-                        "type": "basic",
-                        "name": "Authorization",
-                        "in": "header"
-                    }
-                }
-            )
 
             # Configure CORS on all routes.
             for route in list(self.app.router.routes()):

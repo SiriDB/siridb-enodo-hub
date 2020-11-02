@@ -79,4 +79,5 @@ class EnodoModelManager:
             f.write(json.dumps(model_list, default=safe_json_dumps))
             f.close()
         except Exception as e:
-            print(e)
+            logging.error(f"Something went wrong when writing enodo models to disk")
+            logging.debug(f"Corresponding error: {e}")

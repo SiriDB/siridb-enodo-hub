@@ -29,12 +29,12 @@ class SubscriptionManager:
         return [sub for sub in cls._subscribers]
 
     @classmethod
-    async def get_subscriptions_for_serie_name(cls, serie_name):
+    async def get_subscriptions_for_series_name(cls, series_name):
         subs = []
 
         for sub in cls._subscribers:
             pattern = re.compile(sub.regex)
-            if pattern.match(serie_name):
+            if pattern.match(series_name):
                 subs.append(sub.sid)
 
         return subs

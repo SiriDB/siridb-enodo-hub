@@ -1,5 +1,6 @@
 from configparser import NoOptionError, NoSectionError, RawConfigParser, ConfigParser
 import os
+import logging
 from secrets import token_urlsafe
 
 from lib.exceptions.enodoexception import EnodoInvalidConfigException, EnodoException
@@ -15,6 +16,7 @@ EMPTY_CONFIG_FILE = config = {
         'save_to_disk_interval': '120',
         'enable_rest_api': 'true',
         'enable_socket_io_api': 'false',
+        'disable_safe_mode': 'false'
     },
     'siridb': {
         'host': '',
@@ -92,6 +94,10 @@ class Config:
     internal_security_token = None
     jobs_save_path = None
     model_save_path = None
+    disable_safe_mode = None
+
+    # Enodo Events
+    max_in_queue_before_warning = None
 
     @classmethod
     def create_standard_config_file(cls, path):
@@ -114,6 +120,10 @@ class Config:
         This method can only be called after the configfile is parsed
         :return:
         """
+
+        if cls.disable_safe_mode is True:
+            logging.info('Safe mode disabled for internal communication')
+            return
 
         if cls._config is None:
             raise EnodoException('Can only setup token when config is parsed')
@@ -175,34 +185,18 @@ class Config:
         cls.enable_socket_io_api = cls.to_bool(
             cls._config.get_r('enodo', 'enable_socket_io_api', required=False, default='false'), False)
         cls.base_dir = cls._config.get_r('enodo', 'enodo_base_save_path')
+        cls.disable_safe_mode = cls.to_bool(cls._config.get_r('enodo', 'disable_safe_mode'), False)
         cls.log_path = os.path.join(cls.base_dir, 'log.log')
         cls.series_save_path = os.path.join(cls.base_dir, 'data/series.json')
         cls.jobs_save_path = os.path.join(cls.base_dir, 'data/jobs.json')
         cls.event_outputs_save_path = os.path.join(cls.base_dir, 'data/outputs.json')
         cls.model_save_path = os.path.join(cls.base_dir, 'data/models.json')
+        cls.max_in_queue_before_warning = cls.to_int(cls._config.get_r('events', 'max_in_queue_before_warning'))
 
         if not os.path.exists(os.path.join(cls.base_dir, 'data')):
             os.makedirs(os.path.join(cls.base_dir, 'data'))
         if not os.path.exists(Config.model_pkl_save_path):
             os.makedirs(Config.model_pkl_save_path)
-
-    @classmethod
-    async def save_config(cls):
-        cls._config.set('analyser', 'min_data_points', str(cls.min_data_points))
-        cls._config.set('analyser', 'watcher_interval', str(cls.watcher_interval))
-        cls._config.set('analyser', 'siridb_connection_check_interval', str(cls.siridb_connection_check_interval))
-        cls._config.set('analyser', 'period_to_forecast', str(cls.period_to_forecast))
-        cls._config.set('analyser', 'interval_schedules_series', str(cls.interval_schedules_series))
-
-        # SiriDB
-        cls._config.set('siridb', 'host', cls.siridb_host)
-        cls._config.set('siridb', 'port', str(cls.siridb_port))
-        cls._config.set('siridb', 'user', cls.siridb_user)
-        cls._config.set('siridb', 'password', cls.siridb_password)
-        cls._config.set('siridb', 'database', cls.siridb_database)
-
-        with open(cls._path, "w") as fh:
-            cls._config.write(fh)
 
     @staticmethod
     def to_int(val):

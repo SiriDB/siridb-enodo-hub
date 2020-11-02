@@ -1,18 +1,11 @@
 import urllib.parse
 from aiohttp import web
 
-from aiohttp_apispec import (
-    docs,
-    request_schema,
-    response_schema)
 from aiohttp_basicauth import BasicAuthMiddleware
 
 from lib.config.config import Config
 from lib.socket import ClientManager
 from lib.util import safe_json_dumps
-from lib.api.apischemas import SchemaResponseSeries, SchemaResponseError, SchemaResponseSeriesDetails, \
-    SchemaRequestCreateSeries, SchemaSeries, SchemaResponseModels, SchemaRequestCreateEnodoEventOutput, \
-    SchemaRequestCreateEnodoModel
 from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
 
@@ -27,19 +20,6 @@ class ApiHandlers:
         EnodoAuth.auth.password = Config.basic_auth_password
 
     @classmethod
-    @docs(
-        tags=["public_api"],
-        summary="Get list of active series",
-        description="Get list of active series with general info. You can filter with a regex on the series names.",
-        parameters=[{
-            'in': 'query',
-            'name': 'filter',
-            'description': 'regex string for filtering on series names. Should be URL encoded!',
-            'schema': {'type': 'string', 'format': 'regex'}
-        }]
-    )
-    @response_schema(SchemaResponseSeries(), 200)
-    @response_schema(SchemaResponseError(), 400)
     @EnodoAuth.auth.required
     async def get_monitored_series(cls, request):
         """
@@ -55,23 +35,10 @@ class ApiHandlers:
                                  dumps=safe_json_dumps)
 
     @classmethod
-    @docs(
-        tags=["public_api"],
-        summary="Get details of a certain series",
-        description="Get details of a certain series, including forecasted datapoints",
-        parameters=[{
-            'in': 'query',
-            'name': 'include_points',
-            'description': 'include (original) data points of serie in response, default=false',
-            'schema': {'type': 'boolean'}
-        }]
-    )
-    @response_schema(SchemaResponseSeriesDetails(), 200)
-    @response_schema(SchemaResponseError(), 400)
     @EnodoAuth.auth.required
-    async def get_monitored_serie_details(cls, request):
+    async def get_monitored_series_details(cls, request):
         """
-        Returns all details and data points of a specific serie.
+        Returns all details and data points of a specific series.
         :param request:
         :return:
         """
@@ -79,57 +46,33 @@ class ApiHandlers:
             'include_points'] == 'true' else False
 
         return web.json_response(
-            data=await BaseHandler.resp_get_monitored_serie_details(request.match_info['serie_name'], include_points),
+            data=await BaseHandler.resp_get_monitored_series_details(request.match_info['series_name'], include_points),
             dumps=safe_json_dumps)
 
     @classmethod
-    @docs(
-        tags=["public_api"],
-        summary="Add a new series",
-        description="Add a new series with specified model and optional parameters",
-        parameters=[]
-    )
-    @request_schema(SchemaRequestCreateSeries())
-    @response_schema(SchemaSeries(), 201)
-    @response_schema(SchemaResponseError(), 400)
     @EnodoAuth.auth.required
-    async def add_serie(cls, request):
+    async def add_series(cls, request):
         """
-        Add new serie to the application.
+        Add new series to the application.
         :param request:
         :return:
         """
         data = await request.json()
-        resp, status = await BaseHandler.resp_add_serie(data)
+        resp, status = await BaseHandler.resp_add_series(data)
         return web.json_response(data=resp, status=status)
 
     @classmethod
-    @docs(
-        tags=["public_api"],
-        summary="Remove a new series",
-        description="Remove a certain series by its name",
-        parameters=[]
-    )
-    @response_schema(SchemaResponseError(), 400)
     @EnodoAuth.auth.required
-    async def remove_serie(cls, request):
+    async def remove_series(cls, request):
         """
         Remove series with certain name
         :param request:
         :return:
         """
-        serie_name = urllib.parse.unquote(request.match_info['serie_name'])
-        return web.json_response(data={}, status=await BaseHandler.resp_remove_serie(serie_name))
+        series_name = urllib.parse.unquote(request.match_info['series_name'])
+        return web.json_response(data={}, status=await BaseHandler.resp_remove_series(series_name))
 
     @classmethod
-    @docs(
-        tags=["public_api"],
-        summary="Add an new event output",
-        description="Add an output for enodo events",
-        parameters=[]
-    )
-    @request_schema(SchemaRequestCreateEnodoEventOutput())
-    @response_schema(SchemaResponseError(), 400)
     @EnodoAuth.auth.required
     async def add_enodo_event_output(cls, request):
         """
@@ -145,13 +88,6 @@ class ApiHandlers:
         return web.json_response(data=resp, status=status)
 
     @classmethod
-    @docs(
-        tags=["public_api"],
-        summary="Remove an event output",
-        description="Remove an event output",
-        parameters=[]
-    )
-    @response_schema(SchemaResponseError(), 400)
     @EnodoAuth.auth.required
     async def remove_enodo_event_output(cls, request):
         """
@@ -159,20 +95,12 @@ class ApiHandlers:
         :param request:
         :return:
         """
-        output_id = request.match_info['output_id']
+        output_id = int(request.match_info['output_id'])
 
         resp, status = await BaseHandler.resp_remove_event_output(output_id)
         return web.json_response(data=resp, status=status)
 
     @classmethod
-    @docs(
-        tags=["public_api"],
-        summary="Get a list of possible models",
-        description="Get a list of possible models to use for adding a series",
-        parameters=[]
-    )
-    @response_schema(SchemaResponseModels(), 200)
-    @response_schema(SchemaResponseError(), 400)
     @EnodoAuth.auth.required
     async def get_possible_analyser_models(cls, request):
         """
@@ -184,15 +112,6 @@ class ApiHandlers:
         return web.json_response(data=await BaseHandler.resp_get_possible_analyser_models(), status=200)
 
     @classmethod
-    @docs(
-        tags=["public_api"],
-        summary="Add a new model",
-        description="Add a new Enodo analyse model with arguments",
-        parameters=[]
-    )
-    @request_schema(SchemaRequestCreateEnodoModel())
-    @response_schema(SchemaResponseModels(), 200)
-    @response_schema(SchemaResponseError(), 400)
     @EnodoAuth.auth.required
     async def add_analyser_models(cls, request):
         """
@@ -242,29 +161,6 @@ class ApiHandlers:
         for field in fields:
             settings[field] = getattr(Config, field)
         return settings
-
-    @classmethod
-    @EnodoAuth.auth.required
-    async def set_settings(cls, request):
-        """
-        Override settings.
-        :param request:
-        :return:
-        """
-        data = await request.json()
-
-        fields = ['min_data_points', 'analysis_save_path', 'siridb_host', 'siridb_port', 'siridb_user',
-                  'siridb_password', 'siridb_database']
-
-        for field in fields:
-            if field in data:
-                setattr(Config, field, data[field])
-
-        await Config.save_config()
-
-        settings = await cls.build_settings_dict()
-
-        return web.json_response(data={'data': settings}, status=200)
 
     @classmethod
     @EnodoAuth.auth.required

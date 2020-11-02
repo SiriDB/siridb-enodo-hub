@@ -24,10 +24,19 @@ class SocketIoRouter:
             handler=SocketIoHandler.create_series)
         self._sio_on(
             event='/api/series/details',
-            handler=SocketIoHandler.get_serie_details)
+            handler=SocketIoHandler.get_series_details)
         self._sio_on(
             event='/api/series/delete',
             handler=SocketIoHandler.remove_series)
+        self._sio_on(
+            event='/api/event/output',
+            handler=SocketIoHandler.get_event_outputs)
+        self._sio_on(
+            event='/api/event/output/create',
+            handler=SocketIoHandler.add_event_output)
+        self._sio_on(
+            event='/api/event/output/remove',
+            handler=SocketIoHandler.remove_event_output)
         self._sio_on(
             event='/api/enodo/models',
             handler=SocketIoHandler.get_enodo_models)
@@ -41,6 +50,9 @@ class SocketIoRouter:
         self._sio_on(
             event='/subscribe/series',
             handler=SocketIoHandler.subscribe_series)
+        self._sio_on(
+            event='/subscribe/queue',
+            handler=SocketIoHandler.subscribe_queue)
         self._sio_on(
             event='/subscribe/filtered/series',
             handler=SocketIoHandler.subscribe_filtered_series)

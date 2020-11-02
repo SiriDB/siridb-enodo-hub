@@ -5,7 +5,7 @@ import logging
 
 import qpack
 
-from lib.serie.seriemanager import SerieManager
+from lib.series.seriesmanager import SeriesManager
 from . import ClientManager, ListenerClient, WorkerClient
 from .package import *
 
@@ -53,16 +53,15 @@ class SocketServer:
                 client_id = client_data.get('client_id')
                 client_token = client_data.get('token')
 
-                if client_token is None or client_token != self._token:
+                if self._token is not None and (client_token is None or client_token != self._token):
                     response = create_header(0, HANDSHAKE_FAIL, packet_id)
                     writer.write(response)
                     connected = False
                 else:
                     if 'client_type' in client_data:
                         if client_data.get('client_type') == 'listener':
-                            client = ListenerClient(client_id, writer.get_extra_info('peername'), writer,
+                            await ClientManager.listener_connected(writer.get_extra_info('peername'), writer,
                                                     client_data.get('version', None))
-                            await ClientManager.add_client(client)
                             logging.info(f'New listener with id: {client_id}')
                         elif client_data.get('client_type') == 'worker':
                             supported_jobs_and_models = client_data.get('jobs_and_models')
@@ -71,18 +70,14 @@ class SocketServer:
                                 writer.write(response)
                                 connected = False
                             else:
-                                client = WorkerClient(client_id, writer.get_extra_info('peername'), writer,
-                                                    supported_jobs_and_models,
-                                                    client_data.get('version', None),
-                                                    busy=client_data.get('busy', None))
-                                await ClientManager.add_client(client)
+                                await ClientManager.worker_connected(writer.get_extra_info('peername'), writer, client_data)
                                 logging.info(f'New worker with id: {client_id}')
 
                         response = create_header(0, HANDSHAKE_OK, packet_id)
                         writer.write(response)
 
                         if client_data.get('client_type') == 'listener':
-                            update = qpack.packb(await SerieManager.get_series())
+                            update = qpack.packb(await SeriesManager.get_all_series())
                             series_update = create_header(len(update), UPDATE_SERIES, packet_id)
                             writer.write(series_update + update)
                     else:
@@ -112,10 +107,10 @@ class SocketServer:
                 w_client = await ClientManager.get_worker_by_id(client_id)
                 if l_client is not None:
                     logging.info(f'Listener {client_id} is going down, removing from client list...')
-                    await ClientManager.remove_listener(client_id)
+                    await ClientManager.set_listener_offline(client_id)
                 elif w_client is not None:
                     logging.info(f'Worker {client_id} is going down, removing from client list...')
-                    await ClientManager.remove_worker(client_id)
+                    await ClientManager.set_worker_offline(client_id)
 
                 connected = False
             else:
@@ -127,4 +122,5 @@ class SocketServer:
             await writer.drain()
 
         logging.info(f'Closing socket with client {saved_client_id}')
+        await ClientManager.assert_if_client_is_offline(saved_client_id)
         writer.close()

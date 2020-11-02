@@ -17,3 +17,5 @@ connector/python/dist
 .DS_Store
 .vscode
 *.txt
+.pylintrc
+unittests
