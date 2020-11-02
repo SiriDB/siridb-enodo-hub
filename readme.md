@@ -6,27 +6,14 @@
 ## API's
 
 -   REST API
-    (View API references at http://hostname/api/docs)
 -   Socket.io API
 
 ## Deployment and internal communication
-
-### Listener
-
-The enode listener listens to pipe socket with siridb server. It sums up the totals of added datapoints to each series. 
-It periodically sends an update to the enode hub. The listener only keeps track of series that are registered via the hub. The listener is seperated from the enode hub, so that it can be placed close to the siridb server, so it can locally access the pipe socket.
-Every interval for heartbeat and update can be configured in the .conf file
-
-### Worker
-
-The enode worker executes fitting and forecasting models/algorithms. The worker uses significant CPU and thus should be placed on a machine that has low CPU usage.
-The worker can create different models (ARIMA/prophet) for series, train models with new data and calculate forecasts for a certain series. A worker can implement multiple models. This can be different per worker version. The implemented models should be communicated to the hub during the handshake.
 
 ### Hub
 
 The enode hub communicates and guides both the listener as the worker. The hub tells the listener to which series it needs to pay attention to, and it tells the worker which series should be analysed.
 Clients can connect to the hub for receiving updates, and polling for data. Also a client can use the hub to alter the data about which series should be watched.
-
 
 
 ## Getting started

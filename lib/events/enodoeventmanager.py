@@ -9,38 +9,57 @@ from jinja2 import Environment, PackageLoader
 
 from lib.config.config import Config
 
-ENODO_EVENT_ANOMALY_DETECTED = 1
-ENODO_EVENT_JOB_QUEUE_TOO_LONG = 2
-ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE = 3
+ENODO_EVENT_ANOMALY_DETECTED = "event_anomaly_detected"
+ENODO_EVENT_JOB_QUEUE_TOO_LONG = "job_queue_too_long"
+ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE = "lost_client_without_goodbye"
 ENODO_EVENT_TYPES = [ENODO_EVENT_ANOMALY_DETECTED, ENODO_EVENT_JOB_QUEUE_TOO_LONG, \
     ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE]
 
 ENODO_EVENT_OUTPUT_WEBHOOK = 1
 ENODO_EVENT_OUTPUT_TYPES = [ENODO_EVENT_OUTPUT_WEBHOOK]
 
+ENODO_EVENT_SEVERITY_INFO = "info"
+ENODO_EVENT_SEVERITY_WARNING = "warning"
+ENODO_EVENT_SEVERITY_ERROR = "error"
+ENODO_EVENT_SEVIRITY_LEVELS = [ENODO_EVENT_SEVERITY_INFO, ENODO_EVENT_SEVERITY_WARNING, ENODO_EVENT_SEVERITY_ERROR]
+
 
 class EnodoEvent:
-    def __init__(self, title, message, event_type):
+    """
+    EnodoEvent class. Holds data for an event (error/warning/etc) that occured. No state data is saved.
+    """
+    __slots__ = ('title', 'message', 'event_type', 'ts', 'severity')
+
+    def __init__(self, title, message, event_type, severity=ENODO_EVENT_SEVERITY_INFO):
         if event_type not in ENODO_EVENT_TYPES:
             raise Exception()  # TODO Nice exception
         self.title = title
         self.message = message
         self.event_type = event_type
         self.ts = time.time()
+        self.severity = severity
 
     async def to_dict(self):
         return {
             'title': self.title,
             'event_type': self.event_type,
             'message': self.message,
-            'ts': self.ts
+            'ts': self.ts,
+            'severity': self.severity
         }
 
 
 class EnodoEventOutput:
+    """
+    EnodoEventOutput Class. Class to describe base output method of events
+    """
 
-    def __init__(self, output_id):
+    def __init__(self, output_id,
+                    for_severities=ENODO_EVENT_SEVIRITY_LEVELS,
+                    for_event_types=ENODO_EVENT_TYPES):
         self.output_id = output_id
+        self.for_severities = for_severities
+        self.for_event_types = for_event_types
 
     async def send_event(self, event):
         pass
@@ -56,18 +75,27 @@ class EnodoEventOutput:
             return EnodoEventOutput(output_id)
 
     async def to_dict(self):
-        return {}
+        return {
+            "output_id": self.output_id,
+            "for_severities": self.for_severities,
+            "for_event_types": self.for_event_types
+        }
 
 
 class EnodoEventOutputWebhook(EnodoEventOutput):
+    """
+    EnodoEventOutputWebhook Class. Class to describe webhook method as output method of events
+    This method uses a template which can be used {{ event.var }} will be replaced with a instance
+    variable named var on the event instance
+    """
 
-    def __init__(self, output_id, url, headers=None, payload=None):
+    def __init__(self, output_id, url, headers=None, payload=None, **kwargs):
         """
-        Call webhook url with JSON data of EnodoEvent
+        Call webhook url with data of EnodoEvent
         :param output_id: id of output
         :param url: url to call
         """
-        super().__init__(output_id)
+        super().__init__(output_id, **kwargs)
         self.url = url
         self.headers = headers
         self.payload = payload
@@ -76,7 +104,7 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
         if self.payload is None:
             self.payload = ""
 
-    async def get_payload(self, event):
+    async def _get_payload(self, event):
         env = Environment()
         env.filters['jsonify'] = json.dumps
         template = env.from_string(self.payload)
@@ -86,14 +114,15 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
         try:
             logging.debug(f'Calling EnodoEventOutput webhook {self.url}')
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as session:
-                await session.post(self.url, data=await self.get_payload(event), headers=self.headers)
+                await session.post(self.url, data=await self._get_payload(event), headers=self.headers)
         except Exception as e:
             logging.warning('Calling EnodoEventOutput webhook failed')
             logging.debug(f'Corresponding error: {e}')
 
     async def to_dict(self):
         return {
-            'output_id': self.output_id,
+            **(await super().to_dict()),
+            **{
             'output_type': ENODO_EVENT_OUTPUT_WEBHOOK,
             'data': {
                 'url': self.url,
@@ -101,11 +130,12 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
                 'payload': self.payload
             }
         }
+        }
 
 
 class EnodoEventManager:
     outputs = None
-    _next_output_id = None
+    _next_output_id = None # Next id is always current. will be incremented when setting new id
     _locked = False
     _max_output_id = None
 
