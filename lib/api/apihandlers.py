@@ -1,4 +1,5 @@
 import urllib.parse
+from urllib.parse import unquote
 from aiohttp import web
 
 from aiohttp_basicauth import BasicAuthMiddleware
@@ -45,8 +46,10 @@ class ApiHandlers:
         include_points = True if 'include_points' in request.rel_url.query and request.rel_url.query[
             'include_points'] == 'true' else False
 
+        series_name = unquote(request.match_info['series_name'])
+
         return web.json_response(
-            data=await BaseHandler.resp_get_monitored_series_details(request.match_info['series_name'], include_points),
+            data=await BaseHandler.resp_get_monitored_series_details(series_name, include_points),
             dumps=safe_json_dumps)
 
     @classmethod
@@ -71,6 +74,17 @@ class ApiHandlers:
         """
         series_name = urllib.parse.unquote(request.match_info['series_name'])
         return web.json_response(data={}, status=await BaseHandler.resp_remove_series(series_name))
+
+    @classmethod
+    @EnodoAuth.auth.required
+    async def get_enodo_event_outputs(cls, request):
+        """
+        Get all event outputs.
+        :param request:
+        :return:
+        """
+        resp, status = await BaseHandler.resp_get_event_outputs()
+        return web.json_response(data=resp, status=status)
 
     @classmethod
     @EnodoAuth.auth.required

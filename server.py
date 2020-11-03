@@ -255,6 +255,8 @@ class Server:
                 "/api/enodo/model", ApiHandlers.get_possible_analyser_models, allow_head=False)
             self.app.router.add_post(
                 "/api/enodo/model", ApiHandlers.add_analyser_models)
+            self.app.router.add_get(
+                "/api/enodo/event/output", ApiHandlers.get_enodo_event_outputs)
             self.app.router.add_delete(
                 "/api/enodo/event/output/{output_id}", ApiHandlers.remove_enodo_event_output)
             self.app.router.add_post(

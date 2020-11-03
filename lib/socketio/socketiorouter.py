@@ -35,7 +35,7 @@ class SocketIoRouter:
             event='/api/event/output/create',
             handler=SocketIoHandler.add_event_output)
         self._sio_on(
-            event='/api/event/output/remove',
+            event='/api/event/output/delete',
             handler=SocketIoHandler.remove_event_output)
         self._sio_on(
             event='/api/enodo/models',
