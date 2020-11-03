@@ -1,20 +1,27 @@
 from configparser import NoOptionError, NoSectionError, RawConfigParser, ConfigParser
 import os
+import logging
 from secrets import token_urlsafe
 
 from lib.exceptions.enodoexception import EnodoInvalidConfigException, EnodoException
 
 EMPTY_CONFIG_FILE = config = {
     'enodo': {
+        'basic_auth_username': 'enodo',
+        'basic_auth_password': 'enodo',
         'log_path': '',
         'client_max_timeout': '35',
         'internal_socket_server_hostname': 'localhost',
         'internal_socket_server_port': '9103',
-        'model_pkl_save_path': '',
         'series_save_path': '',
-        'save_to_disk_interval': '120',
+        'enodo_base_save_path': '',
+        'save_to_disk_interval': '20',
         'enable_rest_api': 'true',
         'enable_socket_io_api': 'false',
+        'disable_safe_mode': 'false'
+    },
+    'events': {
+        'max_in_queue_before_warning': '25'
     },
     'siridb': {
         'host': '',
@@ -34,7 +41,6 @@ EMPTY_CONFIG_FILE = config = {
         'min_data_points': '100',
         'watcher_interval': '2',
         'siridb_connection_check_interval': '30',
-        'period_to_forecast': '',
         'interval_schedules_series': '3600',
     }
 }
@@ -57,7 +63,6 @@ class Config:
     min_data_points = None
     watcher_interval = None
     siridb_connection_check_interval = None
-    period_to_forecast = None
     db = None
     interval_schedules_series = None
 
@@ -83,7 +88,6 @@ class Config:
     client_max_timeout = None
     socket_server_host = None
     socket_server_port = None
-    model_pkl_save_path = None
     series_save_path = None
     event_outputs_save_path = None
     save_to_disk_interval = None
@@ -92,6 +96,10 @@ class Config:
     internal_security_token = None
     jobs_save_path = None
     model_save_path = None
+    disable_safe_mode = None
+
+    # Enodo Events
+    max_in_queue_before_warning = None
 
     @classmethod
     def create_standard_config_file(cls, path):
@@ -114,6 +122,10 @@ class Config:
         This method can only be called after the configfile is parsed
         :return:
         """
+
+        if cls.disable_safe_mode is True:
+            logging.info('Safe mode disabled for internal communication')
+            return
 
         if cls._config is None:
             raise EnodoException('Can only setup token when config is parsed')
@@ -142,7 +154,6 @@ class Config:
         cls.watcher_interval = cls.to_int(cls._config.get_r('analyser', 'watcher_interval'))
         cls.siridb_connection_check_interval = cls.to_int(
             cls._config.get_r('analyser', 'siridb_connection_check_interval'))
-        cls.period_to_forecast = cls.to_int(cls._config.get_r('analyser', 'period_to_forecast'))
         cls.interval_schedules_series = cls.to_int(cls._config.get_r('analyser', 'interval_schedules_series'))
 
         # SiriDB
@@ -168,41 +179,22 @@ class Config:
             cls.client_max_timeout = 35
         cls.socket_server_host = cls._config.get_r('enodo', 'internal_socket_server_hostname')
         cls.socket_server_port = cls.to_int(cls._config.get_r('enodo', 'internal_socket_server_port'))
-        cls.model_pkl_save_path = cls._config.get_r('enodo', 'model_pkl_save_path') # TODO Redo saving models
         cls.save_to_disk_interval = cls.to_int(cls._config.get_r('enodo', 'save_to_disk_interval'))
         cls.enable_rest_api = cls.to_bool(
             cls._config.get_r('enodo', 'enable_rest_api', required=False, default='true'), True)
         cls.enable_socket_io_api = cls.to_bool(
             cls._config.get_r('enodo', 'enable_socket_io_api', required=False, default='false'), False)
         cls.base_dir = cls._config.get_r('enodo', 'enodo_base_save_path')
+        cls.disable_safe_mode = cls.to_bool(cls._config.get_r('enodo', 'disable_safe_mode'), False)
         cls.log_path = os.path.join(cls.base_dir, 'log.log')
         cls.series_save_path = os.path.join(cls.base_dir, 'data/series.json')
         cls.jobs_save_path = os.path.join(cls.base_dir, 'data/jobs.json')
         cls.event_outputs_save_path = os.path.join(cls.base_dir, 'data/outputs.json')
         cls.model_save_path = os.path.join(cls.base_dir, 'data/models.json')
+        cls.max_in_queue_before_warning = cls.to_int(cls._config.get_r('events', 'max_in_queue_before_warning'))
 
         if not os.path.exists(os.path.join(cls.base_dir, 'data')):
             os.makedirs(os.path.join(cls.base_dir, 'data'))
-        if not os.path.exists(Config.model_pkl_save_path):
-            os.makedirs(Config.model_pkl_save_path)
-
-    @classmethod
-    async def save_config(cls):
-        cls._config.set('analyser', 'min_data_points', str(cls.min_data_points))
-        cls._config.set('analyser', 'watcher_interval', str(cls.watcher_interval))
-        cls._config.set('analyser', 'siridb_connection_check_interval', str(cls.siridb_connection_check_interval))
-        cls._config.set('analyser', 'period_to_forecast', str(cls.period_to_forecast))
-        cls._config.set('analyser', 'interval_schedules_series', str(cls.interval_schedules_series))
-
-        # SiriDB
-        cls._config.set('siridb', 'host', cls.siridb_host)
-        cls._config.set('siridb', 'port', str(cls.siridb_port))
-        cls._config.set('siridb', 'user', cls.siridb_user)
-        cls._config.set('siridb', 'password', cls.siridb_password)
-        cls._config.set('siridb', 'database', cls.siridb_database)
-
-        with open(cls._path, "w") as fh:
-            cls._config.write(fh)
 
     @staticmethod
     def to_int(val):

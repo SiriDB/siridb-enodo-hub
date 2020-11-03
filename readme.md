@@ -3,30 +3,14 @@
 
 # Enodo Hub
 
-## API's
 
--   REST API
-    (View API references at http://hostname/api/docs)
--   Socket.io API
 
 ## Deployment and internal communication
 
-### Listener
-
-The enode listener listens to pipe socket with siridb server. It sums up the totals of added datapoints to each serie. 
-It periodically sends an update to the enode hub. The listener only keeps track of series that are registered via the hub. The listener is seperated from the enode hub, so that it can be placed close to the siridb server, so it can locally access the pipe socket.
-Every interval for heartbeat and update can be configured in the .conf file
-
-### Worker
-
-The enode worker executes fitting and forecasting models/algorithms. The worker uses significant CPU and thus should be placed on a machine that has low CPU usage.
-The worker can create different models (ARIMA/prophet) for series, train models with new data and calculate forecasts for a certain serie. A worker can implement multiple models. This can be different per worker version. The implemented models should be communicated to the hub during the handshake.
-
 ### Hub
 
-The enode hub communicates and guides both the listener as the worker. The hub tells the listener to which series it needs to pay attention to, and it tells the worker which serie should be analysed.
+The enode hub communicates and guides both the listener as the worker. The hub tells the listener to which series it needs to pay attention to, and it tells the worker which series should be analysed.
 Clients can connect to the hub for receiving updates, and polling for data. Also a client can use the hub to alter the data about which series should be watched.
-
 
 
 ## Getting started
@@ -40,5 +24,85 @@ To get the Enodo Hub setup you need to following the following steps:
 3. Fill in the `default.conf` file
 4. Call `python3 main.py --config=default.conf` to start the hub.
 
-### Docker
-....
+## API's
+
+-   REST API
+-   Socket.io API
+
+### REST API
+
+#### Get all series
+call http://localhost/api/series (GET)
+
+#### Get series details
+call http://localhost/api/series/{series_name} (GET)
+
+#### Create Series
+call http://localhost/api/series (POST)
+```
+{
+	"name": "series_name_in_siridb",
+	"config": {
+		"job_models": {
+			"job_base_analysis": "prophet",
+			"job_forecast": "prophet",
+			"job_anomaly_detect": "prophet"
+		},
+		"job_schedule": {
+			"job_base_analysis": 200
+		},
+		"min_data_points": 2,
+		"model_params": {
+			"points_since": 1563723900
+		}
+	}
+}
+```
+
+#### Get all event output streams
+call http://localhost/api/enodo/event/output (GET)
+
+#### Create event output stream
+call http://localhost/api/enodo/event/output (POST)
+```
+{
+	"output_type": 1,
+	"data": {
+		"for_severities": ["warning", "error"],
+		"url": "url_to_endpoint",
+		"headers": {
+			"authorization": "Basic abcdefghijklmnopqrstuvwxyz"
+		},
+		"payload": "{\n  \"title\": \"{{event.title}}\",\n  \"body\": \"{{event.message}}\",\n  \"dateTime\": {{event.ts}},\n  \"severity\": \"{{event.severity}}\"\n}"
+	}
+}
+```
+
+#### Delete event output stream
+call http://localhost/api/enodo/event/output/{output_id} (DELETE)
+
+
+### Socket.IO Api (WebSockets)
+
+When sending payload in a request, use the data structure same as in the REST API calls, except the data will be wrapped in an object : `{"data": ...}`.
+
+#### Get series
+event: `/api/series/create`
+
+#### Get series Details
+event: `/api/series/details`
+
+#### Create series
+event: `/api/series/create`
+
+#### Delete series
+event: `/api/series/delete`
+
+#### Get all event output stream
+event: `/api/event/output`
+
+#### Create event output stream
+event: `/api/event/output/create`
+
+#### Delete event output stream
+event: `/api/event/output/delete`

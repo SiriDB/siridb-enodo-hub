@@ -1,29 +1,31 @@
-from enodo.jobs import EnodoAnomalyDetectionJobDataModel
-from lib.jobmanager.enodojobmanager import EnodoJobManager, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE
-from lib.serie.seriemanager import SerieManager
-from lib.serie import DETECT_ANOMALIES_STATUS_PENDING
-from lib.socket.clientmanager import ClientManager
-from lib.socket.package import *
+from enodo.jobs import JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES
+from enodo.protocol.packagedata import EnodoJobRequestDataModel
+from enodo.protocol.package import RESPONSE_OK, create_header
 
+
+from lib.enodojobmanager import EnodoJobManager
+from lib.series.seriesmanager import SeriesManager
+from lib.series import DETECT_ANOMALIES_STATUS_PENDING
+from lib.socket import ClientManager
 
 async def receive_new_series_points(writer, packet_type, packet_id, data, client_id):
-    for serie_name in data.keys():
-        serie = await SerieManager.get_serie(serie_name)
-        if serie is not None:
-            if await serie.is_forecasted():
-                lowest_ts = None
-                for point in data.get(serie_name):
-                    if lowest_ts is None or point[0] < lowest_ts:
-                        lowest_ts = point[0]
-                if lowest_ts is not None:
-                    if await serie.get_detect_anomalies_status() is not DETECT_ANOMALIES_STATUS_PENDING:
-                        await EnodoJobManager.create_job(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIE, serie_name,
-                                                         EnodoAnomalyDetectionJobDataModel(
-                                                             points_since=lowest_ts))
-                        await serie.set_detect_anomalies_status(DETECT_ANOMALIES_STATUS_PENDING)
-            else:
-                await SerieManager.add_to_datapoint_counter(serie_name, len(data.get(serie_name)))
-    response = create_header(0, REPONSE_OK, packet_id)
+    for series_name in data.keys():
+        series = await SeriesManager.get_series(series_name)
+        if series is not None:
+            # if await series.is_forecasted():
+            #     lowest_ts = None
+            #     for point in data.get(series_name):
+            #         if lowest_ts is None or point[0] < lowest_ts:
+            #             lowest_ts = point[0]
+            #     if lowest_ts is not None:
+            #         if await series.get_detect_anomalies_status() is not DETECT_ANOMALIES_STATUS_PENDING:
+            #             await EnodoJobManager.create_job(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, series_name,
+            #                                              EnodoDetectAnomaliesJobRequestDataModel(
+            #                                                  points_since=lowest_ts))
+            #             await series.set_detect_anomalies_status(DETECT_ANOMALIES_STATUS_PENDING)
+            # else:
+            await SeriesManager.add_to_datapoint_counter(series_name, len(data.get(series_name)))
+    response = create_header(0, RESPONSE_OK, packet_id)
     writer.write(response)
 
 

@@ -1,9 +1,12 @@
 import functools
 
 from lib.socketio.subscriptionmanager import SubscriptionManager
-from lib.util.util import safe_json_dumps
+from lib.util import safe_json_dumps
 from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
+from lib.enodojobmanager import EnodoJobManager
+from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_DELETE
+from lib.series.seriesmanager import SeriesManager
 
 
 def socketio_auth_required(handler):
@@ -35,7 +38,7 @@ class SocketIoHandler:
         user = data.get('username')
         password = data.get('password')
 
-        if not await EnodoAuth.auth.check_credentials(user, password):
+        if not await EnodoAuth.auth.check_credentials(user, password, None):
             raise ConnectionRefusedError('authentication failed')
 
         async with cls._sio.session(sid) as session:
@@ -59,9 +62,9 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
-    async def get_serie_details(cls, sid, data, event):
-        serie_name = data.get('serie_name')
-        resp = await BaseHandler.resp_get_monitored_serie_details(serie_name, include_points=True)
+    async def get_series_details(cls, sid, data, event):
+        series_name = data.get('series_name')
+        resp = await BaseHandler.resp_get_monitored_series_details(series_name, include_points=True)
         return safe_json_dumps(resp)
 
     @classmethod
@@ -71,9 +74,8 @@ class SocketIoHandler:
             resp = {'error': 'Incorrect data'}
         else:
             series_name = data.get('name')
-            series_model = data.get('model')
-            if series_name is not None and series_model is not None:
-                resp, status = await BaseHandler.resp_add_serie(data)
+            if series_name is not None:
+                resp, status = await BaseHandler.resp_add_series(data)
             else:
                 resp = {'error': 'Missing required field(s)'}
         return safe_json_dumps(resp)
@@ -86,7 +88,7 @@ class SocketIoHandler:
         else:
             series_name = data.get('name')
             if series_name is not None:
-                resp = {'status': await BaseHandler.resp_remove_serie(series_name)}
+                resp = {'status': await BaseHandler.resp_remove_series(series_name)}
             else:
                 resp = {'error': 'Missing required field(s)'}
         return safe_json_dumps(resp)
@@ -98,8 +100,38 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
+    async def get_event_outputs(cls, sid, data, event=None):
+        return await BaseHandler.resp_get_event_outputs()
+
+    @classmethod
+    @socketio_auth_required
+    async def add_event_output(cls, sid, data, event=None):
+        output_type = data.get('output_type')
+        output_data = data.get('data')
+        return await BaseHandler.resp_add_event_output(output_type, output_data)
+
+    @classmethod
+    @socketio_auth_required
+    async def remove_event_output(cls, sid, data, event=None):
+        output_id = data.get('output_id')
+        return await BaseHandler.resp_remove_event_output(output_id)
+
+    @classmethod
+    @socketio_auth_required
+    async def subscribe_queue(cls, sid, data, event=None):
+        if cls._sio is not None:
+            cls._sio.enter_room(sid, 'job_updates')
+        return safe_json_dumps(await BaseHandler.resp_get_jobs_queue())
+
+    @classmethod
+    @socketio_auth_required
+    async def unsubscribe_queue(cls, sid, data, event):
+        if cls._sio is not None:
+            cls._sio.leave_room(sid, 'job_updates')
+
+    @classmethod
+    @socketio_auth_required
     async def subscribe_series(cls, sid, data, event=None):
-        print(cls, sid, data, event)
         if cls._sio is not None:
             cls._sio.enter_room(sid, 'series_updates')
             return await cls._get_all_series(None, None, None)
@@ -132,9 +164,31 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
+    async def subscribe_enodo_models(cls, sid, data, event):
+        if cls._sio is not None:
+            cls._sio.enter_room(sid, 'enodo_model_updates')
+            return await BaseHandler.resp_get_possible_analyser_models()
+
+    @classmethod
+    @socketio_auth_required
+    async def unsubscribe_enodo_models(cls, sid, data, event):
+        if cls._sio is not None:
+            cls._sio.leave_room(sid, 'enodo_model_updates')
+
+    @classmethod
+    @socketio_auth_required
     async def get_enodo_hub_status(cls, sid, data, event):
         resp = await BaseHandler.resp_get_enodo_hub_status()
         return resp
+
+    @classmethod
+    async def internal_updates_queue_subscribers(cls, change_type, job_id, jobs):
+        if cls._sio is not None:
+            await cls._sio.emit('job_updates', {
+                'change_type': change_type,
+                'job_id': job_id,
+                'job_data': jobs
+            }, room='job_updates')
 
     @classmethod
     async def internal_updates_series_subscribers(cls, change_type, series_name, series_data):
@@ -145,10 +199,19 @@ class SocketIoHandler:
                 'series_data': series_data
             }, room='series_updates')
 
-        filtered_subs = await SubscriptionManager.get_subscriptions_for_serie_name(series_name)
+        filtered_subs = await SubscriptionManager.get_subscriptions_for_series_name(series_name)
         for sub in filtered_subs:
             await cls._sio.emit('series_updates', {
                 'change_type': change_type,
                 'series_name': series_name,
                 'series_data': series_data
             }, room=sub.get('sid'))
+
+    @classmethod
+    async def internal_updates_enodo_models_subscribers(cls, change_type, model_name, model_data):
+        if cls._sio is not None:
+            await cls._sio.emit('enodo_model_updates', {
+                'change_type': change_type,
+                'model_name': model_name,
+                'model_data': model_data
+            }, room='enodo_model_updates')

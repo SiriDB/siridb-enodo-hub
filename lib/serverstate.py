@@ -16,7 +16,7 @@ class ServerState:
                           siridb_forecast_dbname,
                           siridb_forecast_hostlist):
         cls.running = True
-        print(siridb_data_username, siridb_data_password, siridb_data_dbname, siridb_data_hostlist)
+        
         cls.siridb_data_client = SiriDBClient(
             username=siridb_data_username,
             password=siridb_data_password,
@@ -30,4 +30,9 @@ class ServerState:
             dbname=siridb_forecast_dbname,
             hostlist=siridb_forecast_hostlist,  # Multiple connections are supported
             keepalive=True)
-        await cls.siridb_data_client.connect()
+        await cls.siridb_forecast_client.connect()
+
+    @classmethod
+    def stop(cls):
+        cls.siridb_data_client.close()
+        cls.siridb_forecast_client.close()

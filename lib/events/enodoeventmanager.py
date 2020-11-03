@@ -1,41 +1,65 @@
+import asyncio
 import logging
 import time
+import os
 
 import aiohttp
 import json
-import os
+from jinja2 import Environment, PackageLoader
 
 from lib.config.config import Config
 
-ENODO_EVENT_ANOMALY_DETECTED = 1
-ENODO_EVENT_TYPES = [ENODO_EVENT_ANOMALY_DETECTED]
+ENODO_EVENT_ANOMALY_DETECTED = "event_anomaly_detected"
+ENODO_EVENT_JOB_QUEUE_TOO_LONG = "job_queue_too_long"
+ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE = "lost_client_without_goodbye"
+ENODO_EVENT_TYPES = [ENODO_EVENT_ANOMALY_DETECTED, ENODO_EVENT_JOB_QUEUE_TOO_LONG, \
+    ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE]
 
 ENODO_EVENT_OUTPUT_WEBHOOK = 1
 ENODO_EVENT_OUTPUT_TYPES = [ENODO_EVENT_OUTPUT_WEBHOOK]
 
+ENODO_EVENT_SEVERITY_INFO = "info"
+ENODO_EVENT_SEVERITY_WARNING = "warning"
+ENODO_EVENT_SEVERITY_ERROR = "error"
+ENODO_EVENT_SEVIRITY_LEVELS = [ENODO_EVENT_SEVERITY_INFO, ENODO_EVENT_SEVERITY_WARNING, ENODO_EVENT_SEVERITY_ERROR]
+
 
 class EnodoEvent:
-    def __init__(self, title, message, event_type):
+    """
+    EnodoEvent class. Holds data for an event (error/warning/etc) that occured. No state data is saved.
+    """
+    __slots__ = ('title', 'message', 'event_type', 'ts', 'severity')
+
+    def __init__(self, title, message, event_type, severity=ENODO_EVENT_SEVERITY_INFO):
         if event_type not in ENODO_EVENT_TYPES:
             raise Exception()  # TODO Nice exception
         self.title = title
         self.message = message
         self.event_type = event_type
         self.ts = time.time()
+        self.severity = severity
 
     async def to_dict(self):
         return {
             'title': self.title,
             'event_type': self.event_type,
             'message': self.message,
-            'ts': self.ts
+            'ts': self.ts,
+            'severity': self.severity
         }
 
 
 class EnodoEventOutput:
+    """
+    EnodoEventOutput Class. Class to describe base output method of events
+    """
 
-    def __init__(self, output_id):
+    def __init__(self, output_id,
+                    for_severities=ENODO_EVENT_SEVIRITY_LEVELS,
+                    for_event_types=ENODO_EVENT_TYPES):
         self.output_id = output_id
+        self.for_severities = for_severities
+        self.for_event_types = for_event_types
 
     async def send_event(self, event):
         pass
@@ -51,46 +75,68 @@ class EnodoEventOutput:
             return EnodoEventOutput(output_id)
 
     async def to_dict(self):
-        return {}
+        return {
+            "output_id": self.output_id,
+            "for_severities": self.for_severities,
+            "for_event_types": self.for_event_types
+        }
 
 
 class EnodoEventOutputWebhook(EnodoEventOutput):
+    """
+    EnodoEventOutputWebhook Class. Class to describe webhook method as output method of events
+    This method uses a template which can be used {{ event.var }} will be replaced with a instance
+    variable named var on the event instance
+    """
 
-    def __init__(self, output_id, url, headers=None):
+    def __init__(self, output_id, url, headers=None, payload=None, **kwargs):
         """
-        Call webhook url with JSON data of EnodoEvent
+        Call webhook url with data of EnodoEvent
         :param output_id: id of output
         :param url: url to call
         """
-        super().__init__(output_id)
+        super().__init__(output_id, **kwargs)
         self.url = url
         self.headers = headers
+        self.payload = payload
         if self.headers is None:
             self.headers = {}
+        if self.payload is None:
+            self.payload = ""
+
+    async def _get_payload(self, event):
+        env = Environment()
+        env.filters['jsonify'] = json.dumps
+        template = env.from_string(self.payload)
+        return template.render(event=event)
 
     async def send_event(self, event):
         try:
             logging.debug(f'Calling EnodoEventOutput webhook {self.url}')
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as session:
-                await session.post(self.url, json=await event.to_dict(), headers=self.headers)
-        except Exception:
+                await session.post(self.url, data=await self._get_payload(event), headers=self.headers)
+        except Exception as e:
             logging.warning('Calling EnodoEventOutput webhook failed')
+            logging.debug(f'Corresponding error: {e}')
 
     async def to_dict(self):
         return {
-            'output_id': self.output_id,
+            **(await super().to_dict()),
+            **{
             'output_type': ENODO_EVENT_OUTPUT_WEBHOOK,
             'data': {
                 'url': self.url,
-                'headers': self.headers
+                'headers': self.headers,
+                'payload': self.payload
             }
+        }
         }
 
 
 class EnodoEventManager:
     outputs = None
-    _next_output_id = None
-    _lock = None
+    _next_output_id = None # Next id is always current. will be incremented when setting new id
+    _locked = False
     _max_output_id = None
 
     @classmethod
@@ -98,17 +144,24 @@ class EnodoEventManager:
         cls.outputs = []
         cls._next_output_id = 0
         cls._max_output_id = 1000
-        cls._lock = False
+
+    @classmethod
+    async def _lock(cls):
+        while cls._locked is True:
+            await asyncio.sleep(0.1)
+        cls._locked = True
+
+    @classmethod
+    async def _unlock(cls):
+        cls._locked = False
 
     @classmethod
     async def _get_next_output_id(cls):
-        while cls._lock is True:
-            await aiohttp.asyncio.sleep(0.1)
-        cls._lock = True
+        await cls._lock()
         if cls._next_output_id + 1 >= cls._max_output_id:
             cls._next_output_id = 0
         cls._next_output_id += 1
-        cls._lock = False
+        await cls._unlock()
         return cls._next_output_id
 
     @classmethod
@@ -127,11 +180,9 @@ class EnodoEventManager:
 
     @classmethod
     async def _remove_event_output(cls, output):
-        while cls._lock is True:
-            await aiohttp.asyncio.sleep(0.1)
-        cls._lock = True
+        await cls._lock()
         cls.outputs.remove(output)
-        cls._lock = False
+        await cls._unlock()
 
     @classmethod
     async def handle_event(cls, event):
@@ -141,19 +192,25 @@ class EnodoEventManager:
 
     @classmethod
     async def load_from_disk(cls):
-        if not os.path.exists(Config.event_outputs_save_path):
-            pass
-        else:
+        try:
+            if not os.path.exists(Config.event_outputs_save_path):
+                raise Exception()
             f = open(Config.event_outputs_save_path, "r")
             data = f.read()
             f.close()
-            output_data = json.loads(data)
-            if 'next_output_id' in output_data:
-                cls._next_output_id = output_data.get('next_output_id')
-            if 'outputs' in output_data:
-                for s in output_data.get('outputs'):
-                    cls.outputs.append(
-                        await EnodoEventOutput.create(s.get('output_id'), s.get('output_type'), s.get('data')))
+        except Exception as _:
+            data = "{}"
+
+        if data == "" or data is None:
+            data = "{}"
+
+        output_data = json.loads(data)
+        if 'next_output_id' in output_data:
+            cls._next_output_id = output_data.get('next_output_id')
+        if 'outputs' in output_data:
+            for s in output_data.get('outputs'):
+                cls.outputs.append(
+                    await EnodoEventOutput.create(s.get('output_id'), s.get('output_type'), s.get('data')))
 
     @classmethod
     async def save_to_disk(cls):
@@ -170,4 +227,5 @@ class EnodoEventManager:
             f.write(json.dumps(output_data))
             f.close()
         except Exception as e:
-            print(e)
+            logging.error(f"Something went wrong when writing eventmanager data to disk")
+            logging.debug(f"Corresponding error: {e}")

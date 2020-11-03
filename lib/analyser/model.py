@@ -3,15 +3,17 @@ import os
 
 from enodo import EnodoModel
 from lib.config.config import Config
-from lib.util.util import safe_json_dumps
+from lib.util import safe_json_dumps
+from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_DELETE
 
 
 class EnodoModelManager:
     models = None
 
     @classmethod
-    async def async_setup(cls):
+    async def async_setup(cls, update_cb):
         cls.models = []
+        cls._update_cb = update_cb
 
     @classmethod
     async def get_model(cls, model_name):
@@ -25,6 +27,7 @@ class EnodoModelManager:
         if await cls.get_model(model_name) is None:
             model = EnodoModel(model_name, model_arguments, supports_forecasting, supports_anomaly_detection)
             cls.models.append(model)
+            await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, model_name, await EnodoModel.to_dict(model))
 
     @classmethod
     async def add_model_from_dict(cls, dict_data):
@@ -35,6 +38,7 @@ class EnodoModelManager:
         else:
             if await cls.get_model(model.model_name) is None:
                 cls.models.append(model)
+                await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, model.model_name, await EnodoModel.to_dict(model))
                 return True
             return False
 
@@ -42,6 +46,7 @@ class EnodoModelManager:
     async def remove_model(cls, model_name):
         model = await cls.get_model(model_name)
         cls.models.remove(model)
+        await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_DELETE, model_name, await EnodoModel.to_dict(model))
 
     @classmethod
     async def load_from_disk(cls):
@@ -74,4 +79,5 @@ class EnodoModelManager:
             f.write(json.dumps(model_list, default=safe_json_dumps))
             f.close()
         except Exception as e:
-            print(e)
+            logging.error(f"Something went wrong when writing enodo models to disk")
+            logging.debug(f"Corresponding error: {e}")
