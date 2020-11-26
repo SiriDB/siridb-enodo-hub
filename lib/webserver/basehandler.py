@@ -70,17 +70,16 @@ class BaseHandler:
         required_fields = ['name', 'config']
         series_config = SeriesConfigModel.from_dict(data.get('config'))
         for model_name in list(series_config.job_models.values()):
-            model_parameters = series_config.model_params.get("model_params")
+            model_parameters = series_config.model_params
 
             model = await EnodoModelManager.get_model(model_name)
             if model is None:
                 return {'error': 'Unknown model'}, 400
-
             if model_parameters is None and len(model.model_arguments.keys()) > 0:
                 return {'error': 'Missing required fields'}, 400
             for key in model.model_arguments:
                 if key not in model_parameters.keys():
-                    return {'error': 'Missing required fields'}, 400
+                    return {'error': f'Missing required field {key}'}, 400
 
         # data['model_parameters'] = await setup_default_model_arguments(model_parameters)
 
@@ -95,6 +94,7 @@ class BaseHandler:
         # TODO: REMOVE JOBS, EVENTS ETC
         if await SeriesManager.remove_series(series_name):
             await EnodoJobManager.cancel_jobs_for_series(series_name)
+            await EnodoJobManager.remove_failed_jobs_for_series(series_name)
             return 200
         return 404
 
@@ -113,9 +113,7 @@ class BaseHandler:
     async def resp_add_model(cls, data):
         try:
             await EnodoModelManager.add_model(data['model_name'],
-                                              data['model_arguments'],
-                                              data['supports_forecasting'],
-                                              data['supports_anomaly_detection'])
+                                              data['model_arguments'])
             return {'data': [await EnodoModel.to_dict(model) for model in EnodoModelManager.models]}, 201
         except Exception:
             return {'error': 'Incorrect model data'}, 400

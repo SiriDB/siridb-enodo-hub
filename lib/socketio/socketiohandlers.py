@@ -4,7 +4,6 @@ from lib.socketio.subscriptionmanager import SubscriptionManager
 from lib.util import safe_json_dumps
 from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
-from lib.enodojobmanager import EnodoJobManager
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_DELETE
 from lib.series.seriesmanager import SeriesManager
 
@@ -168,6 +167,13 @@ class SocketIoHandler:
         if cls._sio is not None:
             cls._sio.enter_room(sid, 'enodo_model_updates')
             return await BaseHandler.resp_get_possible_analyser_models()
+
+    @classmethod
+    @socketio_auth_required
+    async def subscribe_event_output(cls, sid, data, event):
+        if cls._sio is not None:
+            cls._sio.enter_room(sid, 'event_output_updates')
+            return await BaseHandler.resp_get_event_outputs()
 
     @classmethod
     @socketio_auth_required

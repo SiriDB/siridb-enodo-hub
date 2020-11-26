@@ -3,11 +3,12 @@ from siridb.connector import SiriDBClient
 
 class ServerState:
     running = None
+    sio = None
     siridb_data_client = None
     siridb_forecast_client = None
 
     @classmethod
-    async def async_setup(cls, siridb_data_username,
+    async def async_setup(cls, sio, siridb_data_username,
                           siridb_data_password,
                           siridb_data_dbname,
                           siridb_data_hostlist,
@@ -16,6 +17,7 @@ class ServerState:
                           siridb_forecast_dbname,
                           siridb_forecast_hostlist):
         cls.running = True
+        cls.sio = sio
         
         cls.siridb_data_client = SiriDBClient(
             username=siridb_data_username,

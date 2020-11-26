@@ -57,7 +57,10 @@ class SocketIoRouter:
             event='/subscribe/filtered/series',
             handler=SocketIoHandler.subscribe_filtered_series)
         self._sio_on(
-            event='/subscribe/enodo/models',
+            event='/subscribe/enodo/model',
+            handler=SocketIoHandler.subscribe_enodo_models)
+        self._sio_on(
+            event='/subscribe/event/output',
             handler=SocketIoHandler.subscribe_enodo_models)
 
     def _sio_on(self, event, handler):

@@ -46,7 +46,8 @@ class Server:
 
     async def start_up(self):
         # Setup server state object
-        await ServerState.async_setup(siridb_data_username=Config.siridb_user,
+        await ServerState.async_setup(sio=self.sio,
+                                      siridb_data_username=Config.siridb_user,
                                       siridb_data_password=Config.siridb_password,
                                       siridb_data_dbname=Config.siridb_database,
                                       siridb_data_hostlist=[

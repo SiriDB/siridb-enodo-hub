@@ -23,9 +23,9 @@ class EnodoModelManager:
         return None
 
     @classmethod
-    async def add_model(cls, model_name, model_arguments, supports_forecasting, supports_anomaly_detection):
+    async def add_model(cls, model_name, model_arguments):
         if await cls.get_model(model_name) is None:
-            model = EnodoModel(model_name, model_arguments, supports_forecasting, supports_anomaly_detection)
+            model = EnodoModel(model_name, model_arguments)
             cls.models.append(model)
             await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, model_name, await EnodoModel.to_dict(model))
 
