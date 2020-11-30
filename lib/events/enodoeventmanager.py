@@ -65,7 +65,7 @@ class EnodoEventOutput:
         :param output_id: id of output
         :param severity: severity for each event to pass through
         :param for_event_types: only accepts certain event types
-        :param vendor_name: vendor name, for gui or client purposes. 
+        :param vendor_name: vendor name, for gui or client purposes,
             to setup default ouputs for third part systems
         :param custom_name: custom name
         """
