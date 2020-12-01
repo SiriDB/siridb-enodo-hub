@@ -9,7 +9,7 @@ class Series:
     __slots__ = (
         'id', 'name', 'series_config', 'series_job_statuses', '_job_schedule', '_datapoint_count', '_datapoint_count_lock', 'series_characteristics')
 
-    def __init__(self, name, config, datapoint_count, job_schedule=None, job_statuses=None, series_characteristics=None):
+    def __init__(self, name, config, datapoint_count, job_schedule=None, job_statuses=None, series_characteristics=None, id=None):
         self.id = name
         self.name = name # DEPRECATED
         self.series_config = SeriesConfigModel.from_dict(config)
@@ -97,6 +97,7 @@ class Series:
                 'series_characteristics': self.series_characteristics
             }
         return {
+            'id': self.id,
             'name': self.name,
             'datapoint_count': self._datapoint_count,
             'job_statuses': self.series_job_statuses,

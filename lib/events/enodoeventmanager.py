@@ -91,6 +91,7 @@ class EnodoEventOutput:
 
     async def to_dict(self):
         return {
+            "id": self.id,
             "output_id": self.output_id,
             "severity": self.severity,
             "for_event_types": self.for_event_types,
