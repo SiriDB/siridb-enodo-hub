@@ -117,8 +117,9 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
         self.url = url
         self.headers = headers
         self.payload = payload
-        if self.headers is None:
-            self.headers = {}
+        self.headers = headers
+        if not isinstance(self.headers, dict) and self.headers is not None:
+            self.headers = None
         if self.payload is None:
             self.payload = ""
 
