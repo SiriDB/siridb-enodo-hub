@@ -182,7 +182,7 @@ class ClientManager:
             worker = cls.workers.get(worker_id)
             if worker.worker_config.mode == WORKER_MODE_GLOBAL and not worker.busy and not worker.is_going_busy:
                 if worker.support_model_for_job(job_type, model_name):
-                        return worker
+                    return worker
 
         return None
 

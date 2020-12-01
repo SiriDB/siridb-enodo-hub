@@ -123,7 +123,7 @@ class EnodoJobManager:
 
         cls._open_jobs.append(job)
         if cls._update_queue_cb is not None:
-            await cls._update_queue_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, await job.to_dict())
+            await cls._update_queue_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, await EnodoJob.to_dict(job))
 
     @classmethod
     async def has_series_failed_jobs(cls, series_name):

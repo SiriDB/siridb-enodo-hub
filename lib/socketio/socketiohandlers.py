@@ -214,7 +214,7 @@ class SocketIoHandler:
             }, room=sub.get('sid'))
 
     @classmethod
-    async def internal_updates_enodo_models_subscribers(cls, change_type, model_name, model_data):
+    async def internal_updates_enodo_models_subscribers(cls, change_type, model_data):
         if cls._sio is not None:
             await cls._sio.emit('update', {
                 'resource': 'enodo_model',
