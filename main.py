@@ -9,7 +9,7 @@ from server import Server
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process config')
     parser.add_argument('--config', help='Config path', required=False)
-    parser.add_argument('--log_level', help='Log level, error/warning/info/verbose, default: info', required=False,
+    parser.add_argument('--log_level', help='Log level, error/warning/info/debug, default: info', required=False,
                         default='info')
     parser.add_argument('--port', help='Port to serve on, default: 80', required=False,
                         default=80)
