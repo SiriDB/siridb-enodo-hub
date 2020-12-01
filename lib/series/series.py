@@ -7,10 +7,11 @@ from enodo.model.config.series import SeriesConfigModel
 class Series:
     # detecting_anomalies_status forecast_status series_analysed_status
     __slots__ = (
-        'name', 'series_config', 'series_job_statuses', '_job_schedule', '_datapoint_count', '_datapoint_count_lock', 'series_characteristics')
+        'id', 'name', 'series_config', 'series_job_statuses', '_job_schedule', '_datapoint_count', '_datapoint_count_lock', 'series_characteristics')
 
     def __init__(self, name, config, datapoint_count, job_schedule=None, job_statuses=None, series_characteristics=None):
-        self.name = name
+        self.id = name
+        self.name = name # DEPRECATED
         self.series_config = SeriesConfigModel.from_dict(config)
         self.series_job_statuses = job_statuses
         if self.series_job_statuses is None:

@@ -23,7 +23,7 @@ from .socketio import SUBSCRIPTION_CHANGE_TYPE_DELETE, SUBSCRIPTION_CHANGE_TYPE_
 
 
 class EnodoJob:
-    __slots__ = ('job_id', 'job_type', 'series_name', 'job_data', 'send_at', 'error', 'worker_id')
+    __slots__ = ('id', 'job_id', 'job_type', 'series_name', 'job_data', 'send_at', 'error', 'worker_id')
 
     def __init__(self, job_id, job_type, series_name, job_data=None, send_at=None, error=None, worker_id=None):
         if job_type not in JOB_TYPES:
@@ -32,7 +32,8 @@ class EnodoJob:
             job_data = job_data
         elif job_data is not None:
             raise Exception('Unknown job data value')
-        self.job_id = job_id
+        self.id = job_id
+        self.job_id = job_id # DEPRECATED
         self.job_type = job_type
         self.series_name = series_name
         self.job_data = job_data
@@ -122,7 +123,7 @@ class EnodoJobManager:
 
         cls._open_jobs.append(job)
         if cls._update_queue_cb is not None:
-            await cls._update_queue_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, job.job_id, await cls.get_open_queue())
+            await cls._update_queue_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, job)
 
     @classmethod
     async def has_series_failed_jobs(cls, series_name):
@@ -168,7 +169,7 @@ class EnodoJobManager:
         if job in cls._open_jobs:
             cls._open_jobs.remove(job)
             if cls._update_queue_cb is not None:
-                await cls._update_queue_cb(SUBSCRIPTION_CHANGE_TYPE_DELETE, job.job_id, await cls.get_open_queue())
+                await cls._update_queue_cb(SUBSCRIPTION_CHANGE_TYPE_DELETE, job_id)
         job.send_at = datetime.datetime.now()
         job.worker_id = worker_id
         cls._active_jobs.append(job)
@@ -220,7 +221,7 @@ class EnodoJobManager:
         for job in jobs:
             cls._open_jobs.remove(job)
             if cls._update_queue_cb is not None:
-                await cls._update_queue_cb(SUBSCRIPTION_CHANGE_TYPE_DELETE, job.job_id, await cls.get_open_queue())
+                await cls._update_queue_cb(SUBSCRIPTION_CHANGE_TYPE_DELETE, job_id)
             
 
     @classmethod

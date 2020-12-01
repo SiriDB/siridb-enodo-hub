@@ -188,36 +188,36 @@ class SocketIoHandler:
         return resp
 
     @classmethod
-    async def internal_updates_queue_subscribers(cls, change_type, job_id, jobs):
+    async def internal_updates_queue_subscribers(cls, change_type, job):
         if cls._sio is not None:
-            await cls._sio.emit('job_updates', {
-                'change_type': change_type,
-                'job_id': job_id,
-                'job_data': jobs
+            await cls._sio.emit('update', {
+                'resource': 'job',
+                'updateType': change_type,
+                'resourceData': job
             }, room='job_updates')
 
     @classmethod
-    async def internal_updates_series_subscribers(cls, change_type, series_name, series_data):
+    async def internal_updates_series_subscribers(cls, change_type, series, name=None):
         if cls._sio is not None:
-            await cls._sio.emit('series_updates', {
-                'change_type': change_type,
-                'series_name': series_name,
-                'series_data': series_data
+            await cls._sio.emit('update', {
+                'resource': 'series',
+                'updateType': change_type,
+                'resourceData': series
             }, room='series_updates')
 
-        filtered_subs = await SubscriptionManager.get_subscriptions_for_series_name(series_name)
+        filtered_subs = await SubscriptionManager.get_subscriptions_for_series_name(name)
         for sub in filtered_subs:
-            await cls._sio.emit('series_updates', {
-                'change_type': change_type,
-                'series_name': series_name,
-                'series_data': series_data
+            await cls._sio.emit('update', {
+                'resource': 'series',
+                'updateType': change_type,
+                'resourceData': series
             }, room=sub.get('sid'))
 
     @classmethod
     async def internal_updates_enodo_models_subscribers(cls, change_type, model_name, model_data):
         if cls._sio is not None:
-            await cls._sio.emit('enodo_model_updates', {
-                'change_type': change_type,
-                'model_name': model_name,
-                'model_data': model_data
+            await cls._sio.emit('update', {
+                'resource': 'enodo_model',
+                'updateType': change_type,
+                'resourceData': model_data
             }, room='enodo_model_updates')

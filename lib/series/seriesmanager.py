@@ -32,7 +32,10 @@ class SeriesManager:
     @classmethod
     async def series_changed(cls, change_type, series_name):
         if cls._update_cb is not None:
-            await cls._update_cb(change_type, series_name, await cls.get_series_to_dict())
+            if change_type == "remove":
+                await cls._update_cb(change_type, series_name, series_name)
+            else:
+                await cls._update_cb(change_type, await cls.get_series(series_name), series_name)
 
     @classmethod
     async def add_series(cls, series):
@@ -68,9 +71,9 @@ class SeriesManager:
 
     @classmethod
     async def remove_series(cls, series_name):
-        if series_name in cls._series:
-            del cls._series[series_name]
+        if series_name in cls._series:            
             await cls.series_changed(SUBSCRIPTION_CHANGE_TYPE_DELETE, series_name)
+            del cls._series[series_name]
             return True
         return False
 

@@ -69,7 +69,8 @@ class EnodoEventOutput:
             to setup default ouputs for third part systems
         :param custom_name: custom name
         """
-        self.output_id = output_id
+        self.id = output_id
+        self.output_id = output_id # DEPRECATED
         self.severity = severity
         self.for_event_types = for_event_types
         self.vendor_name = vendor_name
@@ -92,7 +93,9 @@ class EnodoEventOutput:
         return {
             "output_id": self.output_id,
             "severity": self.severity,
-            "for_event_types": self.for_event_types
+            "for_event_types": self.for_event_types,
+            "vendor_name": self.vendor_name,
+            "custom_name": self.custom_name
         }
 
 
@@ -184,7 +187,7 @@ class EnodoEventManager:
         output_id = await cls._get_next_output_id()
         output = await EnodoEventOutput.create(output_id, output_type, data)  # TODO: Catch exception
         cls.outputs.append(output)
-        await internal_updates_event_ouput_subscribers(SUBSCRIPTION_CHANGE_TYPE_ADD, output_id, await output.to_dict())
+        await internal_updates_event_ouput_subscribers(SUBSCRIPTION_CHANGE_TYPE_ADD, await output.to_dict())
 
     @classmethod
     async def remove_event_output(cls, output_id):
@@ -198,7 +201,7 @@ class EnodoEventManager:
     async def _remove_event_output(cls, output):
         await cls._lock()
         cls.outputs.remove(output)
-        await internal_updates_event_ouput_subscribers(SUBSCRIPTION_CHANGE_TYPE_DELETE, output.output_id, await output.to_dict())
+        await internal_updates_event_ouput_subscribers(SUBSCRIPTION_CHANGE_TYPE_DELETE, output.output_id)
         await cls._unlock()
 
     @classmethod
@@ -247,11 +250,11 @@ class EnodoEventManager:
             logging.error(f"Something went wrong when writing eventmanager data to disk")
             logging.debug(f"Corresponding error: {e}")
 
-async def internal_updates_event_ouput_subscribers(change_type, output_id, data):
+async def internal_updates_event_ouput_subscribers(change_type, data):
     sio = ServerState.sio
     if sio is not None:
-        await sio.emit('event_output_updates', {
-            'change_type': change_type,
-            'id': output_id,
-            'data': data
+        await sio.emit('update', {
+            'resource': 'event_output',
+            'updateType': change_type,
+            'resourceData': data
         }, room='event_output_updates')
