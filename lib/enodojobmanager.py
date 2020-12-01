@@ -112,7 +112,7 @@ class EnodoJobManager:
         series = await SeriesManager.get_series(series_name)
 
         job_id = await cls._get_next_job_id()
-        job = EnodoJob(job_id, job_type, series_name, job_data=None)  # TODO: Catch exception
+        job = EnodoJob(job_id, job_id, job_type, series_name, job_data=None)  # TODO: Catch exception
         await series.set_job_status(job_type, JOB_STATUS_OPEN)
         await cls._add_job(job)
 
