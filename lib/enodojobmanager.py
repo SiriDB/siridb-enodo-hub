@@ -25,7 +25,7 @@ from .socketio import SUBSCRIPTION_CHANGE_TYPE_DELETE, SUBSCRIPTION_CHANGE_TYPE_
 class EnodoJob:
     __slots__ = ('id', 'job_id', 'job_type', 'series_name', 'job_data', 'send_at', 'error', 'worker_id')
 
-    def __init__(self, job_id, job_type, series_name, job_data=None, send_at=None, error=None, worker_id=None):
+    def __init__(self, id, job_id, job_type, series_name, job_data=None, send_at=None, error=None, worker_id=None):
         if job_type not in JOB_TYPES:
             raise Exception('unknown job type')
         if isinstance(job_data, EnodoJobDataModel):
