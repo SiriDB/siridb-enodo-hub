@@ -57,8 +57,13 @@ class BaseHandler:
 
     @classmethod
     async def resp_add_event_output(cls, output_type, data):
-        await EnodoEventManager.create_event_output(output_type, data)
-        return {'data': [await output.to_dict() for output in EnodoEventManager.outputs]}, 201
+        output = await EnodoEventManager.create_event_output(output_type, data)
+        return {'data': await output.to_dict()}, 201
+
+    @classmethod
+    async def resp_update_event_output(cls, output_id, data):
+        output = await EnodoEventManager.update_event_output(output_id, data)
+        return {'data': await output.to_dict()}, 201
 
     @classmethod
     async def resp_remove_event_output(cls, output_id):

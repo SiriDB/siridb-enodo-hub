@@ -35,6 +35,9 @@ class SocketIoRouter:
             event='/api/event/output/create',
             handler=SocketIoHandler.add_event_output)
         self._sio_on(
+            event='/api/event/output/update',
+            handler=SocketIoHandler.update_event_output)
+        self._sio_on(
             event='/api/event/output/delete',
             handler=SocketIoHandler.remove_event_output)
         self._sio_on(

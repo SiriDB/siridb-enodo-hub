@@ -111,6 +111,13 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
+    async def update_event_output(cls, sid, data, event=None):
+        output_id = data.get('id')
+        output_data = data.get('data')
+        return await BaseHandler.resp_update_event_output(output_id, output_data)
+
+    @classmethod
+    @socketio_auth_required
     async def remove_event_output(cls, sid, data, event=None):
         output_id = data.get('output_id')
         return await BaseHandler.resp_remove_event_output(output_id)

@@ -89,6 +89,9 @@ class EnodoEventOutput:
         else:
             return EnodoEventOutput(output_id)
 
+    async def update(self, data):
+        pass
+
     async def to_dict(self):
         return {
             "id": self.id,
@@ -115,7 +118,6 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
         """
         super().__init__(output_id, **kwargs)
         self.url = url
-        self.headers = headers
         self.payload = payload
         self.headers = headers
         if not isinstance(self.headers, dict) and self.headers is not None:
@@ -138,6 +140,16 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
             except Exception as e:
                 logging.warning('Calling EnodoEventOutput webhook failed')
                 logging.debug(f'Corresponding error: {e}')
+
+    async def update(self, data):
+        self.url = data.get('url') if data.get('url') is not None else self.url
+        self.payload = data.get('payload') if data.get('payload') is not None else self.payload
+        self.headers = data.get('headers') if data.get('headers') is not None else self.headers
+
+        if not isinstance(self.headers, dict) and self.headers is not None:
+            self.headers = None
+        if self.payload is None:
+            self.payload = ""
 
     async def to_dict(self):
         return {
@@ -189,7 +201,16 @@ class EnodoEventManager:
         output_id = await cls._get_next_output_id()
         output = await EnodoEventOutput.create(output_id, output_type, data)  # TODO: Catch exception
         cls.outputs.append(output)
-        await internal_updates_event_ouput_subscribers(SUBSCRIPTION_CHANGE_TYPE_ADD, await output.to_dict())
+        await internal_updates_event_output_subscribers(SUBSCRIPTION_CHANGE_TYPE_ADD, await output.to_dict())
+        return output
+
+    @classmethod
+    async def update_event_output(cls, output_id, data):
+        for output in cls.outputs:
+            if output.id == output_id:
+                await cls._update_event_output(output, data)
+                return output
+        return False
 
     @classmethod
     async def remove_event_output(cls, output_id):
@@ -203,7 +224,14 @@ class EnodoEventManager:
     async def _remove_event_output(cls, output):
         await cls._lock()
         cls.outputs.remove(output)
-        await internal_updates_event_ouput_subscribers(SUBSCRIPTION_CHANGE_TYPE_DELETE, output.output_id)
+        await internal_updates_event_output_subscribers(SUBSCRIPTION_CHANGE_TYPE_DELETE, output.output_id)
+        await cls._unlock()
+
+    @classmethod
+    async def _update_event_output(cls, output, data):
+        await cls._lock()
+        await output.update(data)
+        await internal_updates_event_output_subscribers(SUBSCRIPTION_CHANGE_TYPE_UPDATE, await output.to_dict())
         await cls._unlock()
 
     @classmethod
@@ -252,7 +280,7 @@ class EnodoEventManager:
             logging.error(f"Something went wrong when writing eventmanager data to disk")
             logging.debug(f"Corresponding error: {e}")
 
-async def internal_updates_event_ouput_subscribers(change_type, data):
+async def internal_updates_event_output_subscribers(change_type, data):
     sio = ServerState.sio
     if sio is not None:
         await sio.emit('update', {

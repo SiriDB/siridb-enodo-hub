@@ -175,13 +175,12 @@ class Server:
             await self._save_to_disk()
 
     async def stop_server(self):
-
+        logging.info('Stopping analyser server...')
         if self.sio is not None:
             clients = []
             if '/' in self.sio.manager.rooms and None in self.sio.manager.rooms['/']:
                 clients = [
                     client for client in self.sio.manager.rooms['/'][None]]
-
             for sid in clients:
                 if sid is not None:
                     if sid in self.sio.eio.sockets:
@@ -191,14 +190,12 @@ class Server:
                             # the socket was already closed or gone
                             pass
                         else:
-                            await socket.close()
+                            await socket.close(wait=False)
                             del self.sio.eio.sockets[sid]
 
             await asyncio.sleep(1)
             del self.sio
             self.sio = None
-
-        logging.info('Stopping analyser server...')
         logging.info('...Saving data to disk')
         await self._save_to_disk()
         ServerState.running = False
