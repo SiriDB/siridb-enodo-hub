@@ -23,17 +23,16 @@ from .socketio import SUBSCRIPTION_CHANGE_TYPE_DELETE, SUBSCRIPTION_CHANGE_TYPE_
 
 
 class EnodoJob:
-    __slots__ = ('id', 'job_id', 'job_type', 'series_name', 'job_data', 'send_at', 'error', 'worker_id')
+    __slots__ = ('rid', 'job_type', 'series_name', 'job_data', 'send_at', 'error', 'worker_id')
 
-    def __init__(self, id, job_id, job_type, series_name, job_data=None, send_at=None, error=None, worker_id=None):
+    def __init__(self, rid, job_type, series_name, job_data=None, send_at=None, error=None, worker_id=None):
         if job_type not in JOB_TYPES:
             raise Exception('unknown job type')
         if isinstance(job_data, EnodoJobDataModel):
             job_data = job_data
         elif job_data is not None:
             raise Exception('Unknown job data value')
-        self.id = job_id
-        self.job_id = job_id # DEPRECATED
+        self.rid = rid
         self.job_type = job_type
         self.series_name = series_name
         self.job_data = job_data
@@ -81,7 +80,7 @@ class EnodoJobManager:
     async def _build_index(cls):
         cls._active_jobs_index = {}
         for job in cls._active_jobs:
-            cls._active_jobs_index[job.job_id] = job
+            cls._active_jobs_index[job.rid] = job
 
     @classmethod
     async def _get_next_job_id(cls):
@@ -112,7 +111,7 @@ class EnodoJobManager:
         series = await SeriesManager.get_series(series_name)
 
         job_id = await cls._get_next_job_id()
-        job = EnodoJob(job_id, job_id, job_type, series_name, job_data=None)  # TODO: Catch exception
+        job = EnodoJob(job_id, job_type, series_name, job_data=None)  # TODO: Catch exception
         await series.set_job_status(job_type, JOB_STATUS_OPEN)
         await cls._add_job(job)
 
@@ -153,7 +152,7 @@ class EnodoJobManager:
 
         j = None
         for job in cls._open_jobs:
-            if job.job_id == job_id:
+            if job.rid == job_id:
                 j = job
                 break
         if j is not None:
@@ -169,11 +168,11 @@ class EnodoJobManager:
         if job in cls._open_jobs:
             cls._open_jobs.remove(job)
             if cls._update_queue_cb is not None:
-                await cls._update_queue_cb(SUBSCRIPTION_CHANGE_TYPE_DELETE, job.job_id)
+                await cls._update_queue_cb(SUBSCRIPTION_CHANGE_TYPE_DELETE, job.rid)
         job.send_at = datetime.datetime.now()
         job.worker_id = worker_id
         cls._active_jobs.append(job)
-        cls._active_jobs_index[job.job_id] = job
+        cls._active_jobs_index[job.rid] = job
 
     @classmethod
     async def deactivate_job(cls, job_id):
@@ -181,7 +180,7 @@ class EnodoJobManager:
 
         j = None
         for job in cls._active_jobs:
-            if job.job_id == job_id:
+            if job.rid == job_id:
                 j = job
                 break
 
@@ -192,7 +191,7 @@ class EnodoJobManager:
     async def _deactivate_job(cls, job):
         if job in cls._active_jobs:
             cls._active_jobs.remove(job)
-            del cls._active_jobs_index[job.job_id]
+            del cls._active_jobs_index[job.rid]
 
     @classmethod
     async def cancel_job(cls, job):
@@ -200,7 +199,7 @@ class EnodoJobManager:
 
         if job in cls._active_jobs:
             cls._active_jobs.remove(job)
-            del cls._active_jobs_index[job.job_id]
+            del cls._active_jobs_index[job.rid]
             cls._open_jobs.append(job)
 
         await cls._unlock()
@@ -221,7 +220,7 @@ class EnodoJobManager:
         for job in jobs:
             cls._open_jobs.remove(job)
             if cls._update_queue_cb is not None:
-                await cls._update_queue_cb(SUBSCRIPTION_CHANGE_TYPE_DELETE, job.job_id)
+                await cls._update_queue_cb(SUBSCRIPTION_CHANGE_TYPE_DELETE, job.rid)
             
 
     @classmethod
@@ -230,7 +229,7 @@ class EnodoJobManager:
 
         j = None
         for job in cls._active_jobs:
-            if job.job_id == job_id:
+            if job.rid == job_id:
                 j = job
                 break
         await cls._set_job_failed(j, error)
@@ -242,7 +241,7 @@ class EnodoJobManager:
             job.error = error
             await cls._cancel_jobs_for_series(job.series_name)
             cls._active_jobs.remove(job)
-            del cls._active_jobs_index[job.job_id]
+            del cls._active_jobs_index[job.rid]
             cls._failed_jobs.append(job)
 
     @classmethod
@@ -252,7 +251,7 @@ class EnodoJobManager:
         for job in cls._active_jobs:
             if (datetime.datetime.now() - job.send_at).total_seconds() > cls._max_job_timeout:
                 await cls._set_job_failed(job, "Job timed-out")
-                await cls._send_worker_cancel_job(job.worker_id, job.job_id)
+                await cls._send_worker_cancel_job(job.worker_id, job.rid)
         await cls._unlock()
 
         if len(cls._open_jobs) > cls._max_in_queue_before_warning:
@@ -325,7 +324,7 @@ class EnodoJobManager:
     async def _send_worker_job_request(cls, worker, job):
         try:
             series = await SeriesManager.get_series(job.series_name)
-            job_data = EnodoJobRequestDataModel(job_id=job.job_id, \
+            job_data = EnodoJobRequestDataModel(job_id=job.rid, \
                                             job_type=job.job_type, \
                                             series_name=job.series_name, \
                                             series_config=series.series_config.to_dict(), \

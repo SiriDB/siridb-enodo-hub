@@ -55,22 +55,21 @@ class EnodoEventOutput:
     EnodoEventOutput Class. Class to describe base output method of events
     """
 
-    def __init__(self, output_id,
+    def __init__(self, rid,
                     severity=ENODO_EVENT_SEVERITY_ERROR,
                     for_event_types=ENODO_EVENT_TYPES,
                     vendor_name=None,
                     custom_name=None):
         """
         Call webhook url with data of EnodoEvent
-        :param output_id: id of output
+        :param id: id of output
         :param severity: severity for each event to pass through
         :param for_event_types: only accepts certain event types
         :param vendor_name: vendor name, for gui or client purposes,
             to setup default ouputs for third part systems
         :param custom_name: custom name
         """
-        self.id = output_id
-        self.output_id = output_id # DEPRECATED
+        self.rid = rid
         self.severity = severity
         self.for_event_types = for_event_types
         self.vendor_name = vendor_name
@@ -80,22 +79,21 @@ class EnodoEventOutput:
         pass
 
     @classmethod
-    async def create(cls, output_id, output_type, data):
+    async def create(cls, rid, output_type, data):
         if output_type not in ENODO_EVENT_OUTPUT_TYPES:
             raise Exception  # TODO nice exception
 
         if output_type == ENODO_EVENT_OUTPUT_WEBHOOK:
-            return EnodoEventOutputWebhook(output_id, **data)
+            return EnodoEventOutputWebhook(rid, **data)
         else:
-            return EnodoEventOutput(output_id)
+            return EnodoEventOutput(rid)
 
     async def update(self, data):
         pass
 
     async def to_dict(self):
         return {
-            "id": self.id,
-            "output_id": self.output_id,
+            "rid": self.rid,
             "severity": self.severity,
             "for_event_types": self.for_event_types,
             "vendor_name": self.vendor_name,
@@ -110,13 +108,13 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
     variable named var on the event instance
     """
 
-    def __init__(self, output_id, url, headers=None, payload=None, **kwargs):
+    def __init__(self, rid, url, headers=None, payload=None, **kwargs):
         """
         Call webhook url with data of EnodoEvent
-        :param output_id: id of output
+        :param id: id of output
         :param url: url to call
         """
-        super().__init__(output_id, **kwargs)
+        super().__init__(rid, **kwargs)
         self.url = url
         self.payload = payload
         self.headers = headers
@@ -207,7 +205,7 @@ class EnodoEventManager:
     @classmethod
     async def update_event_output(cls, output_id, data):
         for output in cls.outputs:
-            if output.id == output_id:
+            if output.rid == output_id:
                 await cls._update_event_output(output, data)
                 return output
         return False
@@ -215,7 +213,7 @@ class EnodoEventManager:
     @classmethod
     async def remove_event_output(cls, output_id):
         for output in cls.outputs:
-            if output.output_id == output_id:
+            if output.rid == output_id:
                 await cls._remove_event_output(output)
                 return True
         return False
@@ -224,7 +222,7 @@ class EnodoEventManager:
     async def _remove_event_output(cls, output):
         await cls._lock()
         cls.outputs.remove(output)
-        await internal_updates_event_output_subscribers(SUBSCRIPTION_CHANGE_TYPE_DELETE, output.output_id)
+        await internal_updates_event_output_subscribers(SUBSCRIPTION_CHANGE_TYPE_DELETE, output.rid)
         await cls._unlock()
 
     @classmethod
@@ -260,7 +258,7 @@ class EnodoEventManager:
         if 'outputs' in output_data:
             for s in output_data.get('outputs'):
                 cls.outputs.append(
-                    await EnodoEventOutput.create(s.get('output_id'), s.get('output_type'), s.get('data')))
+                    await EnodoEventOutput.create(s.get('rid'), s.get('output_type'), s.get('data')))
 
     @classmethod
     async def save_to_disk(cls):

@@ -146,6 +146,9 @@ class Config:
         :return:
         """
 
+        if not os.path.exists(path):
+            raise EnodoInvalidConfigException(f'Given config file does not exist or cannot be read')
+
         cls._path = path
         cls._config = EnodoConfigParser()
         cls._config.read(path)

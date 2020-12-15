@@ -94,6 +94,20 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
+    async def update_series(cls, sid, data, event):
+        if not isinstance(data, dict):
+            resp = {'error': 'Incorrect data'}
+        else:
+            series_name = data.get('name')
+            series_data = data.get('data')
+            if series_name is not None:
+                resp, status = await BaseHandler.resp_update_series(series_name, series_data)
+            else:
+                resp = {'error': 'Missing required field(s)'}
+        return safe_json_dumps(resp)
+
+    @classmethod
+    @socketio_auth_required
     async def get_enodo_models(cls, sid, data, event=None):
         return await BaseHandler.resp_get_possible_analyser_models()
 

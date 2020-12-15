@@ -12,6 +12,7 @@ from lib.util import regex_valid
 from version import VERSION
 from lib.enodojobmanager import EnodoJobManager
 from enodo.jobs import JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_STATUS_DONE
+from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
 
 
 class BaseHandler:
@@ -91,6 +92,34 @@ class BaseHandler:
         if all(required_field in data for required_field in required_fields):
             if not await SeriesManager.add_series(data):
                 return {'error': 'Something went wrong when adding the series. Are you sure the series exists?'}, 400
+
+        return {'data': list(await SeriesManager.get_series_to_dict())}, 201
+
+
+    @classmethod
+    async def resp_update_series(cls, series_name, data):
+        required_fields = ['config']
+        if not all(required_field in data for required_field in required_fields):
+            return {'error': 'Something went wrong when updating the series. Missing required fields'}, 400
+        series_config = SeriesConfigModel.from_dict(data.get('config'))
+        for model_name in list(series_config.job_models.values()):
+            model_parameters = series_config.model_params
+
+            model = await EnodoModelManager.get_model(model_name)
+            if model is None:
+                return {'error': 'Unknown model'}, 400
+            if model_parameters is None and len(model.model_arguments.keys()) > 0:
+                return {'error': 'Missing required fields'}, 400
+            for key in model.model_arguments:
+                if key not in model_parameters.keys():
+                    return {'error': f'Missing required field {key}'}, 400
+
+        series = await SeriesManager.get_series(series_name)
+        if series is None:
+            return {'error': 'Something went wrong when updating the series. Are you sure the series exists?'}, 400
+        await series.update(data)
+
+        await SeriesManager.series_changed(SUBSCRIPTION_CHANGE_TYPE_UPDATE, series_name)
 
         return {'data': list(await SeriesManager.get_series_to_dict())}, 201
 
