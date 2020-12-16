@@ -79,14 +79,13 @@ class EnodoEventOutput:
         pass
 
     @classmethod
-    async def create(cls, rid, output_type, data):
+    async def create(cls, output_type, data):
         if output_type not in ENODO_EVENT_OUTPUT_TYPES:
             raise Exception  # TODO nice exception
 
         if output_type == ENODO_EVENT_OUTPUT_WEBHOOK:
-            return EnodoEventOutputWebhook(rid, **data)
-        else:
-            return EnodoEventOutput(rid)
+            return EnodoEventOutputWebhook(**data)
+        return EnodoEventOutput(**data)
 
     async def update(self, data):
         pass
@@ -151,15 +150,15 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
 
     async def to_dict(self):
         return {
-            **(await super().to_dict()),
-            **{
             'output_type': ENODO_EVENT_OUTPUT_WEBHOOK,
             'data': {
+                **(await super().to_dict()),
+                **{
                 'url': self.url,
                 'headers': self.headers,
                 'payload': self.payload
+                }
             }
-        }
         }
 
 
@@ -196,8 +195,8 @@ class EnodoEventManager:
 
     @classmethod
     async def create_event_output(cls, output_type, data):
-        output_id = await cls._get_next_output_id()
-        output = await EnodoEventOutput.create(output_id, output_type, data)  # TODO: Catch exception
+        data["rid"] = await cls._get_next_output_id()
+        output = await EnodoEventOutput.create(output_type, data)  # TODO: Catch exception
         cls.outputs.append(output)
         await internal_updates_event_output_subscribers(SUBSCRIPTION_CHANGE_TYPE_ADD, await output.to_dict())
         return output
@@ -258,7 +257,7 @@ class EnodoEventManager:
         if 'outputs' in output_data:
             for s in output_data.get('outputs'):
                 cls.outputs.append(
-                    await EnodoEventOutput.create(s.get('rid'), s.get('output_type'), s.get('data')))
+                    await EnodoEventOutput.create(s.get('output_type'), s.get('data')))
 
     @classmethod
     async def save_to_disk(cls):
