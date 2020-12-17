@@ -151,7 +151,7 @@ class BaseHandler:
     @classmethod
     async def resp_get_possible_analyser_models(cls):
         data = {
-            'models': [await EnodoModel.to_dict(model) for model in EnodoModelManager.models]
+            'models': [EnodoModel.to_dict(model) for model in EnodoModelManager.models]
         }
         return {'data': data}
 
@@ -160,7 +160,7 @@ class BaseHandler:
         try:
             await EnodoModelManager.add_model(data['model_name'],
                                               data['model_arguments'])
-            return {'data': [await EnodoModel.to_dict(model) for model in EnodoModelManager.models]}, 201
+            return {'data': [EnodoModel.to_dict(model) for model in EnodoModelManager.models]}, 201
         except Exception:
             return {'error': 'Incorrect model data'}, 400
 

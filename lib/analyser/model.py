@@ -63,7 +63,7 @@ class EnodoModelManager:
 
         if isinstance(data, list):
             for model_data in data:
-                model = await EnodoModel.from_dict(model_data)
+                model = EnodoModel.from_dict(model_data)
                 cls.models.append(model)
 
     @classmethod
@@ -72,7 +72,7 @@ class EnodoModelManager:
         if cls.models is None:
             return
         for model in cls.models:
-            model_list.append(await EnodoModel.to_dict(model))
+            model_list.append(EnodoModel.to_dict(model))
 
         try:
             f = open(Config.model_save_path, "w")
