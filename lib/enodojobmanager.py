@@ -28,9 +28,7 @@ class EnodoJob:
     def __init__(self, rid, job_type, series_name, job_data=None, send_at=None, error=None, worker_id=None):
         if job_type not in JOB_TYPES:
             raise Exception('unknown job type')
-        if isinstance(job_data, EnodoJobDataModel):
-            job_data = job_data
-        elif job_data is not None:
+        if not isinstance(job_data, EnodoJobDataModel) and job_data is not None:
             raise Exception('Unknown job data value')
         self.rid = rid
         self.job_type = job_type

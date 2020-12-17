@@ -39,4 +39,4 @@ async def receive_worker_status_update(writer, packet_type, packet_id, data, cli
 
 
 async def received_worker_refused(writer, packet_type, packet_id, data, client_id):
-    print("Worker refused, is probably buys")
+    print("Worker refused, is probably busy")

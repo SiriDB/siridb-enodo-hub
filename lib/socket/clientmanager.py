@@ -23,9 +23,11 @@ class EnodoClient:
         if last_seen is None:
             self.last_seen = datetime.datetime.now()
 
-    async def reconnected(self):
+    async def reconnected(self, ip_address, writer):
         self.online = True
         self.last_seen = datetime.datetime.now()
+        self.ip_address = ip_address
+        self.writer = writer
 
     def to_dict(self):
         return {'client_id': self.client_id,
@@ -115,7 +117,7 @@ class ClientManager:
                                     client_data.get('version', None))
             await cls.add_client(client)
         else:
-            await cls.listeners.get(client_id).reconnected()
+            await cls.listeners.get(client_id).reconnected(peername, writer)
 
     @classmethod
     async def worker_connected(cls, peername, writer, client_data):
@@ -127,7 +129,7 @@ class ClientManager:
                                     busy=client_data.get('busy', None))
             await cls.add_client(client)
         else:
-            await cls.workers.get(client_id).reconnected()
+            await cls.workers.get(client_id).reconnected(peername, writer)
 
     @classmethod
     async def add_client(cls, client):
@@ -190,24 +192,18 @@ class ClientManager:
     async def check_clients_alive(cls, max_timeout):
         clients_to_remove = []
         for client in cls.listeners:
-            if (datetime.datetime.now() - cls.listeners.get(client).last_seen) \
+            listener = cls.listeners.get(client)
+            if listener.online and (datetime.datetime.now() - listener.last_seen) \
                     .total_seconds() > max_timeout:
-                print(f'Not alive: {client}')
-                clients_to_remove.append(client)
-
-        for client in clients_to_remove:
-            del cls.listeners[client]
-        clients_to_remove = []
+                logging.info(f'Lost connection to listener: {client}')
+                listener.online = False
 
         for client in cls.workers:
-            if (datetime.datetime.now() - cls.workers.get(client).last_seen) \
+            worker = cls.workers.get(client)
+            if worker.online and (datetime.datetime.now() - worker.last_seen) \
                     .total_seconds() > max_timeout:
-                print(f'Not alive: {client}')
-                clients_to_remove.append(client)
-
-        for client in clients_to_remove:
-            await cls.check_for_pending_series(cls.workers[client])
-            del cls.workers[client]
+                logging.info(f'Lost connection to worker: {client}')
+                worker.online = False
 
     @classmethod
     async def set_worker_offline(cls, client_id):
