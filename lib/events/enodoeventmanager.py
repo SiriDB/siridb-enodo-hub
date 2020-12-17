@@ -88,7 +88,10 @@ class EnodoEventOutput:
         return EnodoEventOutput(**data)
 
     async def update(self, data):
-        pass
+        self.custom_name = data.get('custom_name') if data.get('custom_name') is not None else self.custom_name
+        self.vendor_name = data.get('vendor_name') if data.get('vendor_name') is not None else self.vendor_name
+        self.severity = data.get('severity') if data.get('severity') is not None else self.severity
+        self.for_event_types = data.get('for_event_types') if data.get('for_event_types') is not None else self.for_event_types
 
     async def to_dict(self):
         return {
@@ -147,6 +150,8 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
             self.headers = None
         if self.payload is None:
             self.payload = ""
+
+        await super().update(data)
 
     async def to_dict(self):
         return {
