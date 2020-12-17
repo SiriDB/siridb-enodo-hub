@@ -49,6 +49,15 @@ class SocketIoRouter:
         self._sio_on(
             event='/api/enodo/status',
             handler=SocketIoHandler.get_enodo_hub_status)
+        self._sio_on(
+            event='/api/job/open',
+            handler=SocketIoHandler.get_open_jobs)
+        self._sio_on(
+            event='/api/job/active',
+            handler=SocketIoHandler.get_active_jobs)
+        self._sio_on(
+            event='/api/job/failed',
+            handler=SocketIoHandler.get_failed_jobs)
 
         self._setup_listen_events()
 

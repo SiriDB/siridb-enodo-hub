@@ -4,8 +4,6 @@ from lib.socketio.subscriptionmanager import SubscriptionManager
 from lib.util import safe_json_dumps
 from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
-from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_DELETE
-from lib.series.seriesmanager import SeriesManager
 
 
 def socketio_auth_required(handler):
@@ -30,7 +28,7 @@ class SocketIoHandler:
     @classmethod
     async def connect(cls, sid, environ):
         await cls._sio.save_session(sid, {'auth': False})
-        pass  # TODO verbose logging
+        # TODO verbose logging
 
     @classmethod
     async def authenticate(cls, sid, data):
@@ -46,7 +44,7 @@ class SocketIoHandler:
     @classmethod
     async def disconnect(cls, sid):
         await SubscriptionManager.remove_subscriber(sid)
-        pass  # TODO verbose logging
+        # TODO verbose logging
 
     @classmethod
     @socketio_auth_required
@@ -110,6 +108,21 @@ class SocketIoHandler:
     @socketio_auth_required
     async def get_enodo_models(cls, sid, data, event=None):
         return await BaseHandler.resp_get_possible_analyser_models()
+
+    @classmethod
+    @socketio_auth_required
+    async def get_open_jobs(cls, sid, data, event=None):
+        return await BaseHandler.resp_get_open_jobs()
+
+    @classmethod
+    @socketio_auth_required
+    async def get_active_jobs(cls, sid, data, event=None):
+        return await BaseHandler.resp_get_active_jobs()
+
+    @classmethod
+    @socketio_auth_required
+    async def get_failed_jobs(cls, sid, data, event=None):
+        return await BaseHandler.resp_get_failed_jobs()
 
     @classmethod
     @socketio_auth_required

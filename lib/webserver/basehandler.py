@@ -137,6 +137,18 @@ class BaseHandler:
         return {'data': await EnodoJobManager.get_open_queue()}
 
     @classmethod
+    async def resp_get_open_jobs(cls):
+        return {'data': await EnodoJobManager.get_open_queue()}
+
+    @classmethod
+    async def resp_get_active_jobs(cls):
+        return {'data': await EnodoJobManager.get_active_jobs()}
+
+    @classmethod
+    async def resp_get_failed_jobs(cls):
+        return {'data': await EnodoJobManager.get_failed_jobs()}
+
+    @classmethod
     async def resp_get_possible_analyser_models(cls):
         data = {
             'models': [await EnodoModel.to_dict(model) for model in EnodoModelManager.models]

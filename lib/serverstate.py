@@ -6,6 +6,7 @@ class ServerState:
     sio = None
     siridb_data_client = None
     siridb_forecast_client = None
+    tasks_last_runs = {}
 
     @classmethod
     async def async_setup(cls, sio, siridb_data_username,
@@ -33,6 +34,14 @@ class ServerState:
             hostlist=siridb_forecast_hostlist,  # Multiple connections are supported
             keepalive=True)
         await cls.siridb_forecast_client.connect()
+
+
+        cls.tasks_last_runs = {
+            'watch_series': None,
+            'save_to_disk': None,
+            'check_jobs': None,
+            'cleanup_clients': None
+        }
 
     @classmethod
     def stop(cls):

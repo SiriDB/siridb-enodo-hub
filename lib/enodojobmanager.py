@@ -102,6 +102,14 @@ class EnodoJobManager:
         cls._locked = False
 
     @classmethod
+    async def get_active_jobs(cls):
+        return cls._active_jobs
+
+    @classmethod
+    async def get_failed_jobs(cls):
+        return cls._failed_jobs
+
+    @classmethod
     async def get_active_jobs_by_worker(cls, worker_id):
         return [job for job in cls._active_jobs if job.worker_id == worker_id]
 
@@ -263,6 +271,7 @@ class EnodoJobManager:
     @classmethod
     async def check_for_jobs(cls):
         while ServerState.running:
+            ServerState.tasks_last_runs['check_jobs'] = datetime.datetime.now()
             if len(cls._open_jobs) > 0:
                 for next_job in cls._open_jobs:
                     try:
