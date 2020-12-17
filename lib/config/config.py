@@ -147,7 +147,7 @@ class Config:
         """
 
         if not os.path.exists(path):
-            raise EnodoInvalidConfigException(f'Given config file does not exist or cannot be read')
+            raise EnodoInvalidConfigException(f'Given config file does not exist or cannot be read at path: {path}')
 
         cls._path = path
         cls._config = EnodoConfigParser()
