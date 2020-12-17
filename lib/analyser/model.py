@@ -27,7 +27,7 @@ class EnodoModelManager:
         if await cls.get_model(model_name) is None:
             model = EnodoModel(model_name, model_arguments)
             cls.models.append(model)
-            await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, await EnodoModel.to_dict(model))
+            await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, EnodoModel.to_dict(model))
 
     @classmethod
     async def add_model_from_dict(cls, dict_data):
@@ -38,7 +38,7 @@ class EnodoModelManager:
         else:
             if await cls.get_model(model.model_name) is None:
                 cls.models.append(model)
-                await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, await EnodoModel.to_dict(model))
+                await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, EnodoModel.to_dict(model))
                 return True
             return False
 
