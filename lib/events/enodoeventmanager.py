@@ -41,7 +41,7 @@ class EnodoEvent:
         self.event_type = event_type
         self.ts = int(time.time())
 
-    async def to_dict(self):
+    def to_dict(self):
         return {
             'title': self.title,
             'event_type': self.event_type,
@@ -87,13 +87,13 @@ class EnodoEventOutput:
             return EnodoEventOutputWebhook(**data)
         return EnodoEventOutput(**data)
 
-    async def update(self, data):
+    def update(self, data):
         self.custom_name = data.get('custom_name') if data.get('custom_name') is not None else self.custom_name
         self.vendor_name = data.get('vendor_name') if data.get('vendor_name') is not None else self.vendor_name
         self.severity = data.get('severity') if data.get('severity') is not None else self.severity
         self.for_event_types = data.get('for_event_types') if data.get('for_event_types') is not None else self.for_event_types
 
-    async def to_dict(self):
+    def to_dict(self):
         return {
             "rid": self.rid,
             "severity": self.severity,
@@ -125,7 +125,7 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
         if self.payload is None:
             self.payload = ""
 
-    async def _get_payload(self, event):
+    def _get_payload(self, event):
         env = Environment()
         env.filters['jsonify'] = json.dumps
         template = env.from_string(self.payload)
@@ -136,12 +136,12 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
             try:
                 logging.debug(f'Calling EnodoEventOutput webhook {self.url}')
                 async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=2)) as session:
-                    resp = await session.post(self.url, data=await self._get_payload(event), headers=self.headers)
+                    resp = await session.post(self.url, data=self._get_payload(event), headers=self.headers)
             except Exception as e:
                 logging.warning('Calling EnodoEventOutput webhook failed')
                 logging.debug(f'Corresponding error: {e}')
 
-    async def update(self, data):
+    def update(self, data):
         self.url = data.get('url') if data.get('url') is not None else self.url
         self.payload = data.get('payload') if data.get('payload') is not None else self.payload
         self.headers = data.get('headers') if data.get('headers') is not None else self.headers
@@ -151,13 +151,13 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
         if self.payload is None:
             self.payload = ""
 
-        await super().update(data)
+        super().update(data)
 
-    async def to_dict(self):
+    def to_dict(self):
         return {
             'output_type': ENODO_EVENT_OUTPUT_WEBHOOK,
             'data': {
-                **(await super().to_dict()),
+                **(super().to_dict()),
                 **{
                 'url': self.url,
                 'headers': self.headers,
@@ -203,7 +203,7 @@ class EnodoEventManager:
         data["rid"] = await cls._get_next_output_id()
         output = await EnodoEventOutput.create(output_type, data)  # TODO: Catch exception
         cls.outputs.append(output)
-        await internal_updates_event_output_subscribers(SUBSCRIPTION_CHANGE_TYPE_ADD, await output.to_dict())
+        await internal_updates_event_output_subscribers(SUBSCRIPTION_CHANGE_TYPE_ADD, output.to_dict())
         return output
 
     @classmethod
@@ -232,8 +232,8 @@ class EnodoEventManager:
     @classmethod
     async def _update_event_output(cls, output, data):
         await cls._lock()
-        await output.update(data)
-        await internal_updates_event_output_subscribers(SUBSCRIPTION_CHANGE_TYPE_UPDATE, await output.to_dict())
+        output.update(data)
+        await internal_updates_event_output_subscribers(SUBSCRIPTION_CHANGE_TYPE_UPDATE, output.to_dict())
         await cls._unlock()
 
     @classmethod
@@ -269,7 +269,7 @@ class EnodoEventManager:
         try:
             serialized_outputs = []
             for output in cls.outputs:
-                serialized_outputs.append(await output.to_dict())
+                serialized_outputs.append(output.to_dict())
 
             output_data = {
                 'next_output_id': cls._next_output_id,

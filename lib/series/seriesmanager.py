@@ -44,7 +44,7 @@ class SeriesManager:
                 collected_datapoints = await query_series_datapoint_count(ServerState.siridb_data_client, series.get('name'))
                 if collected_datapoints:
                     series['datapoint_count'] = collected_datapoints
-                    cls._series[series.get('name')] = await Series.from_dict(series)
+                    cls._series[series.get('name')] = Series.from_dict(series)
                     logging.info(f"Added new series: {series.get('name')}")
                     await cls.series_changed(SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name'))
                     await cls.update_listeners(await cls.get_all_series())
@@ -66,8 +66,8 @@ class SeriesManager:
     async def get_series_to_dict(cls, regex_filter=None):
         if regex_filter is not None:
             pattern = re.compile(regex_filter)
-            return [await series.to_dict() for series in cls._series.values() if pattern.match(series.name)]
-        return [await series.to_dict() for series in cls._series.values()]
+            return [series.to_dict() for series in cls._series.values() if pattern.match(series.name)]
+        return [series.to_dict() for series in cls._series.values()]
 
     @classmethod
     async def remove_series(cls, series_name):
@@ -140,14 +140,14 @@ class SeriesManager:
             f.close()
             series_data = json.loads(data)
             for s in series_data:
-                cls._series[s.get('name')] = await Series.from_dict(s)
+                cls._series[s.get('name')] = Series.from_dict(s)
 
     @classmethod
     async def save_to_disk(cls):
         try:
             serialized_series = []
             for series in cls._series.values():
-                serialized_series.append(await series.to_dict(static_only=True))
+                serialized_series.append(series.to_dict(static_only=True))
             f = open(Config.series_save_path, "w")
             f.write(json.dumps(serialized_series, default=safe_json_dumps))
             f.close()

@@ -35,7 +35,7 @@ class BaseHandler:
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
 
-        series_data = await series.to_dict()
+        series_data = series.to_dict()
         if include_points:
             series_points = await query_series_data(ServerState.siridb_data_client, series.name, "*")
             series_data['points'] = series_points.get(series.name)
@@ -54,17 +54,17 @@ class BaseHandler:
 
     @classmethod
     async def resp_get_event_outputs(cls):
-        return {'data': [await output.to_dict() for output in EnodoEventManager.outputs]}, 200
+        return {'data': [output.to_dict() for output in EnodoEventManager.outputs]}, 200
 
     @classmethod
     async def resp_add_event_output(cls, output_type, data):
         output = await EnodoEventManager.create_event_output(output_type, data)
-        return {'data': await output.to_dict()}, 201
+        return {'data': output.to_dict()}, 201
 
     @classmethod
     async def resp_update_event_output(cls, output_id, data):
         output = await EnodoEventManager.update_event_output(output_id, data)
-        return {'data': await output.to_dict()}, 201
+        return {'data': output.to_dict()}, 201
 
     @classmethod
     async def resp_remove_event_output(cls, output_id):
@@ -117,7 +117,7 @@ class BaseHandler:
         series = await SeriesManager.get_series(series_name)
         if series is None:
             return {'error': 'Something went wrong when updating the series. Are you sure the series exists?'}, 400
-        await series.update(data)
+        series.update(data)
 
         await SeriesManager.series_changed(SUBSCRIPTION_CHANGE_TYPE_UPDATE, series_name)
 
@@ -128,7 +128,7 @@ class BaseHandler:
         # TODO: REMOVE JOBS, EVENTS ETC
         if await SeriesManager.remove_series(series_name):
             await EnodoJobManager.cancel_jobs_for_series(series_name)
-            await EnodoJobManager.remove_failed_jobs_for_series(series_name)
+            EnodoJobManager.remove_failed_jobs_for_series(series_name)
             return 200
         return 404
 
@@ -142,11 +142,11 @@ class BaseHandler:
 
     @classmethod
     async def resp_get_active_jobs(cls):
-        return {'data': await EnodoJobManager.get_active_jobs()}
+        return {'data': EnodoJobManager.get_active_jobs()}
 
     @classmethod
     async def resp_get_failed_jobs(cls):
-        return {'data': await EnodoJobManager.get_failed_jobs()}
+        return {'data': EnodoJobManager.get_failed_jobs()}
 
     @classmethod
     async def resp_get_possible_analyser_models(cls):

@@ -147,7 +147,7 @@ class Server:
                 
                 # Check if series is valid and not ignored
                 if series is not None \
-                        and not await series.is_ignored():
+                        and not series.is_ignored():
 
                     # Check if requirement of min amount of datapoints is met
                     if await series.get_datapoints_count() >= Config.min_data_points or (
@@ -160,7 +160,7 @@ class Server:
                             try:
                                 # Check if base analysis is done and series does not have any failed jobs
                                 if await series.get_job_status(JOB_TYPE_BASE_SERIES_ANALYSIS) == JOB_STATUS_DONE and \
-                                    not len(await EnodoJobManager.get_failed_jobs_for_series(series_name)):
+                                    not len(EnodoJobManager.get_failed_jobs_for_series(series_name)):
 
                                     # If forecast job is not pending and job is due
                                     if (await series.get_job_status(JOB_TYPE_FORECAST_SERIES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
@@ -200,8 +200,7 @@ class Server:
         if self.sio is not None:
             clients = []
             if '/' in self.sio.manager.rooms and None in self.sio.manager.rooms['/']:
-                clients = [
-                    client for client in self.sio.manager.rooms['/'][None]]
+                clients = self.sio.manager.rooms['/'][None]
             for sid in clients:
                 if sid is not None:
                     if sid in self.sio.eio.sockets:

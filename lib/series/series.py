@@ -37,14 +37,14 @@ class Series:
         return self._datapoint_count_lock
 
     async def clear_errors(self):
-        await EnodoJobManager.remove_failed_jobs_for_series(self.name)
+        EnodoJobManager.remove_failed_jobs_for_series(self.name)
 
-    async def get_errors(self):
-        errors = [job.error for job in (await EnodoJobManager.get_failed_jobs_for_series(self.name))]
+    def get_errors(self):
+        errors = [job.error for job in EnodoJobManager.get_failed_jobs_for_series(self.name)]
         return errors
 
-    async def is_ignored(self):
-        return await EnodoJobManager.has_series_failed_jobs(self.name)
+    def is_ignored(self):
+        return EnodoJobManager.has_series_failed_jobs(self.name)
 
     async def get_model(self, job_type):
         return self.series_config.get_model_for_job(job_type)
@@ -85,14 +85,14 @@ class Series:
         elif self._job_schedule.get(job_type) is not None and self._job_schedule.get(job_type) <= self._datapoint_count:
             return True
 
-    async def update(self, data):
+    def update(self, data):
         config = data.get('config')
         if config is not None:
             self.series_config = SeriesConfigModel.from_dict(config)
 
         return True
 
-    async def to_dict(self, static_only=False):
+    def to_dict(self, static_only=False):
         if static_only:
             return {
                 'name': self.name,
@@ -109,13 +109,13 @@ class Series:
             'job_statuses': self.series_job_statuses,
             'job_schedule': self._job_schedule,
             'config': self.series_config.to_dict(),
-            'ignore': await self.is_ignored(),
-            'error': await self.get_errors(),
+            'ignore': self.is_ignored(),
+            'error': self.get_errors(),
             'series_characteristics': self.series_characteristics
         }
 
     @classmethod
-    async def from_dict(cls, data_dict):
+    def from_dict(cls, data_dict):
         return Series(**data_dict)
 
 

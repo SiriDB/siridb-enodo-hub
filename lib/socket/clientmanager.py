@@ -236,7 +236,7 @@ class ClientManager:
     @classmethod
     async def check_for_pending_series(cls, client):
         from ..enodojobmanager import EnodoJobManager
-        pending_jobs = await EnodoJobManager.get_active_jobs_by_worker(client.client_id)
+        pending_jobs = EnodoJobManager.get_active_jobs_by_worker(client.client_id)
         if len(pending_jobs):
             for job in pending_jobs:
                 await EnodoJobManager.cancel_job(job)
