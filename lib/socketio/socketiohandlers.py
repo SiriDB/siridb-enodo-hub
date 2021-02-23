@@ -222,6 +222,18 @@ class SocketIoHandler:
         return resp
 
     @classmethod
+    @socketio_auth_required
+    async def get_enodo_settings(cls, sid, data, event):
+        resp = await BaseHandler.resp_get_enodo_config()
+        return resp
+
+    @classmethod
+    @socketio_auth_required
+    async def update_enodo_hub_settings(cls, sid, data, event):
+        resp = await BaseHandler.resp_set_config(data)
+        return resp
+
+    @classmethod
     async def internal_updates_queue_subscribers(cls, change_type, job):
         if cls._sio is not None:
             await cls._sio.emit('update', {

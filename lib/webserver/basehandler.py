@@ -13,6 +13,7 @@ from version import VERSION
 from lib.enodojobmanager import EnodoJobManager
 from enodo.jobs import JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_STATUS_DONE
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
+from lib.config.config import Config
 
 
 class BaseHandler:
@@ -168,3 +169,19 @@ class BaseHandler:
     async def resp_get_enodo_hub_status(cls):
         data = {'version': VERSION}
         return {'data': data}
+
+    @classmethod
+    async def resp_get_enodo_config(cls):
+        return {'data': Config.get_config()}
+
+    @classmethod
+    async def resp_set_config(cls, data):
+        section = data.get('section')
+        keys_and_values = data.get('entries')
+
+        for key in keys_and_values:
+            if Config.is_runtime_configurable(section, key):
+                # setattr(Config, key, section[key])
+                Config.update_config(section, key, keys_and_values[key])
+        Config.write_config()
+        return {'data': True}

@@ -100,6 +100,7 @@ class Config:
 
     # Enodo Events
     max_in_queue_before_warning = None
+    
 
     @classmethod
     def create_standard_config_file(cls, path):
@@ -153,6 +154,19 @@ class Config:
         cls._config = EnodoConfigParser()
         cls._config.read(path)
 
+        cls.setup_config_variables()
+
+    @classmethod
+    def update_config(cls, section, key, value):
+        cls._config[section][key] = value
+
+    @classmethod
+    def write_config(cls):
+        with open(cls._path, 'w') as configfile:
+            cls._config.write(configfile)
+
+    @classmethod
+    def setup_config_variables(cls):
         cls.min_data_points = cls.to_int(cls._config.get_r('analyser', 'min_data_points'))
         cls.watcher_interval = cls.to_int(cls._config.get_r('analyser', 'watcher_interval'))
         cls.siridb_connection_check_interval = cls.to_int(
@@ -218,3 +232,28 @@ class Config:
             return False
         else:
             return default
+
+    @classmethod
+    def get_config(cls):
+        return cls._config._sections
+
+    @staticmethod
+    def is_runtime_configurable(section, key):
+        _is_runtime_configurable = {
+            "siridb": [
+                "host",
+                "port",
+                "user",
+                "password",
+                "database"
+            ],
+            "siridb_forecast": [
+                "host",
+                "port",
+                "user",
+                "password",
+                "database"
+            ]
+        }
+
+        return section in _is_runtime_configurable and key in _is_runtime_configurable[section]

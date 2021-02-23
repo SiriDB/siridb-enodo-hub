@@ -162,19 +162,15 @@ class ApiHandlers:
     @classmethod
     @EnodoAuth.auth.required
     async def get_settings(cls, request):
-        settings = await cls.build_settings_dict()
-
-        return web.json_response(data={'data': settings}, status=200)
+        resp = await BaseHandler.resp_get_enodo_config()
+        return web.json_response(data=resp, status=200)
 
     @classmethod
     @EnodoAuth.auth.required
-    async def build_settings_dict(cls):
-        settings = {}
-        fields = ['min_data_points', 'analysis_save_path', 'siridb_host', 'siridb_port', 'siridb_user',
-                  'siridb_password', 'siridb_database']
-        for field in fields:
-            settings[field] = getattr(Config, field)
-        return settings
+    async def update_settings(cls, request):
+        data = await request.json()
+        resp = await BaseHandler.resp_set_config(data)
+        return web.json_response(data=resp, status=200)
 
     @classmethod
     @EnodoAuth.auth.required
