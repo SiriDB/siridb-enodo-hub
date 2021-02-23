@@ -58,6 +58,12 @@ class SocketIoRouter:
         self._sio_on(
             event='/api/job/failed',
             handler=SocketIoHandler.get_failed_jobs)
+        self._sio_on(
+            event='/api/enodo/settings',
+            handler=SocketIoHandler.get_enodo_settings)
+        self._sio_on(
+            event='/api/enodo/settings/update',
+            handler=SocketIoHandler.update_enodo_hub_settings)
 
         self._setup_listen_events()
 
