@@ -63,6 +63,14 @@ class SeriesManager:
         return list(cls._series.keys())
 
     @classmethod
+    def get_series_count(cls):
+        return len(list(cls._series.keys()))
+
+    @classmethod
+    def get_ignored_series_count(cls):
+        return len([cls._series[rid] for rid in cls._series if cls._series[rid].is_ignored is True])
+
+    @classmethod
     async def get_series_to_dict(cls, regex_filter=None):
         if regex_filter is not None:
             pattern = re.compile(regex_filter)

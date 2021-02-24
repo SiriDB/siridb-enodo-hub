@@ -14,6 +14,7 @@ from lib.enodojobmanager import EnodoJobManager
 from enodo.jobs import JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_STATUS_DONE
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
 from lib.config.config import Config
+from lib.socket.clientmanager import ClientManager
 
 
 class BaseHandler:
@@ -185,3 +186,17 @@ class BaseHandler:
                 Config.update_config(section, key, keys_and_values[key])
         Config.write_config()
         return {'data': True}
+
+    @classmethod
+    async def resp_get_enodo_stats(cls):
+        return {'data': {
+            "no_series": SeriesManager.get_series_count(),
+            "no_ignored_series": SeriesManager.get_ignored_series_count(),
+            "no_open_jobs": EnodoJobManager.get_open_jobs_count(),
+            "no_active_jobs": EnodoJobManager.get_active_jobs_count(),
+            "no_failed_jobs": EnodoJobManager.get_failed_jobs_count(),
+            "no_listeners": ClientManager.get_listener_count(),
+            "no_workers": ClientManager.get_worker_count(),
+            "no_busy_workers": ClientManager.get_busy_worker_count(),
+            "no_output_streams": len(EnodoEventManager.outputs)
+        }}

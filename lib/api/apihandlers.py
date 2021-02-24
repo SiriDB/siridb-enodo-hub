@@ -184,3 +184,15 @@ class ApiHandlers:
             'data': {'listeners': [l.to_dict() for l in ClientManager.listeners.values()],
                      'workers': [w.to_dict() for w in ClientManager.workers.values()]}}, status=200,
             dumps=safe_json_dumps)
+
+    @classmethod
+    @EnodoAuth.auth.required
+    async def get_enodo_stats(cls, request):
+        """
+        Return stats and numbers from enodo domain
+        :param request:
+        :return:
+        """
+        resp = await BaseHandler.resp_get_enodo_stats()
+        return web.json_response(data={
+            'data': resp}, status=200)

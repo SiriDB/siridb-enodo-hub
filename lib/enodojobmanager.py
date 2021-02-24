@@ -108,6 +108,18 @@ class EnodoJobManager:
         return cls._failed_jobs
 
     @classmethod
+    def get_open_jobs_count(cls):
+        return len(cls._active_jobs)
+
+    @classmethod
+    def get_active_jobs_count(cls):
+        return len(cls._active_jobs)
+
+    @classmethod
+    def get_failed_jobs_count(cls):
+        return len(cls._failed_jobs)
+
+    @classmethod
     def get_active_jobs_by_worker(cls, worker_id):
         return [job for job in cls._active_jobs if job.worker_id == worker_id]
 

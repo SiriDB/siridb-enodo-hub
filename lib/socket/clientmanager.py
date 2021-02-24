@@ -91,6 +91,19 @@ class ClientManager:
         await cls._refresh_dedicated_cache()
 
     @classmethod
+    def get_listener_count(cls):
+        return len(cls.listeners.keys())
+
+    @classmethod
+    def get_worker_count(cls):
+        return len(cls.workers.keys())
+
+    @classmethod
+    def get_busy_worker_count(cls):
+        busy_workers = [cls.workers[worker_id] for worker_id in cls.workers if cls.workers[worker_id].busy is True]
+        return len(busy_workers)
+
+    @classmethod
     async def _refresh_dedicated_cache(cls):
         cls._dedicated_for_series = {}
         cls._dedicated_for_job_type = {}
