@@ -141,7 +141,7 @@ class Server:
     async def watch_series(self):
         while ServerState.running:
             ServerState.tasks_last_runs['watch_series'] = datetime.datetime.now()
-            series_names = await SeriesManager.get_all_series()
+            series_names = SeriesManager.get_all_series()
             for series_name in series_names:
                 series = await SeriesManager.get_series(series_name)
                 

@@ -17,7 +17,7 @@ from lib.socket.package import create_header, UPDATE_SERIES
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_DELETE
 from lib.util import safe_json_dumps
 
-from enodo.jobs import JOB_STATUS_DONE, JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_FORECAST_SERIES
+from enodo.jobs import JOB_STATUS_DONE, JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES_REALTIME
 
 
 class SeriesManager:
@@ -47,7 +47,7 @@ class SeriesManager:
                     cls._series[series.get('name')] = Series.from_dict(series)
                     logging.info(f"Added new series: {series.get('name')}")
                     await cls.series_changed(SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name'))
-                    await cls.update_listeners(await cls.get_all_series())
+                    await cls.update_listeners(cls.get_all_series())
                     return True
         return False
 
@@ -59,8 +59,17 @@ class SeriesManager:
         return series
 
     @classmethod
-    async def get_all_series(cls):
+    def get_all_series(cls):
         return list(cls._series.keys())
+
+    @classmethod
+    def get_listener_info(cls):
+        data = {}
+        for series_name in cls._series:
+            data[series_name] = {
+                "realtime": JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES_REALTIME in cls._series[series_name].series_config.job_models
+            }
+        return data
 
     @classmethod
     def get_series_count(cls):

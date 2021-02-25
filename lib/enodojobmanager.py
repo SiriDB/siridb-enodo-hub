@@ -339,7 +339,6 @@ class EnodoJobManager:
                 try:
                     series = await SeriesManager.get_series(data.get('name'))
                     await series.set_job_status(JOB_TYPE_STATIC_RULES, JOB_STATUS_DONE)
-                    print(data.get('failed_checks'))
                     if len(data.get('failed_checks')):
                         for key in data.get('failed_checks'):
                             event = EnodoEvent('Static rule failed!', 
