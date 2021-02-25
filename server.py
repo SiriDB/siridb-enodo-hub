@@ -13,7 +13,7 @@ from lib.api.apihandlers import ApiHandlers, auth
 from lib.config.config import Config
 from lib.events.enodoeventmanager import EnodoEventManager
 from lib.enodojobmanager import EnodoJobManager
-from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_STATUS_NONE, JOB_STATUS_DONE
+from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_STATIC_RULES, JOB_STATUS_NONE, JOB_STATUS_DONE
 from lib.logging import prepare_logger
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
@@ -174,6 +174,13 @@ class Server:
                                         await series.is_job_due(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES):
                                         
                                         await EnodoJobManager.create_job(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, series_name)
+                                        continue
+
+                                     # If anomaly detect job is not pending and job is due
+                                    if (await series.get_job_status(JOB_TYPE_STATIC_RULES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
+                                        await series.is_job_due(JOB_TYPE_STATIC_RULES):
+                                        
+                                        await EnodoJobManager.create_job(JOB_TYPE_STATIC_RULES, series_name)
                                         continue
                             except Exception as e:
                                 logging.error(f"Something went wrong when trying to create new job")

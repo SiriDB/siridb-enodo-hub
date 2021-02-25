@@ -5,7 +5,7 @@ from secrets import token_urlsafe
 
 from lib.exceptions.enodoexception import EnodoInvalidConfigException, EnodoException
 
-EMPTY_CONFIG_FILE = config = {
+EMPTY_CONFIG_FILE = {
     'enodo': {
         'basic_auth_username': 'enodo',
         'basic_auth_password': 'enodo',
@@ -23,6 +23,15 @@ EMPTY_CONFIG_FILE = config = {
     'events': {
         'max_in_queue_before_warning': '25'
     },
+    'analyser': {
+        'min_data_points': '100',
+        'watcher_interval': '2',
+        'siridb_connection_check_interval': '30',
+        'interval_schedules_series': '3600',
+    }
+}
+
+EMPTY_SETTINGS_FILE = {
     'siridb': {
         'host': '',
         'port': '',
@@ -36,30 +45,37 @@ EMPTY_CONFIG_FILE = config = {
         'user': '',
         'password': '',
         'database': '',
-    },
-    'analyser': {
-        'min_data_points': '100',
-        'watcher_interval': '2',
-        'siridb_connection_check_interval': '30',
-        'interval_schedules_series': '3600',
     }
 }
 
-
 class EnodoConfigParser(RawConfigParser):
+    def __init__(self, env_support=True, **kwargs):
+        self.env_support = env_support
+        super(EnodoConfigParser, self).__init__(**kwargs)
+
     def get_r(self, section, option, required=True, default=None):
+        value = None
         try:
-            return RawConfigParser.get(self, section, option)
-        except (NoOptionError, NoSectionError) as e:
+            value = RawConfigParser.get(self, section, option)
+        except (NoOptionError, NoSectionError) as _:
+            pass
+        
+        if self.env_support:
+            env_value = os.getenv(option.upper())
+            if env_value is not None:
+                value = env_value
+        
+        if value is None:
             if required:
                 raise EnodoInvalidConfigException(f'Invalid config, missing option "{option}" in section "{section}"')
-            else:
-                return default
+            return default
+        return value
 
 
 class Config:
     _config = None
     _path = None
+    _settings = None
     min_data_points = None
     watcher_interval = None
     siridb_connection_check_interval = None
@@ -100,16 +116,15 @@ class Config:
 
     # Enodo Events
     max_in_queue_before_warning = None
-    
 
     @classmethod
     def create_standard_config_file(cls, path):
         _config = ConfigParser()
 
-        for section in config:
+        for section in EMPTY_CONFIG_FILE:
             _config.add_section(section)
-            for option in config[section]:
-                _config.set(section, option, config[section][option])
+            for option in EMPTY_CONFIG_FILE[section]:
+                _config.set(section, option, EMPTY_CONFIG_FILE[section][option])
 
         with open(path, "w") as fh:
             _config.write(fh)
@@ -156,14 +171,30 @@ class Config:
 
         cls.setup_config_variables()
 
-    @classmethod
-    def update_config(cls, section, key, value):
-        cls._config[section][key] = value
+        settings_path = os.path.join(cls.base_dir, 'enodo.settings')
+        if not os.path.exists(settings_path):
+            tmp_settings_parser = ConfigParser()
+
+            for section in EMPTY_SETTINGS_FILE:
+                tmp_settings_parser.add_section(section)
+                for option in EMPTY_SETTINGS_FILE[section]:
+                    tmp_settings_parser.set(section, option, EMPTY_SETTINGS_FILE[section][option])
+
+            with open(settings_path, "w") as fh:
+                tmp_settings_parser.write(fh)
+
+        cls._settings = EnodoConfigParser(env_support=False)
+        cls._settings.read(settings_path)
+        cls.setup_settings_variables()
 
     @classmethod
-    def write_config(cls):
-        with open(cls._path, 'w') as configfile:
-            cls._config.write(configfile)
+    def update_settings(cls, section, key, value):
+        cls._settings[section][key] = value
+
+    @classmethod
+    def write_settings(cls):
+        with open(os.path.join(cls.base_dir, 'enodo.settings'), 'w') as settingsfile:
+            cls._settings.write(settingsfile)
 
     @classmethod
     def setup_config_variables(cls):
@@ -172,20 +203,6 @@ class Config:
         cls.siridb_connection_check_interval = cls.to_int(
             cls._config.get_r('analyser', 'siridb_connection_check_interval'))
         cls.interval_schedules_series = cls.to_int(cls._config.get_r('analyser', 'interval_schedules_series'))
-
-        # SiriDB
-        cls.siridb_host = cls._config.get_r('siridb', 'host')
-        cls.siridb_port = cls.to_int(cls._config.get_r('siridb', 'port'))
-        cls.siridb_user = cls._config.get_r('siridb', 'user')
-        cls.siridb_password = cls._config.get_r('siridb', 'password')
-        cls.siridb_database = cls._config.get_r('siridb', 'database')
-
-        # SiriDB Forecast
-        cls.siridb_forecast_host = cls._config.get_r('siridb_forecast', 'host')
-        cls.siridb_forecast_port = cls.to_int(cls._config.get_r('siridb_forecast', 'port'))
-        cls.siridb_forecast_user = cls._config.get_r('siridb_forecast', 'user')
-        cls.siridb_forecast_password = cls._config.get_r('siridb_forecast', 'password')
-        cls.siridb_forecast_database = cls._config.get_r('siridb_forecast', 'database')
 
         # Enodo
         cls.basic_auth_username = cls._config.get_r('enodo', 'basic_auth_username', required=False, default=None)
@@ -213,6 +230,22 @@ class Config:
         if not os.path.exists(os.path.join(cls.base_dir, 'data')):
             os.makedirs(os.path.join(cls.base_dir, 'data'))
 
+    @classmethod
+    def setup_settings_variables(cls):
+        # SiriDB
+        cls.siridb_host = cls._settings.get_r('siridb', 'host')
+        cls.siridb_port = cls.to_int(cls._settings.get_r('siridb', 'port'))
+        cls.siridb_user = cls._settings.get_r('siridb', 'user')
+        cls.siridb_password = cls._settings.get_r('siridb', 'password')
+        cls.siridb_database = cls._settings.get_r('siridb', 'database')
+
+        # SiriDB Forecast
+        cls.siridb_forecast_host = cls._settings.get_r('siridb_forecast', 'host')
+        cls.siridb_forecast_port = cls.to_int(cls._settings.get_r('siridb_forecast', 'port'))
+        cls.siridb_forecast_user = cls._settings.get_r('siridb_forecast', 'user')
+        cls.siridb_forecast_password = cls._settings.get_r('siridb_forecast', 'password')
+        cls.siridb_forecast_database = cls._settings.get_r('siridb_forecast', 'database')
+
     @staticmethod
     def to_int(val):
         return_val = None
@@ -234,8 +267,8 @@ class Config:
             return default
 
     @classmethod
-    def get_config(cls):
-        return cls._config._sections
+    def get_settings(cls):
+        return cls._settings._sections
 
     @staticmethod
     def is_runtime_configurable(section, key):

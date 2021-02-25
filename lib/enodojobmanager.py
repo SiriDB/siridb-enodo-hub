@@ -10,7 +10,7 @@ from enodo.protocol.packagedata import EnodoJobDataModel, EnodoJobRequestDataMod
 from enodo.model.config.worker import WORKER_MODE_GLOBAL, WORKER_MODE_DEDICATED_JOB_TYPE, \
     WORKER_MODE_DEDICATED_SERIES
 
-from .events.enodoeventmanager import EnodoEvent, EnodoEventManager, ENODO_EVENT_JOB_QUEUE_TOO_LONG
+from .events.enodoeventmanager import EnodoEvent, EnodoEventManager, ENODO_EVENT_JOB_QUEUE_TOO_LONG, ENODO_EVENT_STATIC_RULE_FAIL
 from .config.config import Config
 from .series.seriesmanager import SeriesManager
 from .series import SERIES_ANALYSED_STATUS_DONE
@@ -331,6 +331,22 @@ class EnodoJobManager:
                     series = await SeriesManager.get_series(data.get('name'))
                     series.series_characteristics = data.get('characteristics')
                     await series.set_job_status(JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_DONE)
+                    await SeriesManager.series_changed(SUBSCRIPTION_CHANGE_TYPE_UPDATE, data.get('name'))
+                except Exception as e:
+                    logging.error(f"Something went wrong when receiving base analysis job")
+                    logging.debug(f"Corresponding error: {e}")
+            elif job_type == JOB_TYPE_STATIC_RULES:
+                try:
+                    series = await SeriesManager.get_series(data.get('name'))
+                    await series.set_job_status(JOB_TYPE_STATIC_RULES, JOB_STATUS_DONE)
+                    print(data.get('failed_checks'))
+                    if len(data.get('failed_checks')):
+                        for key in data.get('failed_checks'):
+                            event = EnodoEvent('Static rule failed!', 
+                                f'Series {data.get("name")} failed a static rule ({key}): {data.get("failed_checks")[key]}',
+                                ENODO_EVENT_STATIC_RULE_FAIL)
+                            await EnodoEventManager.handle_event(event)
+                    # TODO Create custom event and raise it
                     await SeriesManager.series_changed(SUBSCRIPTION_CHANGE_TYPE_UPDATE, data.get('name'))
                 except Exception as e:
                     logging.error(f"Something went wrong when receiving base analysis job")

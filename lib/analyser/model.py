@@ -32,8 +32,10 @@ class EnodoModelManager:
     @classmethod
     async def add_model_from_dict(cls, dict_data):
         try:
-            model = await EnodoModel.from_dict(dict_data)
+            model = EnodoModel.from_dict(dict_data)
         except Exception as e:
+            logging.error(f"Something went wrong while adding EnodoModel")
+            logging.debug(f"Corresponding error: {e}")
             return False
         else:
             if await cls.get_model(model.model_name) is None:

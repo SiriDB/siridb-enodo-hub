@@ -173,7 +173,7 @@ class BaseHandler:
 
     @classmethod
     async def resp_get_enodo_config(cls):
-        return {'data': Config.get_config()}
+        return {'data': Config.get_settings()}
 
     @classmethod
     async def resp_set_config(cls, data):
@@ -183,8 +183,8 @@ class BaseHandler:
         for key in keys_and_values:
             if Config.is_runtime_configurable(section, key):
                 # setattr(Config, key, section[key])
-                Config.update_config(section, key, keys_and_values[key])
-        Config.write_config()
+                Config.update_settings(section, key, keys_and_values[key])
+        Config.write_settings()
         return {'data': True}
 
     @classmethod
