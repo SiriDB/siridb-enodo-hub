@@ -2,6 +2,7 @@ import asyncio
 import logging
 import time
 import os
+import uuid
 
 import aiohttp
 import json
@@ -32,7 +33,7 @@ class EnodoEvent:
     """
     EnodoEvent class. Holds data for an event (error/warning/etc) that occured. No state data is saved.
     """
-    __slots__ = ('title', 'message', 'event_type', 'ts', 'severity')
+    __slots__ = ('title', 'message', 'event_type', 'ts', 'severity', 'uuid')
 
     def __init__(self, title, message, event_type):
         if event_type not in ENODO_EVENT_TYPES:
@@ -40,14 +41,16 @@ class EnodoEvent:
         self.title = title
         self.message = message
         self.event_type = event_type
-        self.ts = int(time.time())
+        self.ts = int(time.time()),
+        self.uuid = str(uuid.uuid4()).replace("-", "")
 
     def to_dict(self):
         return {
             'title': self.title,
             'event_type': self.event_type,
             'message': self.message,
-            'ts': self.ts
+            'ts': self.ts,
+            'uuid': self.uuid
         }
 
 

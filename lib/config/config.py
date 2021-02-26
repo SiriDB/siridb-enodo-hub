@@ -67,7 +67,7 @@ class EnodoConfigParser(RawConfigParser):
         
         if value is None:
             if required:
-                raise EnodoInvalidConfigException(f'Invalid config, missing option "{option}" in section "{section}"')
+                raise EnodoInvalidConfigException(f'Invalid config, missing option "{option}" in section "{section}" or environment variable "{option.upper()}"')
             return default
         return value
 
@@ -162,12 +162,14 @@ class Config:
         :return:
         """
 
-        if not os.path.exists(path):
-            raise EnodoInvalidConfigException(f'Given config file does not exist or cannot be read at path: {path}')
+        # if pathnot os.path.exists(path):
+        #     raise EnodoInvalidConfigException(f'Given config file does not exist or cannot be read at path: {path}')
 
         cls._path = path
         cls._config = EnodoConfigParser()
-        cls._config.read(path)
+        if path is not None and os.path.exists(path):
+            # raise EnodoInvalidConfigException(f'Given config file does not exist or cannot be read at path: {path}')
+            cls._config.read(path)
 
         cls.setup_config_variables()
 
