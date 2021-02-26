@@ -41,7 +41,7 @@ class EnodoEvent:
         self.title = title
         self.message = message
         self.event_type = event_type
-        self.ts = int(time.time()),
+        self.ts = int(time.time())
         self.uuid = str(uuid.uuid4()).replace("-", "")
 
     def to_dict(self):
