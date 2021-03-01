@@ -238,6 +238,17 @@ class EnodoJobManager:
             cls._open_jobs.remove(job)
             if cls._update_queue_cb is not None:
                 await cls._update_queue_cb(SUBSCRIPTION_CHANGE_TYPE_DELETE, job.rid)
+
+        jobs = []
+        
+        for job in cls._active_jobs:
+            if job.series_name == series_name:
+                jobs.append(job)
+
+        for job in jobs:
+            cls._active_jobs.remove(job)
+            if cls._update_queue_cb is not None:
+                await cls._update_queue_cb(SUBSCRIPTION_CHANGE_TYPE_DELETE, job.rid)
             
 
     @classmethod
