@@ -1,7 +1,7 @@
 import logging
 
 AVAILABLE_LOG_LEVELS = {'error': logging.ERROR, 'warning': logging.WARNING, 'info': logging.INFO,
-                        'verbose': logging.DEBUG}
+                        'debug': logging.DEBUG}
 
 
 def prepare_logger(log_level_label):

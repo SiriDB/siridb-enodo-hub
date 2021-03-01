@@ -23,9 +23,11 @@ class EnodoClient:
         if last_seen is None:
             self.last_seen = datetime.datetime.now()
 
-    async def reconnected(self):
+    async def reconnected(self, ip_address, writer):
         self.online = True
         self.last_seen = datetime.datetime.now()
+        self.ip_address = ip_address
+        self.writer = writer
 
     def to_dict(self):
         return {'client_id': self.client_id,
@@ -89,6 +91,19 @@ class ClientManager:
         await cls._refresh_dedicated_cache()
 
     @classmethod
+    def get_listener_count(cls):
+        return len(cls.listeners.keys())
+
+    @classmethod
+    def get_worker_count(cls):
+        return len(cls.workers.keys())
+
+    @classmethod
+    def get_busy_worker_count(cls):
+        busy_workers = [cls.workers[worker_id] for worker_id in cls.workers if cls.workers[worker_id].busy is True]
+        return len(busy_workers)
+
+    @classmethod
     async def _refresh_dedicated_cache(cls):
         cls._dedicated_for_series = {}
         cls._dedicated_for_job_type = {}
@@ -115,7 +130,7 @@ class ClientManager:
                                     client_data.get('version', None))
             await cls.add_client(client)
         else:
-            await cls.listeners.get(client_id).reconnected()
+            await cls.listeners.get(client_id).reconnected(peername, writer)
 
     @classmethod
     async def worker_connected(cls, peername, writer, client_data):
@@ -127,7 +142,7 @@ class ClientManager:
                                     busy=client_data.get('busy', None))
             await cls.add_client(client)
         else:
-            await cls.workers.get(client_id).reconnected()
+            await cls.workers.get(client_id).reconnected(peername, writer)
 
     @classmethod
     async def add_client(cls, client):
@@ -182,7 +197,7 @@ class ClientManager:
             worker = cls.workers.get(worker_id)
             if worker.worker_config.mode == WORKER_MODE_GLOBAL and not worker.busy and not worker.is_going_busy:
                 if worker.support_model_for_job(job_type, model_name):
-                        return worker
+                    return worker
 
         return None
 
@@ -190,24 +205,18 @@ class ClientManager:
     async def check_clients_alive(cls, max_timeout):
         clients_to_remove = []
         for client in cls.listeners:
-            if (datetime.datetime.now() - cls.listeners.get(client).last_seen) \
+            listener = cls.listeners.get(client)
+            if listener.online and (datetime.datetime.now() - listener.last_seen) \
                     .total_seconds() > max_timeout:
-                print(f'Not alive: {client}')
-                clients_to_remove.append(client)
-
-        for client in clients_to_remove:
-            del cls.listeners[client]
-        clients_to_remove = []
+                logging.info(f'Lost connection to listener: {client}')
+                listener.online = False
 
         for client in cls.workers:
-            if (datetime.datetime.now() - cls.workers.get(client).last_seen) \
+            worker = cls.workers.get(client)
+            if worker.online and (datetime.datetime.now() - worker.last_seen) \
                     .total_seconds() > max_timeout:
-                print(f'Not alive: {client}')
-                clients_to_remove.append(client)
-
-        for client in clients_to_remove:
-            await cls.check_for_pending_series(cls.workers[client])
-            del cls.workers[client]
+                logging.info(f'Lost connection to worker: {client}')
+                worker.online = False
 
     @classmethod
     async def set_worker_offline(cls, client_id):
@@ -240,7 +249,7 @@ class ClientManager:
     @classmethod
     async def check_for_pending_series(cls, client):
         from ..enodojobmanager import EnodoJobManager
-        pending_jobs = await EnodoJobManager.get_active_jobs_by_worker(client.client_id)
+        pending_jobs = EnodoJobManager.get_active_jobs_by_worker(client.client_id)
         if len(pending_jobs):
             for job in pending_jobs:
                 await EnodoJobManager.cancel_job(job)

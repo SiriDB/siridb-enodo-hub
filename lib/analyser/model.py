@@ -23,22 +23,24 @@ class EnodoModelManager:
         return None
 
     @classmethod
-    async def add_model(cls, model_name, model_arguments, supports_forecasting, supports_anomaly_detection):
+    async def add_model(cls, model_name, model_arguments):
         if await cls.get_model(model_name) is None:
-            model = EnodoModel(model_name, model_arguments, supports_forecasting, supports_anomaly_detection)
+            model = EnodoModel(model_name, model_arguments)
             cls.models.append(model)
-            await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, model_name, await EnodoModel.to_dict(model))
+            await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, EnodoModel.to_dict(model))
 
     @classmethod
     async def add_model_from_dict(cls, dict_data):
         try:
-            model = await EnodoModel.from_dict(dict_data)
+            model = EnodoModel.from_dict(dict_data)
         except Exception as e:
+            logging.error(f"Something went wrong while adding EnodoModel")
+            logging.debug(f"Corresponding error: {e}")
             return False
         else:
             if await cls.get_model(model.model_name) is None:
                 cls.models.append(model)
-                await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, model.model_name, await EnodoModel.to_dict(model))
+                await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, EnodoModel.to_dict(model))
                 return True
             return False
 
@@ -46,7 +48,7 @@ class EnodoModelManager:
     async def remove_model(cls, model_name):
         model = await cls.get_model(model_name)
         cls.models.remove(model)
-        await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_DELETE, model_name, await EnodoModel.to_dict(model))
+        await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_DELETE, model_name)
 
     @classmethod
     async def load_from_disk(cls):
@@ -63,7 +65,7 @@ class EnodoModelManager:
 
         if isinstance(data, list):
             for model_data in data:
-                model = await EnodoModel.from_dict(model_data)
+                model = EnodoModel.from_dict(model_data)
                 cls.models.append(model)
 
     @classmethod
@@ -72,7 +74,7 @@ class EnodoModelManager:
         if cls.models is None:
             return
         for model in cls.models:
-            model_list.append(await EnodoModel.to_dict(model))
+            model_list.append(EnodoModel.to_dict(model))
 
         try:
             f = open(Config.model_save_path, "w")

@@ -162,19 +162,15 @@ class ApiHandlers:
     @classmethod
     @EnodoAuth.auth.required
     async def get_settings(cls, request):
-        settings = await cls.build_settings_dict()
-
-        return web.json_response(data={'data': settings}, status=200)
+        resp = await BaseHandler.resp_get_enodo_config()
+        return web.json_response(data=resp, status=200)
 
     @classmethod
     @EnodoAuth.auth.required
-    async def build_settings_dict(cls):
-        settings = {}
-        fields = ['min_data_points', 'analysis_save_path', 'siridb_host', 'siridb_port', 'siridb_user',
-                  'siridb_password', 'siridb_database']
-        for field in fields:
-            settings[field] = getattr(Config, field)
-        return settings
+    async def update_settings(cls, request):
+        data = await request.json()
+        resp = await BaseHandler.resp_set_config(data)
+        return web.json_response(data=resp, status=200)
 
     @classmethod
     @EnodoAuth.auth.required
@@ -188,3 +184,15 @@ class ApiHandlers:
             'data': {'listeners': [l.to_dict() for l in ClientManager.listeners.values()],
                      'workers': [w.to_dict() for w in ClientManager.workers.values()]}}, status=200,
             dumps=safe_json_dumps)
+
+    @classmethod
+    @EnodoAuth.auth.required
+    async def get_enodo_stats(cls, request):
+        """
+        Return stats and numbers from enodo domain
+        :param request:
+        :return:
+        """
+        resp = await BaseHandler.resp_get_enodo_stats()
+        return web.json_response(data={
+            'data': resp}, status=200)

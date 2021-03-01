@@ -1,10 +1,11 @@
+import datetime
+
 import asyncio
 import logging
 
 import aiohttp_cors
 import socketio
 from aiohttp import web
-from aiohttp_apispec import setup_aiohttp_apispec
 from enodo.protocol.packagedata import *
 
 from lib.analyser.model import EnodoModelManager
@@ -12,7 +13,7 @@ from lib.api.apihandlers import ApiHandlers, auth
 from lib.config.config import Config
 from lib.events.enodoeventmanager import EnodoEventManager
 from lib.enodojobmanager import EnodoJobManager
-from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_STATUS_NONE, JOB_STATUS_OPEN, JOB_STATUS_PENDING, JOB_STATUS_DONE, JOB_STATUS_FAILED
+from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_STATIC_RULES, JOB_STATUS_NONE, JOB_STATUS_DONE
 from lib.logging import prepare_logger
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
@@ -38,15 +39,19 @@ class Server:
 
         self._config_path = config_path
         self.backend_socket = None
+        self._log_level = log_level
+
         self._watch_series_task = None
         self._save_to_disk_task = None
         self._check_jobs_task = None
         self._cleanup_clients_task = None
-        self._log_level = log_level
+
+        self._watch_tasks_task = None
 
     async def start_up(self):
         # Setup server state object
-        await ServerState.async_setup(siridb_data_username=Config.siridb_user,
+        await ServerState.async_setup(sio=self.sio,
+                                      siridb_data_username=Config.siridb_user,
                                       siridb_data_password=Config.siridb_password,
                                       siridb_data_dbname=Config.siridb_database,
                                       siridb_data_hostlist=[
@@ -97,6 +102,7 @@ class Server:
             EnodoJobManager.check_for_jobs())
         self._cleanup_clients_task = self.loop.create_task(
             self._cleanup_clients())
+        self._watch_tasks_task = self.loop.create_task(self.watch_tasks())
 
         # Open backend socket connection
         await self.backend_socket.create()
@@ -110,23 +116,38 @@ class Server:
         self._check_jobs_task.cancel()
         self._save_to_disk_task.cancel()
         self._cleanup_clients_task.cancel()
+        self._watch_tasks_task.cancel()
         await self.backend_socket.stop()
 
     async def _cleanup_clients(self):
         while ServerState.running:
             await asyncio.sleep(Config.save_to_disk_interval)
+            ServerState.tasks_last_runs['cleanup_clients'] = datetime.datetime.now()
             logging.debug('Cleaning-up clients')
             await ClientManager.check_clients_alive(Config.client_max_timeout)
 
+    async def watch_tasks(self):
+        while ServerState.running:
+            await asyncio.sleep(Config.save_to_disk_interval * 2)
+            logging.debug('Watching background tasks')
+            try:
+                for task in ServerState.tasks_last_runs:
+                    if ServerState.tasks_last_runs[task] is not None and \
+                        (datetime.datetime.now() - ServerState.tasks_last_runs[task]).total_seconds() > 60:
+                        logging.error(f"Background task \"{task}\" is unresponsive!")
+            except Exception as e:
+                logging.error('Watching background tasks failed')
+
     async def watch_series(self):
         while ServerState.running:
-            series_names = await SeriesManager.get_all_series()
+            ServerState.tasks_last_runs['watch_series'] = datetime.datetime.now()
+            series_names = SeriesManager.get_all_series()
             for series_name in series_names:
                 series = await SeriesManager.get_series(series_name)
                 
                 # Check if series is valid and not ignored
                 if series is not None \
-                        and not await series.is_ignored():
+                        and not series.is_ignored():
 
                     # Check if requirement of min amount of datapoints is met
                     if await series.get_datapoints_count() >= Config.min_data_points or (
@@ -139,21 +160,28 @@ class Server:
                             try:
                                 # Check if base analysis is done and series does not have any failed jobs
                                 if await series.get_job_status(JOB_TYPE_BASE_SERIES_ANALYSIS) == JOB_STATUS_DONE and \
-                                    not len(await EnodoJobManager.get_failed_jobs_for_series(series_name)):
+                                    not len(EnodoJobManager.get_failed_jobs_for_series(series_name)):
 
                                     # If forecast job is not pending and job is due
                                     if (await series.get_job_status(JOB_TYPE_FORECAST_SERIES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
                                         await series.is_job_due(JOB_TYPE_FORECAST_SERIES):
 
                                         await EnodoJobManager.create_job(JOB_TYPE_FORECAST_SERIES, series_name)
+                                        continue
                                     
                                     # If anomaly detect job is not pending and job is due
-                                    if (await series.get_job_status(JOB_TYPE_FORECAST_SERIES) == JOB_STATUS_DONE) and \
-                                        (await series.get_job_status(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
+                                    if (await series.get_job_status(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
                                         await series.is_job_due(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES):
                                         
                                         await EnodoJobManager.create_job(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, series_name)
+                                        continue
 
+                                     # If anomaly detect job is not pending and job is due
+                                    if (await series.get_job_status(JOB_TYPE_STATIC_RULES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
+                                        await series.is_job_due(JOB_TYPE_STATIC_RULES):
+                                        
+                                        await EnodoJobManager.create_job(JOB_TYPE_STATIC_RULES, series_name)
+                                        continue
                             except Exception as e:
                                 logging.error(f"Something went wrong when trying to create new job")
                                 logging.debug(f"Corresponding error: {e}")
@@ -170,17 +198,16 @@ class Server:
     async def save_to_disk(self):
         while ServerState.running:
             await asyncio.sleep(Config.save_to_disk_interval)
+            ServerState.tasks_last_runs['save_to_disk'] = datetime.datetime.now()
             logging.debug('Saving seriesmanager state to disk')
             await self._save_to_disk()
 
     async def stop_server(self):
-
+        logging.info('Stopping Hub...')
         if self.sio is not None:
             clients = []
             if '/' in self.sio.manager.rooms and None in self.sio.manager.rooms['/']:
-                clients = [
-                    client for client in self.sio.manager.rooms['/'][None]]
-
+                clients = self.sio.manager.rooms['/'][None]
             for sid in clients:
                 if sid is not None:
                     if sid in self.sio.eio.sockets:
@@ -190,14 +217,12 @@ class Server:
                             # the socket was already closed or gone
                             pass
                         else:
-                            await socket.close()
+                            await socket.close(wait=False)
                             del self.sio.eio.sockets[sid]
 
             await asyncio.sleep(1)
             del self.sio
             self.sio = None
-
-        logging.info('Stopping analyser server...')
         logging.info('...Saving data to disk')
         await self._save_to_disk()
         ServerState.running = False
@@ -241,8 +266,6 @@ class Server:
                 )
             })
 
-            # self.app.router.add_get("/", websocket_index, allow_head=False)
-
             # Add rest api routes
             self.app.router.add_get(
                 "/api/series", ApiHandlers.get_monitored_series, allow_head=False)
@@ -261,10 +284,14 @@ class Server:
                 "/api/enodo/event/output/{output_id}", ApiHandlers.remove_enodo_event_output)
             self.app.router.add_post(
                 "/api/enodo/event/output", ApiHandlers.add_enodo_event_output)
+            self.app.router.add_get(
+                "/api/enodo/stats", ApiHandlers.get_enodo_stats)
 
             # Add internal api routes
             self.app.router.add_get(
                 "/api/settings", ApiHandlers.get_settings, allow_head=False)
+            self.app.router.add_post(
+                "/api/settings", ApiHandlers.update_settings)
             self.app.router.add_get(
                 "/api/enodo/status", ApiHandlers.get_siridb_enodo_status, allow_head=False)
             self.app.router.add_get(

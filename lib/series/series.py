@@ -7,9 +7,10 @@ from enodo.model.config.series import SeriesConfigModel
 class Series:
     # detecting_anomalies_status forecast_status series_analysed_status
     __slots__ = (
-        'name', 'series_config', 'series_job_statuses', '_job_schedule', '_datapoint_count', '_datapoint_count_lock', 'series_characteristics')
+        'rid', 'name', 'series_config', 'series_job_statuses', '_datapoint_count', '_datapoint_count_lock', '_job_schedule', 'series_characteristics')
 
-    def __init__(self, name, config, datapoint_count, job_schedule=None, job_statuses=None, series_characteristics=None):
+    def __init__(self, name, config, datapoint_count, job_statuses=None, series_characteristics=None, job_schedule=None, **kwargs):
+        self.rid = name
         self.name = name
         self.series_config = SeriesConfigModel.from_dict(config)
         self.series_job_statuses = job_statuses
@@ -36,14 +37,14 @@ class Series:
         return self._datapoint_count_lock
 
     async def clear_errors(self):
-        await EnodoJobManager.remove_failed_jobs_for_series(self.name)
+        EnodoJobManager.remove_failed_jobs_for_series(self.name)
 
-    async def get_errors(self):
-        errors = [job.error for job in (await EnodoJobManager.get_failed_jobs_for_series(self.name))]
+    def get_errors(self):
+        errors = [job.error for job in EnodoJobManager.get_failed_jobs_for_series(self.name)]
         return errors
 
-    async def is_ignored(self):
-        return await EnodoJobManager.has_series_failed_jobs(self.name)
+    def is_ignored(self):
+        return EnodoJobManager.has_series_failed_jobs(self.name)
 
     async def get_model(self, job_type):
         return self.series_config.get_model_for_job(job_type)
@@ -84,8 +85,14 @@ class Series:
         elif self._job_schedule.get(job_type) is not None and self._job_schedule.get(job_type) <= self._datapoint_count:
             return True
 
+    def update(self, data):
+        config = data.get('config')
+        if config is not None:
+            self.series_config = SeriesConfigModel.from_dict(config)
 
-    async def to_dict(self, static_only=False):
+        return True
+
+    def to_dict(self, static_only=False):
         if static_only:
             return {
                 'name': self.name,
@@ -96,18 +103,19 @@ class Series:
                 'series_characteristics': self.series_characteristics
             }
         return {
+            'rid': self.rid,
             'name': self.name,
             'datapoint_count': self._datapoint_count,
             'job_statuses': self.series_job_statuses,
             'job_schedule': self._job_schedule,
             'config': self.series_config.to_dict(),
-            'ignore': await self.is_ignored(),
-            'error': await self.get_errors(),
+            'ignore': self.is_ignored(),
+            'error': self.get_errors(),
             'series_characteristics': self.series_characteristics
         }
 
     @classmethod
-    async def from_dict(cls, data_dict):
+    def from_dict(cls, data_dict):
         return Series(**data_dict)
 
 

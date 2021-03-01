@@ -77,7 +77,7 @@ class SocketServer:
                         writer.write(response)
 
                         if client_data.get('client_type') == 'listener':
-                            update = qpack.packb(await SeriesManager.get_all_series())
+                            update = qpack.packb(SeriesManager.get_all_series())
                             series_update = create_header(len(update), UPDATE_SERIES, packet_id)
                             writer.write(series_update + update)
                     else:

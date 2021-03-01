@@ -12,6 +12,9 @@ from lib.util import regex_valid
 from version import VERSION
 from lib.enodojobmanager import EnodoJobManager
 from enodo.jobs import JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_STATUS_DONE
+from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
+from lib.config.config import Config
+from lib.socket.clientmanager import ClientManager
 
 
 class BaseHandler:
@@ -34,7 +37,7 @@ class BaseHandler:
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
 
-        series_data = await series.to_dict()
+        series_data = series.to_dict()
         if include_points:
             series_points = await query_series_data(ServerState.siridb_data_client, series.name, "*")
             series_data['points'] = series_points.get(series.name)
@@ -53,12 +56,17 @@ class BaseHandler:
 
     @classmethod
     async def resp_get_event_outputs(cls):
-        return {'data': [await output.to_dict() for output in EnodoEventManager.outputs]}, 200
+        return {'data': [output.to_dict() for output in EnodoEventManager.outputs]}, 200
 
     @classmethod
     async def resp_add_event_output(cls, output_type, data):
-        await EnodoEventManager.create_event_output(output_type, data)
-        return {'data': [await output.to_dict() for output in EnodoEventManager.outputs]}, 201
+        output = await EnodoEventManager.create_event_output(output_type, data)
+        return {'data': output.to_dict()}, 201
+
+    @classmethod
+    async def resp_update_event_output(cls, output_id, data):
+        output = await EnodoEventManager.update_event_output(output_id, data)
+        return {'data': output.to_dict()}, 201
 
     @classmethod
     async def resp_remove_event_output(cls, output_id):
@@ -70,17 +78,16 @@ class BaseHandler:
         required_fields = ['name', 'config']
         series_config = SeriesConfigModel.from_dict(data.get('config'))
         for model_name in list(series_config.job_models.values()):
-            model_parameters = series_config.model_params.get("model_params")
+            model_parameters = series_config.model_params
 
             model = await EnodoModelManager.get_model(model_name)
             if model is None:
                 return {'error': 'Unknown model'}, 400
-
             if model_parameters is None and len(model.model_arguments.keys()) > 0:
                 return {'error': 'Missing required fields'}, 400
             for key in model.model_arguments:
                 if key not in model_parameters.keys():
-                    return {'error': 'Missing required fields'}, 400
+                    return {'error': f'Missing required field {key}'}, 400
 
         # data['model_parameters'] = await setup_default_model_arguments(model_parameters)
 
@@ -90,11 +97,40 @@ class BaseHandler:
 
         return {'data': list(await SeriesManager.get_series_to_dict())}, 201
 
+
+    @classmethod
+    async def resp_update_series(cls, series_name, data):
+        required_fields = ['config']
+        if not all(required_field in data for required_field in required_fields):
+            return {'error': 'Something went wrong when updating the series. Missing required fields'}, 400
+        series_config = SeriesConfigModel.from_dict(data.get('config'))
+        for model_name in list(series_config.job_models.values()):
+            model_parameters = series_config.model_params
+
+            model = await EnodoModelManager.get_model(model_name)
+            if model is None:
+                return {'error': 'Unknown model'}, 400
+            if model_parameters is None and len(model.model_arguments.keys()) > 0:
+                return {'error': 'Missing required fields'}, 400
+            for key in model.model_arguments:
+                if key not in model_parameters.keys():
+                    return {'error': f'Missing required field {key}'}, 400
+
+        series = await SeriesManager.get_series(series_name)
+        if series is None:
+            return {'error': 'Something went wrong when updating the series. Are you sure the series exists?'}, 400
+        series.update(data)
+
+        await SeriesManager.series_changed(SUBSCRIPTION_CHANGE_TYPE_UPDATE, series_name)
+
+        return {'data': list(await SeriesManager.get_series_to_dict())}, 201
+
     @classmethod
     async def resp_remove_series(cls, series_name):
         # TODO: REMOVE JOBS, EVENTS ETC
         if await SeriesManager.remove_series(series_name):
             await EnodoJobManager.cancel_jobs_for_series(series_name)
+            EnodoJobManager.remove_failed_jobs_for_series(series_name)
             return 200
         return 404
 
@@ -103,9 +139,21 @@ class BaseHandler:
         return {'data': await EnodoJobManager.get_open_queue()}
 
     @classmethod
+    async def resp_get_open_jobs(cls):
+        return {'data': await EnodoJobManager.get_open_queue()}
+
+    @classmethod
+    async def resp_get_active_jobs(cls):
+        return {'data': EnodoJobManager.get_active_jobs()}
+
+    @classmethod
+    async def resp_get_failed_jobs(cls):
+        return {'data': EnodoJobManager.get_failed_jobs()}
+
+    @classmethod
     async def resp_get_possible_analyser_models(cls):
         data = {
-            'models': [await EnodoModel.to_dict(model) for model in EnodoModelManager.models]
+            'models': [EnodoModel.to_dict(model) for model in EnodoModelManager.models]
         }
         return {'data': data}
 
@@ -113,10 +161,8 @@ class BaseHandler:
     async def resp_add_model(cls, data):
         try:
             await EnodoModelManager.add_model(data['model_name'],
-                                              data['model_arguments'],
-                                              data['supports_forecasting'],
-                                              data['supports_anomaly_detection'])
-            return {'data': [await EnodoModel.to_dict(model) for model in EnodoModelManager.models]}, 201
+                                              data['model_arguments'])
+            return {'data': [EnodoModel.to_dict(model) for model in EnodoModelManager.models]}, 201
         except Exception:
             return {'error': 'Incorrect model data'}, 400
 
@@ -124,3 +170,33 @@ class BaseHandler:
     async def resp_get_enodo_hub_status(cls):
         data = {'version': VERSION}
         return {'data': data}
+
+    @classmethod
+    async def resp_get_enodo_config(cls):
+        return {'data': Config.get_settings()}
+
+    @classmethod
+    async def resp_set_config(cls, data):
+        section = data.get('section')
+        keys_and_values = data.get('entries')
+
+        for key in keys_and_values:
+            if Config.is_runtime_configurable(section, key):
+                # setattr(Config, key, section[key])
+                Config.update_settings(section, key, keys_and_values[key])
+        Config.write_settings()
+        return {'data': True}
+
+    @classmethod
+    async def resp_get_enodo_stats(cls):
+        return {'data': {
+            "no_series": SeriesManager.get_series_count(),
+            "no_ignored_series": SeriesManager.get_ignored_series_count(),
+            "no_open_jobs": EnodoJobManager.get_open_jobs_count(),
+            "no_active_jobs": EnodoJobManager.get_active_jobs_count(),
+            "no_failed_jobs": EnodoJobManager.get_failed_jobs_count(),
+            "no_listeners": ClientManager.get_listener_count(),
+            "no_workers": ClientManager.get_worker_count(),
+            "no_busy_workers": ClientManager.get_busy_worker_count(),
+            "no_output_streams": len(EnodoEventManager.outputs)
+        }}

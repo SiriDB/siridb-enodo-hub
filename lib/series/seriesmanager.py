@@ -17,7 +17,7 @@ from lib.socket.package import create_header, UPDATE_SERIES
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_DELETE
 from lib.util import safe_json_dumps
 
-from enodo.jobs import JOB_STATUS_DONE, JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_FORECAST_SERIES
+from enodo.jobs import JOB_STATUS_DONE, JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES_REALTIME
 
 
 class SeriesManager:
@@ -32,7 +32,10 @@ class SeriesManager:
     @classmethod
     async def series_changed(cls, change_type, series_name):
         if cls._update_cb is not None:
-            await cls._update_cb(change_type, series_name, await cls.get_series_to_dict())
+            if change_type == "delete":
+                await cls._update_cb(change_type, series_name, series_name)
+            else:
+                await cls._update_cb(change_type, (await cls.get_series(series_name)).to_dict(), series_name)
 
     @classmethod
     async def add_series(cls, series):
@@ -41,10 +44,10 @@ class SeriesManager:
                 collected_datapoints = await query_series_datapoint_count(ServerState.siridb_data_client, series.get('name'))
                 if collected_datapoints:
                     series['datapoint_count'] = collected_datapoints
-                    cls._series[series.get('name')] = await Series.from_dict(series)
+                    cls._series[series.get('name')] = Series.from_dict(series)
                     logging.info(f"Added new series: {series.get('name')}")
                     await cls.series_changed(SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name'))
-                    await cls.update_listeners(await cls.get_all_series())
+                    await cls.update_listeners(cls.get_all_series())
                     return True
         return False
 
@@ -56,21 +59,38 @@ class SeriesManager:
         return series
 
     @classmethod
-    async def get_all_series(cls):
+    def get_all_series(cls):
         return list(cls._series.keys())
+
+    @classmethod
+    def get_listener_info(cls):
+        data = {}
+        for series_name in cls._series:
+            data[series_name] = {
+                "realtime": JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES_REALTIME in cls._series[series_name].series_config.job_models
+            }
+        return data
+
+    @classmethod
+    def get_series_count(cls):
+        return len(list(cls._series.keys()))
+
+    @classmethod
+    def get_ignored_series_count(cls):
+        return len([cls._series[rid] for rid in cls._series if cls._series[rid].is_ignored is True])
 
     @classmethod
     async def get_series_to_dict(cls, regex_filter=None):
         if regex_filter is not None:
             pattern = re.compile(regex_filter)
-            return [await series.to_dict() for series in cls._series.values() if pattern.match(series.name)]
-        return [await series.to_dict() for series in cls._series.values()]
+            return [series.to_dict() for series in cls._series.values() if pattern.match(series.name)]
+        return [series.to_dict() for series in cls._series.values()]
 
     @classmethod
     async def remove_series(cls, series_name):
-        if series_name in cls._series:
-            del cls._series[series_name]
+        if series_name in cls._series:            
             await cls.series_changed(SUBSCRIPTION_CHANGE_TYPE_DELETE, series_name)
+            del cls._series[series_name]
             return True
         return False
 
@@ -137,14 +157,14 @@ class SeriesManager:
             f.close()
             series_data = json.loads(data)
             for s in series_data:
-                cls._series[s.get('name')] = await Series.from_dict(s)
+                cls._series[s.get('name')] = Series.from_dict(s)
 
     @classmethod
     async def save_to_disk(cls):
         try:
             serialized_series = []
             for series in cls._series.values():
-                serialized_series.append(await series.to_dict(static_only=True))
+                serialized_series.append(series.to_dict(static_only=True))
             f = open(Config.series_save_path, "w")
             f.write(json.dumps(serialized_series, default=safe_json_dumps))
             f.close()
