@@ -61,7 +61,7 @@ class SocketServer:
                     if 'client_type' in client_data:
                         if client_data.get('client_type') == 'listener':
                             await ClientManager.listener_connected(writer.get_extra_info('peername'), writer,
-                                                    client_data.get('version', None))
+                                                    client_data)
                             logging.info(f'New listener with id: {client_id}')
                         elif client_data.get('client_type') == 'worker':
                             supported_jobs_and_models = client_data.get('jobs_and_models')

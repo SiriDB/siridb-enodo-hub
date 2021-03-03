@@ -11,8 +11,6 @@ def prepare_logger(log_level_label):
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
     formatter = logging.Formatter(
-        # fmt='[%(levelname)1.1s %(asctime)s %(module)s:%(lineno)d] ' +
-        #     '%(message)s',
         fmt='[%(levelname)1.1s %(asctime)s hub] ' +
             '%(message)s',
         datefmt='%y%m%d %H:%M:%S',
