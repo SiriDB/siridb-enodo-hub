@@ -152,7 +152,6 @@ class Server:
                     # Check if requirement of min amount of datapoints is met
                     if await series.get_datapoints_count() >= Config.min_data_points or (
                         series.series_config.min_data_points is not None and series.get_datapoints_count() >= series.series_config.min_data_points):
-                        
                         # Check if base analysis is still open
                         if await series.get_job_status(JOB_TYPE_BASE_SERIES_ANALYSIS) == JOB_STATUS_NONE:
                             await EnodoJobManager.create_job(JOB_TYPE_BASE_SERIES_ANALYSIS, series_name)

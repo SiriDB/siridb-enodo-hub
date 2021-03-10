@@ -37,7 +37,7 @@ packetid, int     8bit
 total header length = 48 bits
 '''
 
-PACKET_HEADER_LEN = 48
+PACKET_HEADER_LEN = 6
 
 
 async def read_packet(sock, header_data=None):
@@ -54,9 +54,9 @@ async def read_packet(sock, header_data=None):
 
 
 def create_header(size, type, id):
-    return size.to_bytes(32, byteorder='big') + type.to_bytes(8, byteorder='big') + id.to_bytes(8, byteorder='big')
+    return size.to_bytes(4, byteorder='big') + type.to_bytes(1, byteorder='big') + id.to_bytes(1, byteorder='big')
 
 
 def read_header(binary_data):
-    return int.from_bytes(binary_data[:32], 'big'), int.from_bytes(binary_data[32:40], 'big'), int.from_bytes(
-        binary_data[40:48], 'big')
+    return int.from_bytes(binary_data[:4], 'big'), int.from_bytes(binary_data[4:5], 'big'), int.from_bytes(
+        binary_data[5:6], 'big')

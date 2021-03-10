@@ -77,23 +77,25 @@ class BaseHandler:
     async def resp_add_series(cls, data):
         required_fields = ['name', 'config']
         series_config = SeriesConfigModel.from_dict(data.get('config'))
-        for model_name in list(series_config.job_models.values()):
-            model_parameters = series_config.model_params
+        for job_config in list(series_config.job_config.values()):
+            model_parameters = job_config.model_params
 
-            model = await EnodoModelManager.get_model(model_name)
+            model = await EnodoModelManager.get_model(job_config.model)
             if model is None:
                 return {'error': 'Unknown model'}, 400
             if model_parameters is None and len(model.model_arguments.keys()) > 0:
-                return {'error': 'Missing required fields'}, 400
+                return {'error': 'Missing model parameters'}, 400
             for key in model.model_arguments:
                 if key not in model_parameters.keys():
-                    return {'error': f'Missing required field {key}'}, 400
+                    return {'error': f'Missing required model parameter {key}'}, 400
 
         # data['model_parameters'] = await setup_default_model_arguments(model_parameters)
 
         if all(required_field in data for required_field in required_fields):
             if not await SeriesManager.add_series(data):
                 return {'error': 'Something went wrong when adding the series. Are you sure the series exists?'}, 400
+        else:
+            return {'error': 'Series data does not include all required fields'}, 400
 
         return {'data': list(await SeriesManager.get_series_to_dict())}, 201
 
@@ -104,10 +106,10 @@ class BaseHandler:
         if not all(required_field in data for required_field in required_fields):
             return {'error': 'Something went wrong when updating the series. Missing required fields'}, 400
         series_config = SeriesConfigModel.from_dict(data.get('config'))
-        for model_name in list(series_config.job_models.values()):
-            model_parameters = series_config.model_params
+        for job_config in list(series_config.job_config.values()):
+            model_parameters = job_config.model_params
 
-            model = await EnodoModelManager.get_model(model_name)
+            model = await EnodoModelManager.get_model(job_config.name)
             if model is None:
                 return {'error': 'Unknown model'}, 400
             if model_parameters is None and len(model.model_arguments.keys()) > 0:

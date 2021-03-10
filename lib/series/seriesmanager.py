@@ -67,7 +67,7 @@ class SeriesManager:
         data = {}
         for series_name in cls._series:
             data[series_name] = {
-                "realtime": JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES_REALTIME in cls._series[series_name].series_config.job_models
+                "realtime": JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES_REALTIME in cls._series[series_name].series_config.job_config
             }
         return data
 
