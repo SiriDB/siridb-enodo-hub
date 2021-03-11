@@ -109,7 +109,7 @@ class BaseHandler:
         for job_config in list(series_config.job_config.values()):
             model_parameters = job_config.model_params
 
-            model = await EnodoModelManager.get_model(job_config.name)
+            model = await EnodoModelManager.get_model(job_config.model)
             if model is None:
                 return {'error': 'Unknown model'}, 400
             if model_parameters is None and len(model.model_arguments.keys()) > 0:
