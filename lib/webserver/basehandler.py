@@ -150,7 +150,7 @@ class BaseHandler:
 
     @classmethod
     async def resp_get_failed_jobs(cls):
-        return {'data': EnodoJobManager.get_failed_jobs()}
+        return {'data': [job.to_dict() for job in EnodoJobManager.get_failed_jobs()]}
 
     @classmethod
     async def resp_resolve_failed_job(cls, series_name):
