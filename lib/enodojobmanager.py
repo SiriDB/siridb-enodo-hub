@@ -268,7 +268,8 @@ class EnodoJobManager:
         if job is not None:
             job.error = error
             await cls._cancel_jobs_for_series(job.series_name)
-            cls._active_jobs.remove(job)
+            if job in cls._active_jobs:
+                cls._active_jobs.remove(job)
             del cls._active_jobs_index[job.rid]
             cls._failed_jobs.append(job)
 
