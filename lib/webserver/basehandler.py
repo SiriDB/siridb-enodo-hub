@@ -153,6 +153,10 @@ class BaseHandler:
         return {'data': EnodoJobManager.get_failed_jobs()}
 
     @classmethod
+    async def resp_resolve_failed_job(cls, series_name):
+        return {'data': EnodoJobManager.remove_failed_jobs_for_series(series_name)}
+
+    @classmethod
     async def resp_get_possible_analyser_models(cls):
         data = {
             'models': [EnodoModel.to_dict(model) for model in EnodoModelManager.models]

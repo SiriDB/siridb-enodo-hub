@@ -126,6 +126,11 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
+    async def resolve_failed_job(cls, sid, data, event=None):
+        return await BaseHandler.resp_resolve_failed_job(data.get('series_name'))
+
+    @classmethod
+    @socketio_auth_required
     async def get_event_outputs(cls, sid, data, event=None):
         return await BaseHandler.resp_get_event_outputs()
 
