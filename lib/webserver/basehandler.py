@@ -10,7 +10,7 @@ from lib.serverstate import ServerState
 from lib.siridb.siridb import query_series_data
 from lib.util import regex_valid
 from version import VERSION
-from lib.enodojobmanager import EnodoJobManager
+from lib.enodojobmanager import EnodoJobManager, EnodoJob
 from enodo.jobs import JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_STATUS_DONE
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
 from lib.config.config import Config
@@ -150,7 +150,7 @@ class BaseHandler:
 
     @classmethod
     async def resp_get_failed_jobs(cls):
-        return {'data': [job.to_dict() for job in EnodoJobManager.get_failed_jobs()]}
+        return {'data': [EnodoJob.to_dict(job) for job in EnodoJobManager.get_failed_jobs()]}
 
     @classmethod
     async def resp_resolve_failed_job(cls, series_name):
