@@ -4,6 +4,7 @@ from lib.socketio.subscriptionmanager import SubscriptionManager
 from lib.util import safe_json_dumps
 from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
+from lib.serverstate import ServerState
 
 
 def socketio_auth_required(handler):
