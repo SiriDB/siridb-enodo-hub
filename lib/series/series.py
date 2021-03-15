@@ -58,6 +58,12 @@ class Series:
     async def set_job_status(self, job_type, status):
         self.series_job_statuses[job_type] = status
 
+    def job_activated(self, job_type):
+        job_config = self.series_config.job_config.get(job_type)
+        if job_config is None or not job_config.activated:
+            return False
+        return True
+
     async def get_datapoints_count(self):
         return self._datapoint_count
 

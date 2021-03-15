@@ -6,7 +6,7 @@ import re
 
 import qpack
 
-from lib.config.config import Config
+from lib.config import Config
 from lib.events import EnodoEvent
 from lib.events.enodoeventmanager import ENODO_EVENT_ANOMALY_DETECTED, EnodoEventManager
 from lib.serverstate import ServerState
@@ -40,8 +40,8 @@ class SeriesManager:
     @classmethod
     async def add_series(cls, series):
         if series.get('name') not in cls._series:
-            if await does_series_exist(ServerState.siridb_data_client, series.get('name')):
-                collected_datapoints = await query_series_datapoint_count(ServerState.siridb_data_client, series.get('name'))
+            if await does_series_exist(ServerState.get_siridb_data_conn(), series.get('name')):
+                collected_datapoints = await query_series_datapoint_count(ServerState.get_siridb_data_conn(), series.get('name'))
                 if collected_datapoints:
                     series['datapoint_count'] = collected_datapoints
                     cls._series[series.get('name')] = Series.from_dict(series)
@@ -106,8 +106,8 @@ class SeriesManager:
     async def add_forecast_to_series(cls, series_name, points):
         series = cls._series.get(series_name, None)
         if series is not None:
-            await drop_series(ServerState.siridb_forecast_client, f'forecast_{series_name}')
-            await insert_points(ServerState.siridb_forecast_client, f'forecast_{series_name}', points)
+            await drop_series(ServerState.get_siridb_forecast_conn(), f'forecast_{series_name}')
+            await insert_points(ServerState.get_siridb_forecast_conn(), f'forecast_{series_name}', points)
             await series.set_job_status(JOB_TYPE_FORECAST_SERIES, JOB_STATUS_DONE)
 
             # date_1 = datetime.datetime.now()
@@ -122,20 +122,20 @@ class SeriesManager:
             event = EnodoEvent('Anomaly detected!', f'{len(points)} anomalies detected for series {series_name}',
                                ENODO_EVENT_ANOMALY_DETECTED)
             await EnodoEventManager.handle_event(event)
-            await drop_series(ServerState.siridb_forecast_client, f'anomalies_{series_name}')
-            await insert_points(ServerState.siridb_forecast_client, f'anomalies_{series_name}', points)
+            await drop_series(ServerState.get_siridb_forecast_conn(), f'anomalies_{series_name}')
+            await insert_points(ServerState.get_siridb_forecast_conn(), f'anomalies_{series_name}', points)
             await series.set_job_status(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_STATUS_DONE)
 
     @classmethod
     async def get_series_forecast(cls, series_name):
-        values = await query_series_data(ServerState.siridb_forecast_client, f'forecast_{series_name}')
+        values = await query_series_data(ServerState.get_siridb_forecast_conn(), f'forecast_{series_name}')
         if values is not None:
             return values.get(f'forecast_{series_name}', None)
         return None
 
     @classmethod
     async def get_series_anomalies(cls, series_name):
-        values = await query_series_data(ServerState.siridb_forecast_client, f'anomalies_{series_name}')
+        values = await query_series_data(ServerState.get_siridb_forecast_conn(), f'anomalies_{series_name}')
         if values is not None:
             return values.get(f'anomalies_{series_name}', None)
         return None

@@ -11,7 +11,7 @@ from enodo.model.config.worker import WORKER_MODE_GLOBAL, WORKER_MODE_DEDICATED_
     WORKER_MODE_DEDICATED_SERIES
 
 from .events.enodoeventmanager import EnodoEvent, EnodoEventManager, ENODO_EVENT_JOB_QUEUE_TOO_LONG, ENODO_EVENT_STATIC_RULE_FAIL
-from .config.config import Config
+from .config import Config
 from .series.seriesmanager import SeriesManager
 from .series import SERIES_ANALYSED_STATUS_DONE
 from .serverstate import ServerState
@@ -421,7 +421,7 @@ class EnodoJobManager:
         try:
             job_data = {
                 'next_job_id': cls._next_job_id,
-                'open_jobs': [EnodoJob.to_dict(job) for job in cls._open_jobs],
+                # 'open_jobs': [EnodoJob.to_dict(job) for job in cls._open_jobs],
                 'failed_jobs': [EnodoJob.to_dict(job) for job in cls._failed_jobs],
             }
             f = open(Config.jobs_save_path, "w")
@@ -450,9 +450,9 @@ class EnodoJobManager:
         if isinstance(data, dict):
             if 'next_job_id' in data:
                 cls._next_job_id = int(data.get('next_job_id'))
-            if 'open_jobs' in data:
-                loaded_open_jobs += len(data.get('open_jobs'))
-                cls._open_jobs = [EnodoJob.from_dict(job_data) for job_data in data.get('open_jobs')]
+            # if 'open_jobs' in data:
+            #     loaded_open_jobs += len(data.get('open_jobs'))
+            #     cls._open_jobs = [EnodoJob.from_dict(job_data) for job_data in data.get('open_jobs')]
             if 'failed_jobs' in data:
                 loaded_failed_jobs += len(data.get('failed_jobs'))
                 cls._failed_jobs = [EnodoJob.from_dict(job_data) for job_data in data.get('failed_jobs')]
@@ -460,6 +460,6 @@ class EnodoJobManager:
         await cls._build_index()
 
         logging.info(
-            f'Loaded {loaded_open_jobs} open jobs and {loaded_failed_jobs} failed jobs from disk')
+            f'Loaded {loaded_failed_jobs} failed jobs from disk')
 
         cls._unlock()

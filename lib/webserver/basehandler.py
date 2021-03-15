@@ -13,7 +13,7 @@ from version import VERSION
 from lib.enodojobmanager import EnodoJobManager, EnodoJob
 from enodo.jobs import JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_STATUS_DONE
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
-from lib.config.config import Config
+from lib.config import Config
 from lib.socket.clientmanager import ClientManager
 
 
@@ -39,7 +39,7 @@ class BaseHandler:
 
         series_data = series.to_dict()
         if include_points:
-            series_points = await query_series_data(ServerState.siridb_data_client, series.name, "*")
+            series_points = await query_series_data(ServerState.get_siridb_data_conn(), series.name, "*")
             series_data['points'] = series_points.get(series.name)
         if await series.get_job_status(JOB_TYPE_FORECAST_SERIES) == JOB_STATUS_DONE:
             series_data['forcasted'] = True
@@ -191,6 +191,7 @@ class BaseHandler:
                 # setattr(Config, key, section[key])
                 Config.update_settings(section, key, keys_and_values[key])
         Config.write_settings()
+        await ServerState.setup_siridb_connection()
         return {'data': True}
 
     @classmethod

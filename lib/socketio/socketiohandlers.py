@@ -245,6 +245,19 @@ class SocketIoHandler:
         return resp
 
     @classmethod
+    @socketio_auth_required
+    async def subscribe_siridb_status(cls, sid, data, event):
+        if cls._sio is not None:
+            cls._sio.enter_room(sid, 'siridb_status_updates')
+            return ServerState.siridb_conn_status
+
+    @classmethod
+    @socketio_auth_required
+    async def unsubscribe_siridb_status(cls, sid, data, event):
+        if cls._sio is not None:
+            cls._sio.leave_room(sid, 'siridb_status_updates')
+
+    @classmethod
     async def internal_updates_queue_subscribers(cls, change_type, job):
         if cls._sio is not None:
             await cls._sio.emit('update', {
