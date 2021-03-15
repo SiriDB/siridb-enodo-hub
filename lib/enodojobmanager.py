@@ -3,6 +3,7 @@ import datetime
 import json
 import logging
 import os
+import datetime
 
 import qpack
 from enodo.jobs import *
@@ -42,7 +43,10 @@ class EnodoJob:
     def to_dict(cls, job):
         resp = {}
         for slot in cls.__slots__:
-            resp[slot] = getattr(job, slot)
+            if isinstance(getattr(job, slot), datetime.datetime):
+                resp[slot] = int(getattr(job, slot).timestamp())
+            else:
+                resp[slot] = getattr(job, slot)
         return resp
 
     @classmethod
