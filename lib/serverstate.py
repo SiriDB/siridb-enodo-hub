@@ -68,7 +68,7 @@ class ServerState:
     def get_siridb_forecast_conn_status(cls):
         if cls.siridb_forecast_client is None:
             return cls.siridb_data_client._connect_task is None
-        cls.siridb_forecast_client._connect_task is None
+        return cls.siridb_forecast_client._connect_task is None
 
     @classmethod
     async def refresh_siridb_status(cls):
