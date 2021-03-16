@@ -185,12 +185,11 @@ class BaseHandler:
     async def resp_set_config(cls, data):
         section = data.get('section')
         keys_and_values = data.get('entries')
-
         for key in keys_and_values:
             if Config.is_runtime_configurable(section, key):
-                # setattr(Config, key, section[key])
                 Config.update_settings(section, key, keys_and_values[key])
         Config.write_settings()
+        Config.setup_settings_variables()
         await ServerState.setup_siridb_connection()
         return {'data': True}
 
