@@ -7,7 +7,23 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
  
+## [0.1.0-beta2.1] - 2021-03-17
+  
+Migration: series config's are changed completely. Removing series.json from the data folder is necessary. You will need to re-add the series after this.
+ 
+### Added
 
+- Support for series management page in the GUI
+ 
+### Changed
+  
+- Series config is changed. Mainly the job config is setup per job type. This includes `model_params`
+- Package size is change, removed unnecessary bytes
+ 
+### Fixed
+ 
+- Bug with job management
+- Model fetching
  
 ## [0.1.0-beta2.0] - 2021-03-04
   
