@@ -203,7 +203,6 @@ class ClientManager:
 
     @classmethod
     async def check_clients_alive(cls, max_timeout):
-        clients_to_remove = []
         for client in cls.listeners:
             listener = cls.listeners.get(client)
             if listener.online and (datetime.datetime.now() - listener.last_seen) \
@@ -248,9 +247,9 @@ class ClientManager:
 
     @classmethod
     async def check_for_pending_series(cls, client):
-        from ..enodojobmanager import EnodoJobManager
+        from ..enodojobmanager import EnodoJobManager ## To stop circular import
         pending_jobs = EnodoJobManager.get_active_jobs_by_worker(client.client_id)
-        if len(pending_jobs):
+        if len(pending_jobs) > 0:
             for job in pending_jobs:
                 await EnodoJobManager.cancel_job(job)
                 series = await cls.series_manager.get_series(job.series_name)

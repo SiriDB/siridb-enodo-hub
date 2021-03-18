@@ -2,7 +2,7 @@ import argparse
 import asyncio
 import os
 
-from lib.config.config import Config
+from lib.config import Config
 from server import Server
 
 

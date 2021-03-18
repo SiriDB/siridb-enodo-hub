@@ -2,7 +2,7 @@ import json
 import os
 
 from enodo import EnodoModel
-from lib.config.config import Config
+from lib.config import Config
 from lib.util import safe_json_dumps
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_DELETE
 

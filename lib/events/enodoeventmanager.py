@@ -8,7 +8,7 @@ import aiohttp
 import json
 from jinja2 import Environment, PackageLoader
 
-from lib.config.config import Config
+from lib.config import Config
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_UPDATE, SUBSCRIPTION_CHANGE_TYPE_DELETE
 from lib.serverstate import ServerState
 

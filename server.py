@@ -10,7 +10,7 @@ from enodo.protocol.packagedata import *
 
 from lib.analyser.model import EnodoModelManager
 from lib.api.apihandlers import ApiHandlers, auth
-from lib.config.config import Config
+from lib.config import Config
 from lib.events.enodoeventmanager import EnodoEventManager
 from lib.enodojobmanager import EnodoJobManager
 from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_STATIC_RULES, JOB_STATUS_NONE, JOB_STATUS_DONE
@@ -44,24 +44,13 @@ class Server:
         self._watch_series_task = None
         self._save_to_disk_task = None
         self._check_jobs_task = None
-        self._cleanup_clients_task = None
+        self._connection_management_task = None
 
         self._watch_tasks_task = None
 
     async def start_up(self):
         # Setup server state object
-        await ServerState.async_setup(sio=self.sio,
-                                      siridb_data_username=Config.siridb_user,
-                                      siridb_data_password=Config.siridb_password,
-                                      siridb_data_dbname=Config.siridb_database,
-                                      siridb_data_hostlist=[
-                                          (Config.siridb_host, Config.siridb_port)],
-                                      siridb_forecast_username=Config.siridb_forecast_user,
-                                      siridb_forecast_password=Config.siridb_forecast_password,
-                                      siridb_forecast_dbname=Config.siridb_forecast_database,
-                                      siridb_forecast_hostlist=[
-                                          (Config.siridb_forecast_host, Config.siridb_forecast_port)]
-                                      )
+        await ServerState.async_setup(sio=self.sio)
 
         # Setup internal security token for authenticating backend socket connections
         logging.info('Setting up internal communications token...')
@@ -100,8 +89,8 @@ class Server:
         self._save_to_disk_task = self.loop.create_task(self.save_to_disk())
         self._check_jobs_task = self.loop.create_task(
             EnodoJobManager.check_for_jobs())
-        self._cleanup_clients_task = self.loop.create_task(
-            self._cleanup_clients())
+        self._connection_management_task = self.loop.create_task(
+            self._manage_connections())
         self._watch_tasks_task = self.loop.create_task(self.watch_tasks())
 
         # Open backend socket connection
@@ -115,16 +104,18 @@ class Server:
         self._watch_series_task.cancel()
         self._check_jobs_task.cancel()
         self._save_to_disk_task.cancel()
-        self._cleanup_clients_task.cancel()
+        self._connection_management_task.cancel()
         self._watch_tasks_task.cancel()
         await self.backend_socket.stop()
 
-    async def _cleanup_clients(self):
+    async def _manage_connections(self):
         while ServerState.running:
             await asyncio.sleep(Config.save_to_disk_interval)
-            ServerState.tasks_last_runs['cleanup_clients'] = datetime.datetime.now()
+            ServerState.tasks_last_runs['manage_connections'] = datetime.datetime.now()
             logging.debug('Cleaning-up clients')
             await ClientManager.check_clients_alive(Config.client_max_timeout)
+            logging.debug('Refreshing SiriDB connection status')
+            await ServerState.refresh_siridb_status()
 
     async def watch_tasks(self):
         while ServerState.running:
@@ -152,39 +143,40 @@ class Server:
                     # Check if requirement of min amount of datapoints is met
                     if await series.get_datapoints_count() >= Config.min_data_points or (
                         series.series_config.min_data_points is not None and series.get_datapoints_count() >= series.series_config.min_data_points):
-                        
-                        # Check if base analysis is still open
-                        if await series.get_job_status(JOB_TYPE_BASE_SERIES_ANALYSIS) == JOB_STATUS_NONE:
-                            await EnodoJobManager.create_job(JOB_TYPE_BASE_SERIES_ANALYSIS, series_name)
-                        else:
-                            try:
-                                # Check if base analysis is done and series does not have any failed jobs
-                                if await series.get_job_status(JOB_TYPE_BASE_SERIES_ANALYSIS) == JOB_STATUS_DONE and \
-                                    not len(EnodoJobManager.get_failed_jobs_for_series(series_name)):
+                        try:
+                            # Check if series does not have any failed jobs
+                            if not len(EnodoJobManager.get_failed_jobs_for_series(series_name)):
 
-                                    # If forecast job is not pending and job is due
-                                    if (await series.get_job_status(JOB_TYPE_FORECAST_SERIES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
-                                        await series.is_job_due(JOB_TYPE_FORECAST_SERIES):
+                                if series.job_activated(JOB_TYPE_BASE_SERIES_ANALYSIS) \
+                                    and await series.get_job_status(JOB_TYPE_BASE_SERIES_ANALYSIS) == JOB_STATUS_NONE:
+                                    await EnodoJobManager.create_job(JOB_TYPE_BASE_SERIES_ANALYSIS, series_name)
 
-                                        await EnodoJobManager.create_job(JOB_TYPE_FORECAST_SERIES, series_name)
-                                        continue
+                                # If forecast job is not pending and job is due
+                                if series.job_activated(JOB_TYPE_FORECAST_SERIES) \
+                                    and (await series.get_job_status(JOB_TYPE_FORECAST_SERIES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
+                                    await series.is_job_due(JOB_TYPE_FORECAST_SERIES):
+
+                                    await EnodoJobManager.create_job(JOB_TYPE_FORECAST_SERIES, series_name)
+                                    continue
+                                
+                                # If anomaly detect job is not pending and job is due
+                                if series.job_activated(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES) \
+                                    and (await series.get_job_status(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
+                                    await series.is_job_due(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES):
                                     
-                                    # If anomaly detect job is not pending and job is due
-                                    if (await series.get_job_status(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
-                                        await series.is_job_due(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES):
-                                        
-                                        await EnodoJobManager.create_job(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, series_name)
-                                        continue
+                                    await EnodoJobManager.create_job(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, series_name)
+                                    continue
 
-                                     # If anomaly detect job is not pending and job is due
-                                    if (await series.get_job_status(JOB_TYPE_STATIC_RULES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
-                                        await series.is_job_due(JOB_TYPE_STATIC_RULES):
-                                        
-                                        await EnodoJobManager.create_job(JOB_TYPE_STATIC_RULES, series_name)
-                                        continue
-                            except Exception as e:
-                                logging.error(f"Something went wrong when trying to create new job")
-                                logging.debug(f"Corresponding error: {e}")
+                                # If anomaly detect job is not pending and job is due
+                                if series.job_activated(JOB_TYPE_STATIC_RULES) \
+                                    and (await series.get_job_status(JOB_TYPE_STATIC_RULES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
+                                    await series.is_job_due(JOB_TYPE_STATIC_RULES):
+                                    
+                                    await EnodoJobManager.create_job(JOB_TYPE_STATIC_RULES, series_name)
+                                    continue
+                        except Exception as e:
+                            logging.error(f"Something went wrong when trying to create new job")
+                            logging.debug(f"Corresponding error: {e}")
 
             await asyncio.sleep(Config.watcher_interval)
 

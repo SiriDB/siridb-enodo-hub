@@ -47,7 +47,7 @@ class Series:
         return EnodoJobManager.has_series_failed_jobs(self.name)
 
     async def get_model(self, job_type):
-        return self.series_config.get_model_for_job(job_type)
+        return self.series_config.get_config_for_job(job_type).model
 
     async def get_job_status(self, job_type):
         status = self.series_job_statuses.get(job_type)
@@ -57,6 +57,12 @@ class Series:
 
     async def set_job_status(self, job_type, status):
         self.series_job_statuses[job_type] = status
+
+    def job_activated(self, job_type):
+        job_config = self.series_config.job_config.get(job_type)
+        if job_config is None or not job_config.activated:
+            return False
+        return True
 
     async def get_datapoints_count(self):
         return self._datapoint_count
@@ -71,13 +77,13 @@ class Series:
             self._datapoint_count += add_to_count
 
     async def schedule_job(self, job_type):
-        if job_type in self.series_config.job_models:
-            if job_type in self._job_schedule and job_type in self.series_config.job_schedule:
+        if job_type in self.series_config.job_config:
+            if job_type in self._job_schedule:
                 if self._job_schedule[job_type] <= self._datapoint_count:
-                    self._job_schedule[job_type] = self._datapoint_count + self.series_config.job_schedule[job_type]
+                    self._job_schedule[job_type] = self._datapoint_count + self.series_config.job_config[job_type].job_schedule
 
     async def is_job_due(self, job_type):
-        if job_type not in self.series_config.job_models:
+        if job_type not in self.series_config.job_config:
             return False
         
         if self.series_job_statuses.get(job_type) != JOB_STATUS_DONE:

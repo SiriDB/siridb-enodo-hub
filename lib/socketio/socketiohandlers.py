@@ -4,6 +4,7 @@ from lib.socketio.subscriptionmanager import SubscriptionManager
 from lib.util import safe_json_dumps
 from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
+from lib.serverstate import ServerState
 
 
 def socketio_auth_required(handler):
@@ -126,6 +127,11 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
+    async def resolve_failed_job(cls, sid, data, event=None):
+        return await BaseHandler.resp_resolve_failed_job(data.get('series_name'))
+
+    @classmethod
+    @socketio_auth_required
     async def get_event_outputs(cls, sid, data, event=None):
         return await BaseHandler.resp_get_event_outputs()
 
@@ -238,6 +244,19 @@ class SocketIoHandler:
     async def get_enodo_stats(cls, sid, data, event):
         resp = await BaseHandler.resp_get_enodo_stats()
         return resp
+
+    @classmethod
+    @socketio_auth_required
+    async def subscribe_siridb_status(cls, sid, data, event):
+        if cls._sio is not None:
+            cls._sio.enter_room(sid, 'siridb_status_updates')
+            return ServerState.siridb_conn_status
+
+    @classmethod
+    @socketio_auth_required
+    async def unsubscribe_siridb_status(cls, sid, data, event):
+        if cls._sio is not None:
+            cls._sio.leave_room(sid, 'siridb_status_updates')
 
     @classmethod
     async def internal_updates_queue_subscribers(cls, change_type, job):

@@ -59,6 +59,9 @@ class SocketIoRouter:
             event='/api/job/failed',
             handler=SocketIoHandler.get_failed_jobs)
         self._sio_on(
+            event='/api/job/failed/resolve',
+            handler=SocketIoHandler.resolve_failed_job)
+        self._sio_on(
             event='/api/enodo/settings',
             handler=SocketIoHandler.get_enodo_settings)
         self._sio_on(
@@ -86,6 +89,9 @@ class SocketIoRouter:
         self._sio_on(
             event='/subscribe/event/output',
             handler=SocketIoHandler.subscribe_event_output)
+        self._sio_on(
+            event='/subscribe/siridb/status',
+            handler=SocketIoHandler.subscribe_siridb_status)
 
     def _sio_on(self, event, handler):
         async def fun(sid, data):

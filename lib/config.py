@@ -190,6 +190,20 @@ class Config:
         cls.setup_settings_variables()
 
     @classmethod
+    def get_siridb_settings(cls):
+        return {
+            "username": cls.siridb_user,
+            "password": cls.siridb_password,
+            "dbname": cls.siridb_database,
+            "hostlist": [(cls.siridb_host, cls.siridb_port)]
+        }, {
+            "username":  cls.siridb_forecast_user,
+            "password": cls.siridb_forecast_password,
+            "dbname": cls.siridb_forecast_database,
+            "hostlist": [(cls.siridb_forecast_host, cls.siridb_forecast_port)]
+        }
+
+    @classmethod
     def update_settings(cls, section, key, value):
         cls._settings[section][key] = value
 
