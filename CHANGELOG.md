@@ -6,7 +6,13 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
- 
+
+## [0.1.0-beta2.1.1] - 2021-03-19
+
+### Fixed
+
+- Fixed siridb connection status update for subscribers socket.io before socket.io is setup
+
 ## [0.1.0-beta2.1] - 2021-03-17
   
 Migration: series config's are changed completely. Removing series.json from the data folder is necessary. You will need to re-add the series after this.
