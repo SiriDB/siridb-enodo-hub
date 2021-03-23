@@ -20,7 +20,7 @@ To get the Enodo Hub setup you need to following the following steps:
 ### Locally
 
 1. Install dependencies via `pip3 install -r requirements.txt`
-2. Setup a .conf file file `python3 main.py --create_config` There will be made a `default.conf` next to the main.py.
+2. Setup a .conf file file `python3 main.py --create-config` There will be made a `default.conf` next to the main.py.
 3. Fill in the `default.conf` file
 4. Call `python3 main.py --config=default.conf` to start the hub.
 5. Fill `in settings.endo` file, which you can find in the data folder by the path set in the conf file with key: `enodo_base_save_path`
