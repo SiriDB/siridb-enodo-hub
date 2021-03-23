@@ -18,8 +18,6 @@ if __name__ == '__main__':
     if parser.parse_args().create_config:
         Config.create_standard_config_file(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default.conf'))
         exit()
-    # elif not parser.parse_args().config:
-    #     parser.error('No config given')
 
     loop = asyncio.get_event_loop()
 

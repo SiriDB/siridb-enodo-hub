@@ -129,7 +129,6 @@ class BaseHandler:
 
     @classmethod
     async def resp_remove_series(cls, series_name):
-        # TODO: REMOVE JOBS, EVENTS ETC
         if await SeriesManager.remove_series(series_name):
             await EnodoJobManager.cancel_jobs_for_series(series_name)
             EnodoJobManager.remove_failed_jobs_for_series(series_name)

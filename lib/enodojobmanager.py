@@ -357,11 +357,10 @@ class EnodoJobManager:
                     await series.set_job_status(JOB_TYPE_STATIC_RULES, JOB_STATUS_DONE)
                     if len(data.get('failed_checks')):
                         for key in data.get('failed_checks'):
-                            event = EnodoEvent('Static rule failed!', 
+                            event = EnodoEvent('Static rule failed!',
                                 f'Series {data.get("name")} failed a static rule ({key}): {data.get("failed_checks")[key]}',
                                 ENODO_EVENT_STATIC_RULE_FAIL)
                             await EnodoEventManager.handle_event(event)
-                    # TODO Create custom event and raise it
                     await SeriesManager.series_changed(SUBSCRIPTION_CHANGE_TYPE_UPDATE, data.get('name'))
                 except Exception as e:
                     logging.error(f"Something went wrong when receiving base analysis job")

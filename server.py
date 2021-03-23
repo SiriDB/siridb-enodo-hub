@@ -182,6 +182,9 @@ class Server:
 
     @staticmethod
     async def _save_to_disk():
+        """
+        Call all save to disk methods from various manager classes
+        """
         await SeriesManager.save_to_disk()
         await EnodoJobManager.save_to_disk()
         await EnodoEventManager.save_to_disk()
@@ -309,6 +312,7 @@ class Server:
             logging.getLogger('aiohttp').setLevel(logging.ERROR)
             logging.getLogger('socketio').setLevel(logging.ERROR)
             logging.getLogger('engineio').setLevel(logging.ERROR)
+            logging.getLogger('siridb.connector').setLevel(logging.ERROR)
 
         self.app.on_shutdown.append(self._stop_server_from_aiohttp_cleanup)
         self.loop.run_until_complete(self.start_up())

@@ -100,9 +100,9 @@ class ServerState:
             cls.siridb_conn_status = status
             if cls.sio is not None:
                 await cls.sio.emit('update', {
-                        'resource': 'siridb_status',
-                        'updateType': SUBSCRIPTION_CHANGE_TYPE_INITIAL,
-                        'resourceData': cls.siridb_conn_status
+                    'resource': 'siridb_status',
+                    'updateType': SUBSCRIPTION_CHANGE_TYPE_INITIAL,
+                    'resourceData': cls.siridb_conn_status
                     }, room='siridb_status_updates')
 
     @classmethod
