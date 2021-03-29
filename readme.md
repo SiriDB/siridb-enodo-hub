@@ -90,7 +90,7 @@ call http://localhost/api/enodo/event/output/{output_id} (DELETE)
 When sending payload in a request, use the data structure same as in the REST API calls, except the data will be wrapped in an object : `{"data": ...}`.
 
 #### Get series
-event: `/api/series/create`
+event: `/api/series`
 
 #### Get series Details
 event: `/api/series/details`

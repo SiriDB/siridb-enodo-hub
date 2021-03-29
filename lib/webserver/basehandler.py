@@ -76,6 +76,8 @@ class BaseHandler:
     @classmethod
     async def resp_add_series(cls, data):
         required_fields = ['name', 'config']
+        if not all(required_field in data for required_field in required_fields):
+            return {'error': 'Series data does not include all required fields'}, 400
         series_config = SeriesConfigModel.from_dict(data.get('config'))
         for job_config in list(series_config.job_config.values()):
             model_parameters = job_config.model_params
@@ -91,12 +93,9 @@ class BaseHandler:
 
         # data['model_parameters'] = await setup_default_model_arguments(model_parameters)
 
-        if all(required_field in data for required_field in required_fields):
-            if not await SeriesManager.add_series(data):
-                return {'error': 'Something went wrong when adding the series. Are you sure the series exists?'}, 400
-        else:
-            return {'error': 'Series data does not include all required fields'}, 400
-
+        if not await SeriesManager.add_series(data):
+            return {'error': 'Something went wrong when adding the series. Are you sure the series exists?'}, 400
+       
         return {'data': list(await SeriesManager.get_series_to_dict())}, 201
 
 

@@ -142,7 +142,7 @@ class Server:
 
                     # Check if requirement of min amount of datapoints is met
                     if await series.get_datapoints_count() >= Config.min_data_points or (
-                        series.series_config.min_data_points is not None and series.get_datapoints_count() >= series.series_config.min_data_points):
+                        series.series_config.min_data_points is not None and (await series.get_datapoints_count()) >= series.series_config.min_data_points):
                         try:
                             # Check if series does not have any failed jobs
                             if not len(EnodoJobManager.get_failed_jobs_for_series(series_name)):
