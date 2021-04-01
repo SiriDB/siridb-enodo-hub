@@ -64,7 +64,7 @@ class Series:
             return False
         return True
 
-    async def get_datapoints_count(self):
+    def get_datapoints_count(self):
         return self._datapoint_count
 
     async def add_to_datapoints_count(self, add_to_count):
