@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Changed
 - Arguments underscore to dash
+- Using Prophet package instead of fbprophet
+
+### Fixed
+
+- Guard statement adding serie handler
 
 ## [0.1.0-beta2.1.1] - 2021-03-19
 
