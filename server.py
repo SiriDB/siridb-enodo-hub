@@ -141,7 +141,7 @@ class Server:
                         and not series.is_ignored():
 
                     # Check if requirement of min amount of datapoints is met
-                    if await series.get_datapoints_count() >= Config.min_data_points or (
+                    if series.get_datapoints_count() >= Config.min_data_points or (
                         series.series_config.min_data_points is not None and series.get_datapoints_count() >= series.series_config.min_data_points):
                         try:
                             # Check if series does not have any failed jobs
