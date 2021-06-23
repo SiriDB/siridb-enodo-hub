@@ -404,7 +404,7 @@ class EnodoJobManager:
         job_id = data.get('job_id')
         worker = await ClientManager.get_worker_by_id(client_id)
         if job_id in cls._active_jobs_index:
-            await cls.set_job_failed(job_id, "")
+            await cls.set_job_failed(job_id, "Worker cancelled job. Check worker logging for details")
         logging.error(f"Worker {client_id} cancelled job {job_id}")
         if worker is None:
             return
