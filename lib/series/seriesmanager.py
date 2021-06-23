@@ -47,7 +47,7 @@ class SeriesManager:
                     cls._series[series.get('name')] = Series.from_dict(series)
                     logging.info(f"Added new series: {series.get('name')}")
                     await cls.series_changed(SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name'))
-                    await cls.update_listeners(cls.get_all_series())
+                    await cls.update_listeners(cls.get_listener_series_info())
                     return True
         return False
 
@@ -61,6 +61,10 @@ class SeriesManager:
     @classmethod
     def get_all_series(cls):
         return list(cls._series.keys())
+
+    @classmethod
+    def get_listener_series_info(cls):
+        return [{"name": series_name, "realtime": series.series_config.realtime} for series_name, series in cls._series.items()]
 
     @classmethod
     def get_listener_info(cls):

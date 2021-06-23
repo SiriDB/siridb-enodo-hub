@@ -78,7 +78,11 @@ class BaseHandler:
         required_fields = ['name', 'config']
         if not all(required_field in data for required_field in required_fields):
             return {'error': 'Series data does not include all required fields'}, 400
-        series_config = SeriesConfigModel.from_dict(data.get('config'))
+        try:
+            series_config = SeriesConfigModel.from_dict(data.get('config'))
+        except Exception as e:
+            print(e)
+            return {'error': f'Invalid series config'}, 400
         for job_config in list(series_config.job_config.values()):
             model_parameters = job_config.model_params
 

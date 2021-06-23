@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+### Added
+- Added realtime property to series config, to control speed of updates from listener to hub for that series
+
 ### Changed
 - Arguments underscore to dash
 - Using Prophet package instead of fbprophet
