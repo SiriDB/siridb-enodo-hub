@@ -281,6 +281,12 @@ class Server:
                 "/api/enodo/event/output", ApiHandlers.add_enodo_event_output)
             self.app.router.add_get(
                 "/api/enodo/stats", ApiHandlers.get_enodo_stats)
+            self.app.router.add_get(
+                "/api/enodo/label", ApiHandlers.get_enodo_labels, allow_head=False)
+            self.app.router.add_post(
+                "/api/enodo/label", ApiHandlers.add_enodo_label)
+            self.app.router.add_delete(
+                "/api/enodo/label", ApiHandlers.remove_enodo_label)
 
             # Add internal api routes
             self.app.router.add_get(

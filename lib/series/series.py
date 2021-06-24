@@ -7,7 +7,7 @@ from enodo.model.config.series import SeriesConfigModel
 class Series:
     # detecting_anomalies_status forecast_status series_analysed_status
     __slots__ = (
-        'rid', 'name', 'series_config', 'series_job_statuses', '_datapoint_count', '_datapoint_count_lock', '_job_schedule', 'series_characteristics')
+        'rid', 'name', 'series_config', 'series_job_statuses', '_datapoint_count', '_datapoint_count_lock', '_job_schedule', 'series_characteristics', 'health')
 
     def __init__(self, name, config, datapoint_count, job_statuses=None, series_characteristics=None, job_schedule=None, **kwargs):
         self.rid = name
@@ -24,6 +24,7 @@ class Series:
 
         self._datapoint_count = datapoint_count
         self._datapoint_count_lock = False
+        self.health = 100
         
     async def set_datapoints_counter_lock(self, is_locked):
         """

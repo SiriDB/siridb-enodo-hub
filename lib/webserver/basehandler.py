@@ -208,3 +208,20 @@ class BaseHandler:
             "no_busy_workers": ClientManager.get_busy_worker_count(),
             "no_output_streams": len(EnodoEventManager.outputs)
         }}
+
+    @classmethod
+    async def resp_get_enodo_labels(cls):
+        data = SeriesManager.get_labels_data()
+        return {'data': data}
+
+    @classmethod
+    async def resp_add_enodo_label(cls, data):
+        SeriesManager.add_label(data.get('name'), data.get('grouptag'))
+        return {'data': True}
+
+    @classmethod
+    async def resp_remove_enodo_label(cls, data):
+        data = SeriesManager.remove_label(data.get('grouptag'))
+        if not data:
+            return {'error': "Cannot remove label"}, 400
+        return {'data': data}

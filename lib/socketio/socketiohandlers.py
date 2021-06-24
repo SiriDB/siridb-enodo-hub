@@ -1,4 +1,5 @@
 import functools
+from lib.series.seriesmanager import SeriesManager
 
 from lib.socketio.subscriptionmanager import SubscriptionManager
 from lib.util import safe_json_dumps
@@ -257,6 +258,21 @@ class SocketIoHandler:
     async def unsubscribe_siridb_status(cls, sid, data, event):
         if cls._sio is not None:
             cls._sio.leave_room(sid, 'siridb_status_updates')
+
+    @classmethod
+    @socketio_auth_required
+    async def get_enodo_labels(cls, sid, data, event):
+        return BaseHandler.resp_get_enodo_labels()
+
+    @classmethod
+    @socketio_auth_required
+    async def add_enodo_label(cls, sid, data, event):
+        return BaseHandler.resp_add_enodo_label(data)
+
+    @classmethod
+    @socketio_auth_required
+    async def remove_enodo_label(cls, sid, data, event):
+        return BaseHandler.resp_remove_enodo_label(data)
 
     @classmethod
     async def internal_updates_queue_subscribers(cls, change_type, job):

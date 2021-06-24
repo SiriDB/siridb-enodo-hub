@@ -22,12 +22,16 @@ from enodo.jobs import JOB_STATUS_DONE, JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_
 
 class SeriesManager:
     _series = None
+    _labels = None
+    _labels_last_update = None
     _update_cb = None
 
     @classmethod
     async def prepare(cls, update_cb=None):
         cls._series = {}
         cls._update_cb = update_cb
+        cls._labels = {}
+        cls._labels_last_update = None
 
     @classmethod
     async def series_changed(cls, change_type, series_name):
@@ -67,13 +71,22 @@ class SeriesManager:
         return [{"name": series_name, "realtime": series.series_config.realtime} for series_name, series in cls._series.items()]
 
     @classmethod
-    def get_listener_info(cls):
-        data = {}
-        for series_name in cls._series:
-            data[series_name] = {
-                "realtime": JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES_REALTIME in cls._series[series_name].series_config.job_config
-            }
-        return data
+    def get_labels_data(cls):
+        return {
+            "last_update": cls._labels_last_update,
+            "labels": list(cls._labels.values())
+        }
+
+    @classmethod
+    def add_label(cls, name, grouptag):
+        cls._labels[grouptag] = {"name": name, "grouptag": grouptag}
+
+    @classmethod
+    def remove_label(cls, grouptag):
+        if grouptag in cls._labels:
+            del cls._labels[grouptag]
+            return True
+        return False
 
     @classmethod
     def get_series_count(cls):
@@ -159,9 +172,15 @@ class SeriesManager:
             f = open(Config.series_save_path, "r")
             data = f.read()
             f.close()
-            series_data = json.loads(data)
-            for s in series_data:
-                cls._series[s.get('name')] = Series.from_dict(s)
+            data = json.loads(data)
+            series_data = data.get('series')
+            if series_data is not None:
+                for s in series_data:
+                    cls._series[s.get('name')] = Series.from_dict(s)
+            label_data = data.get('labels')
+            if label_data is not None:
+                for l in label_data:
+                    cls._labels[l.get('grouptag')] = l
 
     @classmethod
     async def save_to_disk(cls):
@@ -169,8 +188,14 @@ class SeriesManager:
             serialized_series = []
             for series in cls._series.values():
                 serialized_series.append(series.to_dict(static_only=True))
+            serialized_labels = list(cls._labels.values())
+
+            serialized_data = {
+                "series": serialized_series,
+                "labels": serialized_labels
+            }
             f = open(Config.series_save_path, "w")
-            f.write(json.dumps(serialized_series, default=safe_json_dumps))
+            f.write(json.dumps(serialized_data, default=safe_json_dumps))
             f.close()
         except Exception as e:
             logging.error(f"Something went wrong when writing seriesmanager data to disk")

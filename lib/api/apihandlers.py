@@ -196,3 +196,41 @@ class ApiHandlers:
         resp = await BaseHandler.resp_get_enodo_stats()
         return web.json_response(data={
             'data': resp}, status=200)
+
+    @classmethod
+    @EnodoAuth.auth.required
+    async def get_enodo_labels(cls, request):
+        """
+        Return enodo labels and last update timestamp
+        :param request:
+        :return:
+        """
+        resp = await BaseHandler.resp_get_enodo_labels()
+        return web.json_response(data={
+            'data': resp}, status=200)
+
+    @classmethod
+    @EnodoAuth.auth.required
+    async def add_enodo_label(cls, request):
+        """
+        Add enodo label
+        :param request:
+        :return:
+        """
+        data = await request.json()
+        resp = await BaseHandler.resp_add_enodo_label(data)
+        return web.json_response(data={
+            'data': resp}, status=201)
+
+    @classmethod
+    @EnodoAuth.auth.required
+    async def remove_enodo_label(cls, request):
+        """
+        Remove enodo label
+        :param request:
+        :return:
+        """
+        data = await request.json()
+        resp = await BaseHandler.resp_remove_enodo_label(data)
+        return web.json_response(data={
+            'data': resp}, status=200 if resp else 400)
