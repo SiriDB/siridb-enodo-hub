@@ -107,7 +107,8 @@ class Series:
                 'job_statuses': self.series_job_statuses,
                 'job_schedule': self._job_schedule,
                 'config': self.series_config.to_dict(),
-                'series_characteristics': self.series_characteristics
+                'series_characteristics': self.series_characteristics,
+                'health': self.health
             }
         return {
             'rid': self.rid,
@@ -118,7 +119,8 @@ class Series:
             'config': self.series_config.to_dict(),
             'ignore': self.is_ignored(),
             'error': self.get_errors(),
-            'series_characteristics': self.series_characteristics
+            'series_characteristics': self.series_characteristics,
+            'health': self.health
         }
 
     @classmethod
