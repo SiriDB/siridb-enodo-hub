@@ -16,39 +16,32 @@ class EnodoModelManager:
         cls._update_cb = update_cb
 
     @classmethod
-    async def get_model(cls, model_name):
+    async def get_model(cls, name):
         for m in cls.models:
-            if m.model_name == model_name:
+            if m.name == name:
                 return m
         return None
 
     @classmethod
-    async def add_model(cls, model_name, model_arguments):
-        if await cls.get_model(model_name) is None:
-            model = EnodoModel(model_name, model_arguments)
+    async def add_model(cls, name, model_arguments):
+        if await cls.get_model(name) is None:
+            model = EnodoModel(name, model_arguments)
             cls.models.append(model)
             await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, EnodoModel.to_dict(model))
 
     @classmethod
-    async def add_model_from_dict(cls, dict_data):
-        try:
-            model = EnodoModel.from_dict(dict_data)
-        except Exception as e:
-            logging.error(f"Something went wrong while adding EnodoModel")
-            logging.debug(f"Corresponding error: {e}")
-            return False
-        else:
-            if await cls.get_model(model.model_name) is None:
-                cls.models.append(model)
-                await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, EnodoModel.to_dict(model))
-                return True
-            return False
+    async def add_enodo_model(cls, model):
+        if await cls.get_model(model.name) is None:
+            cls.models.append(model)
+            await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, EnodoModel.to_dict(model))
+            return True
+        return False
 
     @classmethod
-    async def remove_model(cls, model_name):
-        model = await cls.get_model(model_name)
+    async def remove_model(cls, name):
+        model = await cls.get_model(name)
         cls.models.remove(model)
-        await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_DELETE, model_name)
+        await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_DELETE, name)
 
     @classmethod
     async def load_from_disk(cls):

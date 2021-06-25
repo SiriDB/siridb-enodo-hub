@@ -91,9 +91,9 @@ class BaseHandler:
                 return {'error': 'Unknown model'}, 400
             if model_parameters is None and len(model.model_arguments.keys()) > 0:
                 return {'error': 'Missing model parameters'}, 400
-            for key in model.model_arguments:
-                if key not in model_parameters.keys():
-                    return {'error': f'Missing required model parameter {key}'}, 400
+            for model_argument in model.model_arguments:
+                if model_argument.get("required") and model_argument.get('name') not in model_parameters.keys():
+                    return {'error': f'Missing required model parameter {model_argument.get("name")}'}, 400
 
         # data['model_parameters'] = await setup_default_model_arguments(model_parameters)
 

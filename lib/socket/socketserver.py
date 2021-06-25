@@ -64,8 +64,8 @@ class SocketServer:
                                                     client_data)
                             logging.info(f'New listener with id: {client_id}')
                         elif client_data.get('client_type') == 'worker':
-                            supported_jobs_and_models = client_data.get('jobs_and_models')
-                            if supported_jobs_and_models is None or len(supported_jobs_and_models) < 1:
+                            supported_models = client_data.get('models')
+                            if supported_models is None or len(supported_models) < 1:
                                 response = create_header(0, HANDSHAKE_FAIL, packet_id)
                                 writer.write(response)
                                 connected = False
