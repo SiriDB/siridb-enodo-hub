@@ -10,7 +10,7 @@ from enodo import EnodoModel
 from lib.analyser.model import EnodoModelManager
 from lib.events.enodoeventmanager import EnodoEvent, EnodoEventManager, \
     ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE
-
+    
 
 class EnodoClient:
 
