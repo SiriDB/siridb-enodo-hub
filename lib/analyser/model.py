@@ -1,9 +1,10 @@
 import json
+from lib.util.util import load_disk_data
 import os
 
 from enodo import EnodoModel
 from lib.config import Config
-from lib.util import safe_json_dumps
+from lib.util import load_disk_data, save_disk_data
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_DELETE
 
 
@@ -48,13 +49,9 @@ class EnodoModelManager:
         try:
             if not os.path.exists(Config.model_save_path):
                 raise Exception()
-            f = open(Config.model_save_path, "r")
-            data = f.read()
-            f.close()
+            data = load_disk_data(Config.model_save_path)
         except Exception as e:
-            data = "{}"
-
-        data = json.loads(data)
+            data = {}
 
         if isinstance(data, list):
             for model_data in data:
@@ -70,9 +67,7 @@ class EnodoModelManager:
             model_list.append(EnodoModel.to_dict(model))
 
         try:
-            f = open(Config.model_save_path, "w")
-            f.write(json.dumps(model_list, default=safe_json_dumps))
-            f.close()
+            save_disk_data(Config.model_save_path, model_list)
         except Exception as e:
             logging.error(f"Something went wrong when writing enodo models to disk")
             logging.debug(f"Corresponding error: {e}")

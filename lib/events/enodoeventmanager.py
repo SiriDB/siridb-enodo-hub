@@ -6,11 +6,12 @@ import uuid
 
 import aiohttp
 import json
-from jinja2 import Environment, PackageLoader
+from jinja2 import Environment
 
 from lib.config import Config
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_UPDATE, SUBSCRIPTION_CHANGE_TYPE_DELETE
 from lib.serverstate import ServerState
+from lib.util import save_disk_data, load_disk_data
 
 ENODO_EVENT_ANOMALY_DETECTED = "event_anomaly_detected"
 ENODO_EVENT_JOB_QUEUE_TOO_LONG = "job_queue_too_long"
@@ -251,16 +252,14 @@ class EnodoEventManager:
         try:
             if not os.path.exists(Config.event_outputs_save_path):
                 raise Exception()
-            f = open(Config.event_outputs_save_path, "r")
-            data = f.read()
-            f.close()
+            data = load_disk_data(Config.event_outputs_save_path)
         except Exception as _:
-            data = "{}"
+            data = {}
 
         if data == "" or data is None:
-            data = "{}"
+            data = {}
 
-        output_data = json.loads(data)
+        output_data = data
         if 'next_output_id' in output_data:
             cls._next_output_id = output_data.get('next_output_id')
         if 'outputs' in output_data:
@@ -279,9 +278,7 @@ class EnodoEventManager:
                 'next_output_id': cls._next_output_id,
                 'outputs': serialized_outputs
             }
-            f = open(Config.event_outputs_save_path, "w")
-            f.write(json.dumps(output_data))
-            f.close()
+            save_disk_data(Config.event_outputs_save_path, output_data)
         except Exception as e:
             logging.error(f"Something went wrong when writing eventmanager data to disk")
             logging.debug(f"Corresponding error: {e}")

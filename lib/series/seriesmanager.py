@@ -15,7 +15,7 @@ from lib.siridb.siridb import query_series_datapoint_count, drop_series, \
 from lib.socket import ClientManager
 from lib.socket.package import create_header, UPDATE_SERIES
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_DELETE
-from lib.util import safe_json_dumps
+from lib.util import load_disk_data, save_disk_data
 
 from enodo.jobs import JOB_STATUS_DONE, JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES_REALTIME
 
@@ -169,10 +169,7 @@ class SeriesManager:
         if not os.path.exists(Config.series_save_path):
             pass
         else:
-            f = open(Config.series_save_path, "r")
-            data = f.read()
-            f.close()
-            data = json.loads(data)
+            data = load_disk_data(Config.series_save_path)
             series_data = data.get('series')
             if series_data is not None:
                 for s in series_data:
@@ -194,9 +191,7 @@ class SeriesManager:
                 "series": serialized_series,
                 "labels": serialized_labels
             }
-            f = open(Config.series_save_path, "w")
-            f.write(json.dumps(serialized_data, default=safe_json_dumps))
-            f.close()
+            save_disk_data(Config.series_save_path, serialized_data)
         except Exception as e:
             logging.error(f"Something went wrong when writing seriesmanager data to disk")
             logging.debug(f"Corresponding error: {e}")
