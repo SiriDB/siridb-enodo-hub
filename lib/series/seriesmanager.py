@@ -78,8 +78,8 @@ class SeriesManager:
         }
 
     @classmethod
-    def add_label(cls, name, grouptag):
-        cls._labels[grouptag] = {"name": name, "grouptag": grouptag}
+    def add_label(cls, name, grouptag, series_config):
+        cls._labels[grouptag] = {"name": name, "grouptag": grouptag, "series_config": series_config}
 
     @classmethod
     def remove_label(cls, grouptag):

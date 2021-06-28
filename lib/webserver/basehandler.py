@@ -216,7 +216,7 @@ class BaseHandler:
 
     @classmethod
     async def resp_add_enodo_label(cls, data):
-        SeriesManager.add_label(data.get('name'), data.get('grouptag'))
+        SeriesManager.add_label(data.get('name'), data.get('grouptag'), data.get('series_config'))
         return {'data': True}
 
     @classmethod
