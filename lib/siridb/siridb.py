@@ -58,3 +58,16 @@ async def insert_points(siridb_client, series_name, points):
         print(e)
         pass
     return result
+
+async def query_group_expression_by_name(siridb_client, group_name):
+    result = None
+    try:
+        result = await siridb_client.query(f'list groups where name == "{group_name}"')
+    except (QueryError, InsertError, ServerError, PoolError, AuthenticationError, UserAuthError) as e:
+        print("Connection problem with SiriDB server")
+        pass
+    groups = result.get('groups')
+    if groups is None or len(groups) < 1:
+        return None
+
+    return groups[0][0]

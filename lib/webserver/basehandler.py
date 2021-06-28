@@ -216,12 +216,12 @@ class BaseHandler:
 
     @classmethod
     async def resp_add_enodo_label(cls, data):
-        SeriesManager.add_label(data.get('name'), data.get('grouptag'), data.get('series_config'))
+        await SeriesManager.add_label(data.get('description'), data.get('name'), data.get('series_config'))
         return {'data': True}
 
     @classmethod
     async def resp_remove_enodo_label(cls, data):
-        data = SeriesManager.remove_label(data.get('grouptag'))
+        data = SeriesManager.remove_label(data.get('name'))
         if not data:
             return {'error': "Cannot remove label"}, 400
         return {'data': data}

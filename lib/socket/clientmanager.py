@@ -6,10 +6,12 @@ from enodo.model.config.worker import WORKER_MODE_GLOBAL, WORKER_MODE_DEDICATED_
     WORKER_MODE_DEDICATED_SERIES
 from enodo.jobs import JOB_STATUS_OPEN
 from enodo import EnodoModel
+import qpack
 
 from lib.analyser.model import EnodoModelManager
 from lib.events.enodoeventmanager import EnodoEvent, EnodoEventManager, \
     ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE
+from .package import *
     
 
 class EnodoClient:
@@ -200,6 +202,20 @@ class ClientManager:
                     return worker
 
         return None
+
+    @classmethod
+    def update_listeners(cls, data):
+        for client in cls.listeners:
+            listener = cls.listeners.get(client)
+            if listener.online:
+                cls.update_listener(listener, data)
+
+
+    @classmethod
+    def update_listener(cls, listener, data):
+        update = qpack.packb(data)
+        series_update = create_header(len(update), UPDATE_SERIES, 1)
+        listener.writer.write(series_update + update)
 
     @classmethod
     async def check_clients_alive(cls, max_timeout):

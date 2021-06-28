@@ -8,16 +8,21 @@ import qpack
 
 from lib.config import Config
 from lib.events import EnodoEvent
-from lib.events.enodoeventmanager import ENODO_EVENT_ANOMALY_DETECTED, EnodoEventManager
+from lib.events.enodoeventmanager import ENODO_EVENT_ANOMALY_DETECTED,\
+    EnodoEventManager
 from lib.serverstate import ServerState
-from lib.siridb.siridb import query_series_datapoint_count, drop_series, \
-    insert_points, query_series_data, does_series_exist
+from lib.siridb.siridb import query_series_datapoint_count,\
+    drop_series, insert_points, query_series_data, does_series_exist,\
+    query_group_expression_by_name
 from lib.socket import ClientManager
 from lib.socket.package import create_header, UPDATE_SERIES
-from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_DELETE
+from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD,\
+    SUBSCRIPTION_CHANGE_TYPE_DELETE
 from lib.util import load_disk_data, save_disk_data
 
-from enodo.jobs import JOB_STATUS_DONE, JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES_REALTIME
+from enodo.jobs import JOB_STATUS_DONE, JOB_TYPE_BASE_SERIES_ANALYSIS,\
+    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_FORECAST_SERIES,\
+    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES_REALTIME
 
 
 class SeriesManager:
@@ -68,7 +73,13 @@ class SeriesManager:
 
     @classmethod
     def get_listener_series_info(cls):
-        return [{"name": series_name, "realtime": series.series_config.realtime} for series_name, series in cls._series.items()]
+        series = [{"name": series_name, "realtime": series.series_config.realtime} for series_name, series in cls._series.items()]
+        labels = [{"name": label.get('selector'), "realtime": label.get('series_config').get('realtime'), "isGroup": label.get('type') == "group"} for label in cls._labels.values()]
+        return series + labels
+
+    @classmethod
+    def _update_listeners(cls):
+        ClientManager.update_listeners(cls.get_listener_series_info())
 
     @classmethod
     def get_labels_data(cls):
@@ -78,13 +89,18 @@ class SeriesManager:
         }
 
     @classmethod
-    def add_label(cls, name, grouptag, series_config):
-        cls._labels[grouptag] = {"name": name, "grouptag": grouptag, "series_config": series_config}
+    async def add_label(cls, description, name, series_config):
+        if name not in cls._labels:
+            # TODO: Change auto type == "group" to a input value when tags are added
+            group_expression = await query_group_expression_by_name(ServerState.get_siridb_data_conn(), name)
+            cls._labels[name] = {"description": description, "name": name, "series_config": series_config, "type": "group", "selector": group_expression}
+            cls._update_listeners()
 
     @classmethod
-    def remove_label(cls, grouptag):
-        if grouptag in cls._labels:
-            del cls._labels[grouptag]
+    def remove_label(cls, name):
+        if name in cls._labels:
+            del cls._labels[name]
+            cls._update_listeners()
             return True
         return False
 
