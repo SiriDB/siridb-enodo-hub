@@ -5,11 +5,14 @@ from enodo import WorkerConfigModel
 from enodo.model.config.worker import WORKER_MODE_GLOBAL, WORKER_MODE_DEDICATED_JOB_TYPE, \
     WORKER_MODE_DEDICATED_SERIES
 from enodo.jobs import JOB_STATUS_OPEN
+from enodo import EnodoModel
+import qpack
 
 from lib.analyser.model import EnodoModelManager
 from lib.events.enodoeventmanager import EnodoEvent, EnodoEventManager, \
     ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE
-
+from .package import *
+    
 
 class EnodoClient:
 
@@ -43,21 +46,21 @@ class ListenerClient(EnodoClient):
 
 
 class WorkerClient(EnodoClient):
-    def __init__(self, client_id, ip_address, writer, supported_jobs_and_models, version="unknown", last_seen=None, busy=False, worker_config=None):
+    def __init__(self, client_id, ip_address, writer, supported_models, version="unknown", last_seen=None, busy=False, worker_config=None):
         super().__init__(client_id, ip_address, writer, version, last_seen)
         self.busy = busy
         self.is_going_busy = False
-        self.supported_jobs_and_models = supported_jobs_and_models
+        supported_models = [EnodoModel.from_dict(model_data) for model_data in supported_models]
+        self.supported_models = {model.name: model for model in supported_models}
 
         if worker_config is None:
             worker_config = WorkerConfigModel(WORKER_MODE_GLOBAL, dedicated_job_type=None, dedicated_series_name=None)
         self.worker_config = worker_config
 
     def support_model_for_job(self, job_type, model_name):
-        if job_type in self.supported_jobs_and_models.keys():
-            for model in self.supported_jobs_and_models[job_type]:
-                if model.get('model_name') == model_name:
-                    return True
+        model = self.supported_models.get(model_name)
+        if model is not None and model.support_job_type(job_type):
+            return True
         return False
 
     def set_config(self, worker_config):
@@ -71,7 +74,7 @@ class WorkerClient(EnodoClient):
         base_dict = super().to_dict()
         extra_dict = {
             'busy': self.busy,
-            'jobs_and_models': self.supported_jobs_and_models,
+            'jobs_and_models': self.supported_models,
             'worker_config': self.worker_config.to_dict()
         }
         return {**base_dict, **extra_dict}
@@ -137,7 +140,7 @@ class ClientManager:
         client_id = client_data.get('client_id')
         if client_id not in cls.workers:
             client = WorkerClient(client_id, peername, writer,
-                                    client_data.get('jobs_and_models'),
+                                    client_data.get('models'),
                                     client_data.get('version', None),
                                     busy=client_data.get('busy', None))
             await cls.add_client(client)
@@ -149,9 +152,8 @@ class ClientManager:
         if isinstance(client, ListenerClient):
             cls.listeners[client.client_id] = client
         elif isinstance(client, WorkerClient):
-            for job in client.supported_jobs_and_models:
-                for model in client.supported_jobs_and_models[job]:
-                    await EnodoModelManager.add_model_from_dict(model)
+            for model_name in client.supported_models:
+                await EnodoModelManager.add_enodo_model(client.supported_models[model_name])
             cls.workers[client.client_id] = client
             await cls._refresh_dedicated_cache()
 
@@ -200,6 +202,20 @@ class ClientManager:
                     return worker
 
         return None
+
+    @classmethod
+    def update_listeners(cls, data):
+        for client in cls.listeners:
+            listener = cls.listeners.get(client)
+            if listener.online:
+                cls.update_listener(listener, data)
+
+
+    @classmethod
+    def update_listener(cls, listener, data):
+        update = qpack.packb(data)
+        series_update = create_header(len(update), UPDATE_SERIES, 1)
+        listener.writer.write(series_update + update)
 
     @classmethod
     async def check_clients_alive(cls, max_timeout):

@@ -24,7 +24,7 @@ class Series:
 
         self._datapoint_count = datapoint_count
         self._datapoint_count_lock = False
-        self.health = 100
+        self.health = None
         
     async def set_datapoints_counter_lock(self, is_locked):
         """
