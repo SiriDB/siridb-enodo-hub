@@ -19,7 +19,7 @@ from .serverstate import ServerState
 from .socket import ClientManager
 from .socket.package import create_header, WORKER_JOB, WORKER_JOB_CANCEL
 from .socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
-from .util import safe_json_dumps
+from lib.util import load_disk_data, save_disk_data
 from .socketio import SUBSCRIPTION_CHANGE_TYPE_DELETE, SUBSCRIPTION_CHANGE_TYPE_ADD
 
 
@@ -345,7 +345,8 @@ class EnodoJobManager:
             elif job_type == JOB_TYPE_BASE_SERIES_ANALYSIS:
                 try:
                     series = await SeriesManager.get_series(data.get('name'))
-                    series.series_characteristics = data.get('characteristics')
+                    series.series_characteristics = data.get('data').get('characteristics')
+                    series.health = data.get('data').get('health')
                     await series.set_job_status(JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_DONE)
                     await SeriesManager.series_changed(SUBSCRIPTION_CHANGE_TYPE_UPDATE, data.get('name'))
                 except Exception as e:
@@ -357,11 +358,10 @@ class EnodoJobManager:
                     await series.set_job_status(JOB_TYPE_STATIC_RULES, JOB_STATUS_DONE)
                     if len(data.get('failed_checks')):
                         for key in data.get('failed_checks'):
-                            event = EnodoEvent('Static rule failed!', 
+                            event = EnodoEvent('Static rule failed!',
                                 f'Series {data.get("name")} failed a static rule ({key}): {data.get("failed_checks")[key]}',
                                 ENODO_EVENT_STATIC_RULE_FAIL)
                             await EnodoEventManager.handle_event(event)
-                    # TODO Create custom event and raise it
                     await SeriesManager.series_changed(SUBSCRIPTION_CHANGE_TYPE_UPDATE, data.get('name'))
                 except Exception as e:
                     logging.error(f"Something went wrong when receiving base analysis job")
@@ -405,7 +405,7 @@ class EnodoJobManager:
         job_id = data.get('job_id')
         worker = await ClientManager.get_worker_by_id(client_id)
         if job_id in cls._active_jobs_index:
-            await cls.set_job_failed(job_id, "")
+            await cls.set_job_failed(job_id, "Worker cancelled job. Check worker logging for details")
         logging.error(f"Worker {client_id} cancelled job {job_id}")
         if worker is None:
             return
@@ -428,9 +428,7 @@ class EnodoJobManager:
                 # 'open_jobs': [EnodoJob.to_dict(job) for job in cls._open_jobs],
                 'failed_jobs': [EnodoJob.to_dict(job) for job in cls._failed_jobs],
             }
-            f = open(Config.jobs_save_path, "w")
-            f.write(json.dumps(job_data, default=safe_json_dumps))
-            f.close()
+            save_disk_data(Config.jobs_save_path, job_data)
         except Exception as e:
             logging.error(f"Something went wrong when saving jobmanager data to disk")
             logging.debug(f"Corresponding error: {e}")
@@ -438,25 +436,18 @@ class EnodoJobManager:
 
     @classmethod
     async def load_from_disk(cls):
-        loaded_open_jobs = 0
         loaded_failed_jobs = 0
         await cls._lock()
         try:
             if not os.path.exists(Config.jobs_save_path):
                 raise Exception()
-            f = open(Config.jobs_save_path, "r")
-            data = f.read()
-            f.close()
+            data = load_disk_data(Config.jobs_save_path)
         except Exception as e:
-            data = "{}"
-
-        data = json.loads(data)
+            data = {}
+        
         if isinstance(data, dict):
             if 'next_job_id' in data:
                 cls._next_job_id = int(data.get('next_job_id'))
-            # if 'open_jobs' in data:
-            #     loaded_open_jobs += len(data.get('open_jobs'))
-            #     cls._open_jobs = [EnodoJob.from_dict(job_data) for job_data in data.get('open_jobs')]
             if 'failed_jobs' in data:
                 loaded_failed_jobs += len(data.get('failed_jobs'))
                 cls._failed_jobs = [EnodoJob.from_dict(job_data) for job_data in data.get('failed_jobs')]

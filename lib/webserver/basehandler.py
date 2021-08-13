@@ -76,7 +76,13 @@ class BaseHandler:
     @classmethod
     async def resp_add_series(cls, data):
         required_fields = ['name', 'config']
-        series_config = SeriesConfigModel.from_dict(data.get('config'))
+        if not all(required_field in data for required_field in required_fields):
+            return {'error': 'Series data does not include all required fields'}, 400
+        try:
+            series_config = SeriesConfigModel.from_dict(data.get('config'))
+        except Exception as e:
+            print(e)
+            return {'error': f'Invalid series config'}, 400
         for job_config in list(series_config.job_config.values()):
             model_parameters = job_config.model_params
 
@@ -85,18 +91,15 @@ class BaseHandler:
                 return {'error': 'Unknown model'}, 400
             if model_parameters is None and len(model.model_arguments.keys()) > 0:
                 return {'error': 'Missing model parameters'}, 400
-            for key in model.model_arguments:
-                if key not in model_parameters.keys():
-                    return {'error': f'Missing required model parameter {key}'}, 400
+            for model_argument in model.model_arguments:
+                if model_argument.get("required") and model_argument.get('name') not in model_parameters.keys():
+                    return {'error': f'Missing required model parameter {model_argument.get("name")}'}, 400
 
         # data['model_parameters'] = await setup_default_model_arguments(model_parameters)
 
-        if all(required_field in data for required_field in required_fields):
-            if not await SeriesManager.add_series(data):
-                return {'error': 'Something went wrong when adding the series. Are you sure the series exists?'}, 400
-        else:
-            return {'error': 'Series data does not include all required fields'}, 400
-
+        if not await SeriesManager.add_series(data):
+            return {'error': 'Something went wrong when adding the series. Are you sure the series exists?'}, 400
+       
         return {'data': list(await SeriesManager.get_series_to_dict())}, 201
 
 
@@ -129,7 +132,6 @@ class BaseHandler:
 
     @classmethod
     async def resp_remove_series(cls, series_name):
-        # TODO: REMOVE JOBS, EVENTS ETC
         if await SeriesManager.remove_series(series_name):
             await EnodoJobManager.cancel_jobs_for_series(series_name)
             EnodoJobManager.remove_failed_jobs_for_series(series_name)
@@ -206,3 +208,20 @@ class BaseHandler:
             "no_busy_workers": ClientManager.get_busy_worker_count(),
             "no_output_streams": len(EnodoEventManager.outputs)
         }}
+
+    @classmethod
+    async def resp_get_enodo_labels(cls):
+        data = SeriesManager.get_labels_data()
+        return {'data': data}
+
+    @classmethod
+    async def resp_add_enodo_label(cls, data):
+        await SeriesManager.add_label(data.get('description'), data.get('name'), data.get('series_config'))
+        return {'data': True}
+
+    @classmethod
+    async def resp_remove_enodo_label(cls, data):
+        data = SeriesManager.remove_label(data.get('name'))
+        if not data:
+            return {'error': "Cannot remove label"}, 400
+        return {'data': data}

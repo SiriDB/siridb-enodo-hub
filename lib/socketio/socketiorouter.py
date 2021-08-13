@@ -70,6 +70,15 @@ class SocketIoRouter:
         self._sio_on(
             event='/api/enodo/stats',
             handler=SocketIoHandler.get_enodo_stats)
+        self._sio_on(
+            event='/api/enodo/labels',
+            handler=SocketIoHandler.get_enodo_labels)
+        self._sio_on(
+            event='/api/enodo/labels/create',
+            handler=SocketIoHandler.add_enodo_label)
+        self._sio_on(
+            event='/api/enodo/labels/delete',
+            handler=SocketIoHandler.remove_enodo_label)
 
         self._setup_listen_events()
 

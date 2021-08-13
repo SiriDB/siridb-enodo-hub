@@ -141,7 +141,7 @@ class Server:
                         and not series.is_ignored():
 
                     # Check if requirement of min amount of datapoints is met
-                    if await series.get_datapoints_count() >= Config.min_data_points or (
+                    if series.get_datapoints_count() >= Config.min_data_points or (
                         series.series_config.min_data_points is not None and series.get_datapoints_count() >= series.series_config.min_data_points):
                         try:
                             # Check if series does not have any failed jobs
@@ -182,6 +182,9 @@ class Server:
 
     @staticmethod
     async def _save_to_disk():
+        """
+        Call all save to disk methods from various manager classes
+        """
         await SeriesManager.save_to_disk()
         await EnodoJobManager.save_to_disk()
         await EnodoEventManager.save_to_disk()
@@ -278,6 +281,12 @@ class Server:
                 "/api/enodo/event/output", ApiHandlers.add_enodo_event_output)
             self.app.router.add_get(
                 "/api/enodo/stats", ApiHandlers.get_enodo_stats)
+            self.app.router.add_get(
+                "/api/enodo/label", ApiHandlers.get_enodo_labels, allow_head=False)
+            self.app.router.add_post(
+                "/api/enodo/label", ApiHandlers.add_enodo_label)
+            self.app.router.add_delete(
+                "/api/enodo/label", ApiHandlers.remove_enodo_label)
 
             # Add internal api routes
             self.app.router.add_get(
@@ -309,6 +318,7 @@ class Server:
             logging.getLogger('aiohttp').setLevel(logging.ERROR)
             logging.getLogger('socketio').setLevel(logging.ERROR)
             logging.getLogger('engineio').setLevel(logging.ERROR)
+            logging.getLogger('siridb.connector').setLevel(logging.ERROR)
 
         self.app.on_shutdown.append(self._stop_server_from_aiohttp_cleanup)
         self.loop.run_until_complete(self.start_up())

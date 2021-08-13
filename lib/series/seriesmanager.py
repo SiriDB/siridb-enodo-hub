@@ -8,26 +8,35 @@ import qpack
 
 from lib.config import Config
 from lib.events import EnodoEvent
-from lib.events.enodoeventmanager import ENODO_EVENT_ANOMALY_DETECTED, EnodoEventManager
+from lib.events.enodoeventmanager import ENODO_EVENT_ANOMALY_DETECTED,\
+    EnodoEventManager
 from lib.serverstate import ServerState
-from lib.siridb.siridb import query_series_datapoint_count, drop_series, \
-    insert_points, query_series_data, does_series_exist
+from lib.siridb.siridb import query_series_datapoint_count,\
+    drop_series, insert_points, query_series_data, does_series_exist,\
+    query_group_expression_by_name
 from lib.socket import ClientManager
 from lib.socket.package import create_header, UPDATE_SERIES
-from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_DELETE
-from lib.util import safe_json_dumps
+from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD,\
+    SUBSCRIPTION_CHANGE_TYPE_DELETE
+from lib.util import load_disk_data, save_disk_data
 
-from enodo.jobs import JOB_STATUS_DONE, JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES_REALTIME
+from enodo.jobs import JOB_STATUS_DONE, JOB_TYPE_BASE_SERIES_ANALYSIS,\
+    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_FORECAST_SERIES,\
+    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES_REALTIME
 
 
 class SeriesManager:
     _series = None
+    _labels = None
+    _labels_last_update = None
     _update_cb = None
 
     @classmethod
     async def prepare(cls, update_cb=None):
         cls._series = {}
         cls._update_cb = update_cb
+        cls._labels = {}
+        cls._labels_last_update = None
 
     @classmethod
     async def series_changed(cls, change_type, series_name):
@@ -47,7 +56,7 @@ class SeriesManager:
                     cls._series[series.get('name')] = Series.from_dict(series)
                     logging.info(f"Added new series: {series.get('name')}")
                     await cls.series_changed(SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name'))
-                    await cls.update_listeners(cls.get_all_series())
+                    await cls.update_listeners(cls.get_listener_series_info())
                     return True
         return False
 
@@ -63,13 +72,37 @@ class SeriesManager:
         return list(cls._series.keys())
 
     @classmethod
-    def get_listener_info(cls):
-        data = {}
-        for series_name in cls._series:
-            data[series_name] = {
-                "realtime": JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES_REALTIME in cls._series[series_name].series_config.job_config
-            }
-        return data
+    def get_listener_series_info(cls):
+        series = [{"name": series_name, "realtime": series.series_config.realtime} for series_name, series in cls._series.items()]
+        labels = [{"name": label.get('selector'), "realtime": label.get('series_config').get('realtime'), "isGroup": label.get('type') == "group"} for label in cls._labels.values()]
+        return series + labels
+
+    @classmethod
+    def _update_listeners(cls):
+        ClientManager.update_listeners(cls.get_listener_series_info())
+
+    @classmethod
+    def get_labels_data(cls):
+        return {
+            "last_update": cls._labels_last_update,
+            "labels": list(cls._labels.values())
+        }
+
+    @classmethod
+    async def add_label(cls, description, name, series_config):
+        if name not in cls._labels:
+            # TODO: Change auto type == "group" to a input value when tags are added
+            group_expression = await query_group_expression_by_name(ServerState.get_siridb_data_conn(), name)
+            cls._labels[name] = {"description": description, "name": name, "series_config": series_config, "type": "group", "selector": group_expression}
+            cls._update_listeners()
+
+    @classmethod
+    def remove_label(cls, name):
+        if name in cls._labels:
+            del cls._labels[name]
+            cls._update_listeners()
+            return True
+        return False
 
     @classmethod
     def get_series_count(cls):
@@ -152,12 +185,15 @@ class SeriesManager:
         if not os.path.exists(Config.series_save_path):
             pass
         else:
-            f = open(Config.series_save_path, "r")
-            data = f.read()
-            f.close()
-            series_data = json.loads(data)
-            for s in series_data:
-                cls._series[s.get('name')] = Series.from_dict(s)
+            data = load_disk_data(Config.series_save_path)
+            series_data = data.get('series')
+            if series_data is not None:
+                for s in series_data:
+                    cls._series[s.get('name')] = Series.from_dict(s)
+            label_data = data.get('labels')
+            if label_data is not None:
+                for l in label_data:
+                    cls._labels[l.get('grouptag')] = l
 
     @classmethod
     async def save_to_disk(cls):
@@ -165,9 +201,13 @@ class SeriesManager:
             serialized_series = []
             for series in cls._series.values():
                 serialized_series.append(series.to_dict(static_only=True))
-            f = open(Config.series_save_path, "w")
-            f.write(json.dumps(serialized_series, default=safe_json_dumps))
-            f.close()
+            serialized_labels = list(cls._labels.values())
+
+            serialized_data = {
+                "series": serialized_series,
+                "labels": serialized_labels
+            }
+            save_disk_data(Config.series_save_path, serialized_data)
         except Exception as e:
             logging.error(f"Something went wrong when writing seriesmanager data to disk")
             logging.debug(f"Corresponding error: {e}")

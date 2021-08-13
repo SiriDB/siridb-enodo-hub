@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import json
 import logging
+from packaging import version
 
 import qpack
 
@@ -9,6 +10,7 @@ from lib.series.seriesmanager import SeriesManager
 from . import ClientManager, ListenerClient, WorkerClient
 from .package import *
 
+ENODO_HUB_WORKER_MIN_VERSION = "0.1.0-beta3.0"
 
 class SocketServer:
     def __init__(self, hostname, port, token, cbs=None):
@@ -64,20 +66,25 @@ class SocketServer:
                                                     client_data)
                             logging.info(f'New listener with id: {client_id}')
                         elif client_data.get('client_type') == 'worker':
-                            supported_jobs_and_models = client_data.get('jobs_and_models')
-                            if supported_jobs_and_models is None or len(supported_jobs_and_models) < 1:
+                            supported_models = client_data.get('models')
+                            if supported_models is None or len(supported_models) < 1:
                                 response = create_header(0, HANDSHAKE_FAIL, packet_id)
                                 writer.write(response)
                                 connected = False
                             else:
-                                await ClientManager.worker_connected(writer.get_extra_info('peername'), writer, client_data)
-                                logging.info(f'New worker with id: {client_id}')
+                                if version.parse(client_data.get('version')) < version.parse(ENODO_HUB_WORKER_MIN_VERSION):
+                                    response = create_header(0, HANDSHAKE_FAIL, packet_id)
+                                    writer.write(response)
+                                    connected = False
+                                else:
+                                    await ClientManager.worker_connected(writer.get_extra_info('peername'), writer, client_data)
+                                    logging.info(f'New worker with id: {client_id}')
 
                         response = create_header(0, HANDSHAKE_OK, packet_id)
                         writer.write(response)
 
                         if client_data.get('client_type') == 'listener':
-                            update = qpack.packb(SeriesManager.get_all_series())
+                            update = qpack.packb(SeriesManager.get_listener_series_info())
                             series_update = create_header(len(update), UPDATE_SERIES, packet_id)
                             writer.write(series_update + update)
                     else:

@@ -7,7 +7,7 @@ from enodo.model.config.series import SeriesConfigModel
 class Series:
     # detecting_anomalies_status forecast_status series_analysed_status
     __slots__ = (
-        'rid', 'name', 'series_config', 'series_job_statuses', '_datapoint_count', '_datapoint_count_lock', '_job_schedule', 'series_characteristics')
+        'rid', 'name', 'series_config', 'series_job_statuses', '_datapoint_count', '_datapoint_count_lock', '_job_schedule', 'series_characteristics', 'health')
 
     def __init__(self, name, config, datapoint_count, job_statuses=None, series_characteristics=None, job_schedule=None, **kwargs):
         self.rid = name
@@ -24,6 +24,7 @@ class Series:
 
         self._datapoint_count = datapoint_count
         self._datapoint_count_lock = False
+        self.health = None
         
     async def set_datapoints_counter_lock(self, is_locked):
         """
@@ -64,7 +65,7 @@ class Series:
             return False
         return True
 
-    async def get_datapoints_count(self):
+    def get_datapoints_count(self):
         return self._datapoint_count
 
     async def add_to_datapoints_count(self, add_to_count):
@@ -106,7 +107,8 @@ class Series:
                 'job_statuses': self.series_job_statuses,
                 'job_schedule': self._job_schedule,
                 'config': self.series_config.to_dict(),
-                'series_characteristics': self.series_characteristics
+                'series_characteristics': self.series_characteristics,
+                'health': self.health
             }
         return {
             'rid': self.rid,
@@ -117,7 +119,8 @@ class Series:
             'config': self.series_config.to_dict(),
             'ignore': self.is_ignored(),
             'error': self.get_errors(),
-            'series_characteristics': self.series_characteristics
+            'series_characteristics': self.series_characteristics,
+            'health': self.health
         }
 
     @classmethod
