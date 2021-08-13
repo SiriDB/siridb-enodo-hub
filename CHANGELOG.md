@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta2.1.1] - 2021-08-13
+
 ### Added
 - Added realtime property to series config, to control speed of updates from listener to hub for that series
 
