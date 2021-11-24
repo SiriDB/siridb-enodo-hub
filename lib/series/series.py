@@ -1,30 +1,22 @@
-import datetime
+import time
 
 from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_NONE, JOB_STATUS_OPEN, JOB_STATUS_PENDING, JOB_STATUS_DONE, JOB_STATUS_FAILED
-from enodo.model.config.series import SeriesConfigModel
+from enodo.model.config.series import SeriesConfigModel, SeriesState
 
 
 class Series:
     # detecting_anomalies_status forecast_status series_analysed_status
     __slots__ = (
-        'rid', 'name', 'series_config', 'series_job_statuses', '_datapoint_count', '_datapoint_count_lock', '_job_schedule', 'series_characteristics', 'health')
+        'rid', 'name', 'series_config', 'series_state', '_datapoint_count_lock', 'series_characteristics')
 
-    def __init__(self, name, config, datapoint_count, job_statuses=None, series_characteristics=None, job_schedule=None, **kwargs):
+    def __init__(self, name, config, state, series_characteristics=None, **kwargs):
         self.rid = name
         self.name = name
         self.series_config = SeriesConfigModel.from_dict(config)
-        self.series_job_statuses = job_statuses
-        if self.series_job_statuses is None:
-            self.series_job_statuses = dict()
+        self.state = SeriesState.from_dict(state)
         self.series_characteristics = series_characteristics
 
-        self._job_schedule = job_schedule
-        if self._job_schedule is None:
-            self._job_schedule = {}
-
-        self._datapoint_count = datapoint_count
         self._datapoint_count_lock = False
-        self.health = None
         
     async def set_datapoints_counter_lock(self, is_locked):
         """
@@ -37,9 +29,6 @@ class Series:
     async def get_datapoints_counter_lock(self):
         return self._datapoint_count_lock
 
-    async def clear_errors(self):
-        EnodoJobManager.remove_failed_jobs_for_series(self.name)
-
     def get_errors(self):
         errors = [job.error for job in EnodoJobManager.get_failed_jobs_for_series(self.name)]
         return errors
@@ -47,26 +36,30 @@ class Series:
     def is_ignored(self):
         return EnodoJobManager.has_series_failed_jobs(self.name)
 
-    async def get_model(self, job_type):
-        return self.series_config.get_config_for_job(job_type).model
+    async def get_job_status(self, job_link_name):
+        return self.state.get_job_status(job_link_name)
 
-    async def get_job_status(self, job_type):
-        status = self.series_job_statuses.get(job_type)
-        if status is None:
-            status = JOB_STATUS_NONE
-        return status
+    async def set_job_status(self, link_name, status):
+        self.state.set_job_status(link_name, status)
 
-    async def set_job_status(self, job_type, status):
-        self.series_job_statuses[job_type] = status
-
-    def job_activated(self, job_type):
-        job_config = self.series_config.job_config.get(job_type)
-        if job_config is None or not job_config.activated:
+    @property
+    def base_analysis_job(self):
+        job_config = self.series_config.get_config_for_job_type(JOB_TYPE_BASE_SERIES_ANALYSIS)
+        if job_config is None or job_config is False:
             return False
-        return True
+        return job_config
+
+    def get_job(self, job_link_name):
+        return self.series_config.get_config_for_job(job_link_name)
+
+    def base_analysis_status(self):
+        job_config = self.series_config.get_config_for_job_type(JOB_TYPE_BASE_SERIES_ANALYSIS)
+        if job_config is None or job_config is False:
+            return False
+        return self.state.get_job_status(job_config.link_name)
 
     def get_datapoints_count(self):
-        return self._datapoint_count
+        return self.state.datapoint_count
 
     async def add_to_datapoints_count(self, add_to_count):
         """
@@ -75,22 +68,44 @@ class Series:
         :return:
         """
         if self._datapoint_count_lock is False:
-            self._datapoint_count += add_to_count
+            self.state.datapoint_count += add_to_count
 
-    async def schedule_job(self, job_type):
-        if job_type in self.series_config.job_config:
-            if job_type in self._job_schedule:
-                if self._job_schedule[job_type] <= self._datapoint_count:
-                    self._job_schedule[job_type] = self._datapoint_count + self.series_config.job_config[job_type].job_schedule
+    async def schedule_job(self, job_link_name):
+        job_schedule = self.state.get_job_schedule(job_link_name)
 
-    async def is_job_due(self, job_type):
-        if job_type not in self.series_config.job_config:
+        job_config = self.series_config.get_config_for_job(job_link_name)  
+        if job_config is None:                  
             return False
+        if job_schedule is None:
+            job_schedule = {"value": 0, "type": job_config.job_schedule_type}
+
+        if job_schedule["type"] == "TS":
+            current_ts = int(time.time())
+            if job_schedule["value"] <= current_ts:
+                next_value = current_ts + job_config.job_schedule
+                self.state.set_job_schedule(job_link_name, next_value)
+        elif job_schedule["type"] == "N":
+            if job_schedule["value"] <= self.state.datapoint_count:
+                next_value = self.state.datapoint_count + job_config.job_schedule
+                self.state.set_job_schedule(job_link_name, next_value)
+            
+    async def is_job_due(self, job_link_name):
+        job_status = self.state.get_job_status(job_link_name)
+        job_schedule = self.state.get_job_schedule(job_link_name)
         
-        if self.series_job_statuses.get(job_type) != JOB_STATUS_DONE:
-            return True
-        elif self._job_schedule.get(job_type) is not None and self._job_schedule.get(job_type) <= self._datapoint_count:
-            return True
+        if job_status == JOB_STATUS_NONE or job_status == JOB_STATUS_DONE:
+            job_config = self.series_config.get_config_for_job(job_link_name)
+            if job_config.requires_job is not None:
+                required_job_status = self.state.get_job_status(job_config.requires_job)
+                if required_job_status is not JOB_STATUS_DONE:
+                    return False
+            if job_schedule["value"] is None:
+                return True
+            elif job_schedule["type"] == "TS" and job_schedule["value"] <= int(time.time()):
+                return True
+            elif job_schedule["type"] == "N" and job_schedule["value"] <= self.state.datapoint_count:
+                return True
+        return False
 
     def update(self, data):
         config = data.get('config')

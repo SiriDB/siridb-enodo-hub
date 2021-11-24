@@ -41,16 +41,6 @@ class BaseHandler:
         if include_points:
             series_points = await query_series_data(ServerState.get_siridb_data_conn(), series.name, "*")
             series_data['points'] = series_points.get(series.name)
-        if await series.get_job_status(JOB_TYPE_FORECAST_SERIES) == JOB_STATUS_DONE:
-            series_data['forcasted'] = True
-            series_data['forecast_points'] = await SeriesManager.get_series_forecast(series.name)
-        else:
-            series_data['forecast_points'] = []
-
-        series_data['anomalies'] = []
-        if await series.get_job_status(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES) == JOB_STATUS_DONE:
-            anomalies = await SeriesManager.get_series_anomalies(series.name)
-            series_data['anomalies'] = anomalies
 
         return {'data': series_data}
 
@@ -76,12 +66,9 @@ class BaseHandler:
     @classmethod
     async def resp_add_series(cls, data):
         required_fields = ['name', 'config']
-        if not all(required_field in data for required_field in required_fields):
-            return {'error': 'Series data does not include all required fields'}, 400
         try:
             series_config = SeriesConfigModel.from_dict(data.get('config'))
         except Exception as e:
-            print(e)
             return {'error': f'Invalid series config'}, 400
         for job_config in list(series_config.job_config.values()):
             model_parameters = job_config.model_params

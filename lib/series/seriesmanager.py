@@ -21,8 +21,7 @@ from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD,\
 from lib.util import load_disk_data, save_disk_data
 
 from enodo.jobs import JOB_STATUS_DONE, JOB_TYPE_BASE_SERIES_ANALYSIS,\
-    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_FORECAST_SERIES,\
-    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES_REALTIME
+    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_FORECAST_SERIES
 
 
 class SeriesManager:
@@ -141,7 +140,6 @@ class SeriesManager:
         if series is not None:
             await drop_series(ServerState.get_siridb_forecast_conn(), f'forecast_{series_name}')
             await insert_points(ServerState.get_siridb_forecast_conn(), f'forecast_{series_name}', points)
-            await series.set_job_status(JOB_TYPE_FORECAST_SERIES, JOB_STATUS_DONE)
 
             # date_1 = datetime.datetime.now()
             # # end_date = date_1 + datetime.timedelta(days=1)
@@ -153,11 +151,10 @@ class SeriesManager:
         series = cls._series.get(series_name, None)
         if series is not None:
             event = EnodoEvent('Anomaly detected!', f'{len(points)} anomalies detected for series {series_name}',
-                               ENODO_EVENT_ANOMALY_DETECTED)
+                               ENODO_EVENT_ANOMALY_DETECTED, series=series)
             await EnodoEventManager.handle_event(event)
             await drop_series(ServerState.get_siridb_forecast_conn(), f'anomalies_{series_name}')
             await insert_points(ServerState.get_siridb_forecast_conn(), f'anomalies_{series_name}', points)
-            await series.set_job_status(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_STATUS_DONE)
 
     @classmethod
     async def get_series_forecast(cls, series_name):

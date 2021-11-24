@@ -13,7 +13,7 @@ from lib.api.apihandlers import ApiHandlers, auth
 from lib.config import Config
 from lib.events.enodoeventmanager import EnodoEventManager
 from lib.enodojobmanager import EnodoJobManager
-from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_STATIC_RULES, JOB_STATUS_NONE, JOB_STATUS_DONE
+from enodo.jobs import JOB_STATUS_OPEN, JOB_STATUS_PENDING, JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_TYPE_FORECAST_SERIES, JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_STATIC_RULES, JOB_STATUS_NONE, JOB_STATUS_DONE
 from lib.logging import prepare_logger
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
@@ -134,46 +134,36 @@ class Server:
             ServerState.tasks_last_runs['watch_series'] = datetime.datetime.now()
             series_names = SeriesManager.get_all_series()
             for series_name in series_names:
-                series = await SeriesManager.get_series(series_name)
-                
+                series = await SeriesManager.get_series(series_name)       
                 # Check if series is valid and not ignored
                 if series is not None \
                         and not series.is_ignored():
-
                     # Check if requirement of min amount of datapoints is met
                     if series.get_datapoints_count() >= Config.min_data_points or (
                         series.series_config.min_data_points is not None and series.get_datapoints_count() >= series.series_config.min_data_points):
                         try:
                             # Check if series does not have any failed jobs
                             if not len(EnodoJobManager.get_failed_jobs_for_series(series_name)):
+                                if await series.base_analysis_status() == JOB_STATUS_NONE:
+                                    base_analysis_job = series.base_analysis_job
+                                    await EnodoJobManager.create_job(base_analysis_job.link_name, series_name)
 
-                                if series.job_activated(JOB_TYPE_BASE_SERIES_ANALYSIS) \
-                                    and await series.get_job_status(JOB_TYPE_BASE_SERIES_ANALYSIS) == JOB_STATUS_NONE:
-                                    await EnodoJobManager.create_job(JOB_TYPE_BASE_SERIES_ANALYSIS, series_name)
-
-                                # If forecast job is not pending and job is due
-                                if series.job_activated(JOB_TYPE_FORECAST_SERIES) \
-                                    and (await series.get_job_status(JOB_TYPE_FORECAST_SERIES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
-                                    await series.is_job_due(JOB_TYPE_FORECAST_SERIES):
-
-                                    await EnodoJobManager.create_job(JOB_TYPE_FORECAST_SERIES, series_name)
-                                    continue
-                                
-                                # If anomaly detect job is not pending and job is due
-                                if series.job_activated(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES) \
-                                    and (await series.get_job_status(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
-                                    await series.is_job_due(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES):
+                                elif await series.base_analysis_status() == JOB_STATUS_DONE:
                                     
-                                    await EnodoJobManager.create_job(JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, series_name)
-                                    continue
-
-                                # If anomaly detect job is not pending and job is due
-                                if series.job_activated(JOB_TYPE_STATIC_RULES) \
-                                    and (await series.get_job_status(JOB_TYPE_STATIC_RULES) in [JOB_STATUS_NONE, JOB_STATUS_DONE]) and \
-                                    await series.is_job_due(JOB_TYPE_STATIC_RULES):
-                                    
-                                    await EnodoJobManager.create_job(JOB_TYPE_STATIC_RULES, series_name)
-                                    continue
+                                    # loop through scheduled jobs:
+                                    job_schedules = series.state.get_all_job_schedules()
+                                    for job_link_name in series.series_config.job_config:
+                                        if job_link_name in job_schedules:
+                                            if series.state.get_job_status(job_link_name) in [JOB_STATUS_OPEN, JOB_STATUS_PENDING]:
+                                                continue
+                                                
+                                            job_config = series.series_config.get_config_for_job(job_link_name)
+                                            if await series.is_job_due(job_link_name):
+                                                await EnodoJobManager.create_job(job_link_name, series_name)
+                                                continue
+                                        else:
+                                            # Job has not been schedules yet, lets add it
+                                            await series.schedule_job(job_link_name)
                         except Exception as e:
                             logging.error(f"Something went wrong when trying to create new job")
                             logging.debug(f"Corresponding error: {e}")

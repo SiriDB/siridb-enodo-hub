@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
  
 ## [Unreleased] - yyyy-mm-dd
 
+### Added
+- 
+
+### Changed
+- Changed series config and job config. Job config is now a list of jobs. Not categorised by job type. Forecast, anomaly detection jobs can be in the list multiple times. 
+- Jobs get an unique identifier `link_name`, which can be set to now the `link_name` beforehand
+- Jobs can be silenced by the silenced property in the job config. This makes sure no events will be created for the job's results.
+- A job can require an other job the be run beforehand by using the `requires_job` property
+
+### Fixed
+
+- 
+
 ## [0.1.0-beta3.0.0] - 2021-08-13
 
 ### Added

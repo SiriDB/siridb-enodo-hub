@@ -19,6 +19,8 @@ ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE = "lost_client_without_goodbye"
 ENODO_EVENT_STATIC_RULE_FAIL = "event_static_rule_fail"
 ENODO_EVENT_TYPES = [ENODO_EVENT_ANOMALY_DETECTED, ENODO_EVENT_JOB_QUEUE_TOO_LONG, \
     ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE, ENODO_EVENT_STATIC_RULE_FAIL]
+ENODO_SERIES_RELATED_EVENT_TYPES = [ENODO_EVENT_ANOMALY_DETECTED, \
+    ENODO_EVENT_STATIC_RULE_FAIL]
 
 ENODO_EVENT_OUTPUT_WEBHOOK = 1
 ENODO_EVENT_OUTPUT_TYPES = [ENODO_EVENT_OUTPUT_WEBHOOK]
@@ -34,14 +36,16 @@ class EnodoEvent:
     """
     EnodoEvent class. Holds data for an event (error/warning/etc) that occured. No state data is saved.
     """
-    __slots__ = ('title', 'message', 'event_type', 'ts', 'severity', 'uuid')
+    __slots__ = ('title', 'message', 'event_type', 'series', 'ts', 'severity', 'uuid')
 
-    def __init__(self, title, message, event_type):
+    def __init__(self, title, message, event_type, series=None):
         if event_type not in ENODO_EVENT_TYPES:
             raise Exception()  # TODO Nice exception
         self.title = title
         self.message = message
         self.event_type = event_type
+        self.series_name = series # only needs to be set if it regards a
+                                  # series related event
         self.ts = int(time.time())
         self.uuid = str(uuid.uuid4()).replace("-", "")
 
@@ -244,6 +248,9 @@ class EnodoEventManager:
     @classmethod
     async def handle_event(cls, event):
         if isinstance(event, EnodoEvent):
+            if event.event_type in ENODO_SERIES_RELATED_EVENT_TYPES:
+                if event.series is not None and event.series.series_config.silenced == True:
+                    return False
             for output in cls.outputs:
                 await output.send_event(event)
 
