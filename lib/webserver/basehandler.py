@@ -69,7 +69,7 @@ class BaseHandler:
         try:
             series_config = SeriesConfigModel.from_dict(data.get('config'))
         except Exception as e:
-            return {'error': f'Invalid series config'}, 400
+            return {'error': f'Invalid series config', 'message': str(e)}, 400
         for job_config in list(series_config.job_config.values()):
             model_parameters = job_config.model_params
 

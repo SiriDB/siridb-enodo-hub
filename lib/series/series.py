@@ -7,12 +7,14 @@ from enodo.model.config.series import SeriesConfigModel, SeriesState
 class Series:
     # detecting_anomalies_status forecast_status series_analysed_status
     __slots__ = (
-        'rid', 'name', 'series_config', 'series_state', '_datapoint_count_lock', 'series_characteristics')
+        'rid', 'name', 'series_config', 'state', '_datapoint_count_lock', 'series_characteristics')
 
-    def __init__(self, name, config, state, series_characteristics=None, **kwargs):
+    def __init__(self, name, config, state=None, series_characteristics=None, **kwargs):
         self.rid = name
         self.name = name
         self.series_config = SeriesConfigModel.from_dict(config)
+        if state is None:
+            state = {}
         self.state = SeriesState.from_dict(state)
         self.series_characteristics = series_characteristics
 
@@ -118,24 +120,24 @@ class Series:
         if static_only:
             return {
                 'name': self.name,
-                'datapoint_count': self._datapoint_count,
-                'job_statuses': self.series_job_statuses,
-                'job_schedule': self._job_schedule,
+                'datapoint_count': self.state.datapoint_count,
+                'job_statuses': self.state.job_schedule.to_dict(),
+                'job_schedule': self.state.job_schedule.to_dict(),
                 'config': self.series_config.to_dict(),
                 'series_characteristics': self.series_characteristics,
-                'health': self.health
+                'health': self.state.health
             }
         return {
             'rid': self.rid,
             'name': self.name,
-            'datapoint_count': self._datapoint_count,
-            'job_statuses': self.series_job_statuses,
-            'job_schedule': self._job_schedule,
+            'datapoint_count': self.state.datapoint_count,
+            'job_statuses': self.state.job_statuses.to_dict(),
+            'job_schedule': self.state.job_schedule.to_dict(),
             'config': self.series_config.to_dict(),
             'ignore': self.is_ignored(),
             'error': self.get_errors(),
             'series_characteristics': self.series_characteristics,
-            'health': self.health
+            'health': self.state.health
         }
 
     @classmethod
