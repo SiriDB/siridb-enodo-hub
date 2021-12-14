@@ -130,45 +130,49 @@ class Server:
                 logging.error('Watching background tasks failed')
 
     async def watch_series(self):
-        while ServerState.running:
-            ServerState.tasks_last_runs['watch_series'] = datetime.datetime.now()
-            series_names = SeriesManager.get_all_series()
-            for series_name in series_names:
-                series = await SeriesManager.get_series(series_name)       
-                # Check if series is valid and not ignored
-                if series is not None \
-                        and not series.is_ignored():
-                    # Check if requirement of min amount of datapoints is met
-                    if series.get_datapoints_count() >= Config.min_data_points or (
-                        series.series_config.min_data_points is not None and series.get_datapoints_count() >= series.series_config.min_data_points):
-                        try:
-                            # Check if series does not have any failed jobs
-                            if not len(EnodoJobManager.get_failed_jobs_for_series(series_name)):
-                                if await series.base_analysis_status() == JOB_STATUS_NONE:
-                                    base_analysis_job = series.base_analysis_job
-                                    await EnodoJobManager.create_job(base_analysis_job.link_name, series_name)
+        try:
+            while ServerState.running:
+                ServerState.tasks_last_runs['watch_series'] = datetime.datetime.now()
+                series_names = SeriesManager.get_all_series()
+                for series_name in series_names:
+                    series = await SeriesManager.get_series(series_name)       
+                    # Check if series is valid and not ignored
+                    if series is not None \
+                            and not series.is_ignored():
+                        # Check if requirement of min amount of datapoints is met
+                        if series.get_datapoints_count() is not None and series.get_datapoints_count() >= Config.min_data_points or (
+                            series.series_config.min_data_points is not None and series.get_datapoints_count() is not None and series.get_datapoints_count() >= series.series_config.min_data_points):
+                            try:
+                                # Check if series does not have any failed jobs
+                                if not len(EnodoJobManager.get_failed_jobs_for_series(series_name)):
+                                    if series.base_analysis_status() == JOB_STATUS_NONE:
+                                        base_analysis_job = series.base_analysis_job
+                                        await EnodoJobManager.create_job(base_analysis_job.link_name, series_name)
 
-                                elif await series.base_analysis_status() == JOB_STATUS_DONE:
-                                    
-                                    # loop through scheduled jobs:
-                                    job_schedules = series.state.get_all_job_schedules()
-                                    for job_link_name in series.series_config.job_config:
-                                        if job_link_name in job_schedules:
-                                            if series.state.get_job_status(job_link_name) in [JOB_STATUS_OPEN, JOB_STATUS_PENDING]:
-                                                continue
-                                                
-                                            job_config = series.series_config.get_config_for_job(job_link_name)
-                                            if await series.is_job_due(job_link_name):
-                                                await EnodoJobManager.create_job(job_link_name, series_name)
-                                                continue
-                                        else:
-                                            # Job has not been schedules yet, lets add it
-                                            await series.schedule_job(job_link_name)
-                        except Exception as e:
-                            logging.error(f"Something went wrong when trying to create new job")
-                            logging.debug(f"Corresponding error: {e}")
+                                    elif series.base_analysis_status() == JOB_STATUS_DONE:
+                                        
+                                        # loop through scheduled jobs:
+                                        job_schedules = series.state.get_all_job_schedules()
+                                        for job_link_name in series.series_config.job_config:
+                                            if job_link_name in job_schedules:
+                                                if series.state.get_job_status(job_link_name) in [JOB_STATUS_OPEN, JOB_STATUS_PENDING]:
+                                                    continue
+                                                    
+                                                if await series.is_job_due(job_link_name):
+                                                    await EnodoJobManager.create_job(job_link_name, series_name)
+                                                    continue
+                                            else:
+                                                # Job has not been schedules yet, lets add it
+                                                await series.schedule_job(job_link_name, initial=True)
+                            except Exception as e:
+                                logging.error(f"Something went wrong when trying to create new job")
+                                import traceback
+                                traceback.print_exc()
+                                logging.debug(f"Corresponding error: {e}")
 
-            await asyncio.sleep(Config.watcher_interval)
+                await asyncio.sleep(Config.watcher_interval)
+        except Exception as e:
+            print(e)
 
     @staticmethod
     async def _save_to_disk():

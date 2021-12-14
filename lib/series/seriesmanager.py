@@ -51,8 +51,10 @@ class SeriesManager:
             if await does_series_exist(ServerState.get_siridb_data_conn(), series.get('name')):
                 collected_datapoints = await query_series_datapoint_count(ServerState.get_siridb_data_conn(), series.get('name'))
                 if collected_datapoints:
-                    series['datapoint_count'] = collected_datapoints
+
+                    # series['datapoint_count'] = collected_datapoints
                     cls._series[series.get('name')] = Series.from_dict(series)
+                    cls._series[series.get('name')].state.datapoint_count = collected_datapoints
                     logging.info(f"Added new series: {series.get('name')}")
                     await cls.series_changed(SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name'))
                     await cls.update_listeners(cls.get_listener_series_info())

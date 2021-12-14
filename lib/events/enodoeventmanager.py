@@ -36,7 +36,7 @@ class EnodoEvent:
     """
     EnodoEvent class. Holds data for an event (error/warning/etc) that occured. No state data is saved.
     """
-    __slots__ = ('title', 'message', 'event_type', 'series', 'ts', 'severity', 'uuid')
+    __slots__ = ('title', 'message', 'event_type', 'series_name', 'ts', 'severity', 'uuid')
 
     def __init__(self, title, message, event_type, series=None):
         if event_type not in ENODO_EVENT_TYPES:
@@ -54,6 +54,7 @@ class EnodoEvent:
             'title': self.title,
             'event_type': self.event_type,
             'message': self.message,
+            'series_name': self.series_name,
             'ts': self.ts,
             'uuid': self.uuid
         }
@@ -246,10 +247,10 @@ class EnodoEventManager:
         await cls._unlock()
 
     @classmethod
-    async def handle_event(cls, event):
+    async def handle_event(cls, event, series=None):
         if isinstance(event, EnodoEvent):
             if event.event_type in ENODO_SERIES_RELATED_EVENT_TYPES:
-                if event.series is not None and event.series.series_config.silenced == True:
+                if series is not None and series.is_ignored() == True:
                     return False
             for output in cls.outputs:
                 await output.send_event(event)

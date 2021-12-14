@@ -38,6 +38,9 @@ class Series:
     def is_ignored(self):
         return EnodoJobManager.has_series_failed_jobs(self.name)
 
+    async def get_model(self, job_name):
+        return self.series_config.get_config_for_job(job_name).model
+
     async def get_job_status(self, job_link_name):
         return self.state.get_job_status(job_link_name)
 
@@ -72,24 +75,32 @@ class Series:
         if self._datapoint_count_lock is False:
             self.state.datapoint_count += add_to_count
 
-    async def schedule_job(self, job_link_name):
-        job_schedule = self.state.get_job_schedule(job_link_name)
-
+    async def schedule_job(self, job_link_name, initial=False):
         job_config = self.series_config.get_config_for_job(job_link_name)  
         if job_config is None:                  
             return False
+
+        job_schedule = self.state.get_job_schedule(job_link_name)
+            
         if job_schedule is None:
             job_schedule = {"value": 0, "type": job_config.job_schedule_type}
 
+        next_value = None
         if job_schedule["type"] == "TS":
             current_ts = int(time.time())
-            if job_schedule["value"] <= current_ts:
+            if initial:
+                next_value = current_ts
+            elif job_schedule["value"] <= current_ts:
                 next_value = current_ts + job_config.job_schedule
-                self.state.set_job_schedule(job_link_name, next_value)
         elif job_schedule["type"] == "N":
-            if job_schedule["value"] <= self.state.datapoint_count:
+            if initial:
+                next_value = self.state.datapoint_count
+            elif job_schedule["value"] <= self.state.datapoint_count:
                 next_value = self.state.datapoint_count + job_config.job_schedule
-                self.state.set_job_schedule(job_link_name, next_value)
+
+        if next_value is not None:
+            job_schedule['value'] = next_value
+            self.state.set_job_schedule(job_link_name, job_schedule)
             
     async def is_job_due(self, job_link_name):
         job_status = self.state.get_job_status(job_link_name)
