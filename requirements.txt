@@ -9,3 +9,5 @@ python-enodo==0.1.16
 python-socketio==5.0.4
 qpack==0.0.17
 siridb-connector==2.0.8
+packaging==21.3
+MarkupSafe==2.0.1
