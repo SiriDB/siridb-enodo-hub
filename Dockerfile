@@ -1,7 +1,4 @@
 FROM python:3.8
-# RUN apt-get update && \
-#     apt-get upgrade -y && \
-#     apt-get install -y git python3-pip gcc python3-dev musl-dev && \
 COPY . /opt/siridb-enodo-hub
 WORKDIR /opt/siridb-enodo-hub
 RUN pip install -r requirements.txt
