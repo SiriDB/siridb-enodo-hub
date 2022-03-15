@@ -10,10 +10,12 @@ class ServerState:
     siridb_forecast_client = None
     tasks_last_runs = {}
     siridb_conn_status = {}
+    readiness = None
 
     @classmethod
     async def async_setup(cls, sio):
         cls.running = True
+        cls.readiness = False
         cls.sio = sio
 
         await cls.setup_siridb_connection()
@@ -33,6 +35,10 @@ class ServerState:
         await cls.refresh_siridb_status()
 
     @classmethod
+    def get_readiness(cls):
+        return cls.readiness
+
+    @classmethod
     def _siridb_config_equal(cls, a, b):
         if a.get('username') != b.get('username'):
             return False
@@ -47,20 +53,21 @@ class ServerState:
 
     @classmethod
     async def setup_siridb_connection(cls):
-        siridb_data_config, siridb_forecast_config = Config.get_siridb_settings()
+        data_config, forecast_config = Config.get_siridb_settings()
 
         if cls.siridb_data_client is not None:
             cls.stop()
-        
+
         cls.siridb_data_client = SiriDBClient(
-            **siridb_data_config,
+            **data_config,
             keepalive=True)
         await cls.siridb_data_client.connect()
-        if not cls._siridb_config_equal(siridb_data_config, siridb_forecast_config):
+        if not cls._siridb_config_equal(
+                data_config, forecast_config):
             if cls.siridb_forecast_client is not None:
                 cls.siridb_forecast_client.close()
             cls.siridb_forecast_client = SiriDBClient(
-                **siridb_forecast_config,
+                **forecast_config,
                 keepalive=True)
             await cls.siridb_forecast_client.connect()
         elif cls.siridb_forecast_client is not None:
@@ -78,7 +85,6 @@ class ServerState:
         if cls.siridb_forecast_client is None:
             return cls.siridb_data_client
         return cls.siridb_forecast_client
-
 
     @classmethod
     def get_siridb_data_conn_status(cls):
@@ -103,7 +109,7 @@ class ServerState:
                     'resource': 'siridb_status',
                     'updateType': SUBSCRIPTION_CHANGE_TYPE_INITIAL,
                     'resourceData': cls.siridb_conn_status
-                    }, room='siridb_status_updates')
+                }, room='siridb_status_updates')
 
     @classmethod
     def stop(cls):

@@ -5,7 +5,8 @@ import os
 from enodo import EnodoModel
 from lib.config import Config
 from lib.util import load_disk_data, save_disk_data
-from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, SUBSCRIPTION_CHANGE_TYPE_DELETE
+from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, \
+    SUBSCRIPTION_CHANGE_TYPE_DELETE
 
 
 class EnodoModelManager:
@@ -28,13 +29,15 @@ class EnodoModelManager:
         if await cls.get_model(name) is None:
             model = EnodoModel(name, model_arguments)
             cls.models.append(model)
-            await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, EnodoModel.to_dict(model))
+            await cls._update_cb(
+                SUBSCRIPTION_CHANGE_TYPE_ADD, EnodoModel.to_dict(model))
 
     @classmethod
     async def add_enodo_model(cls, model):
         if await cls.get_model(model.name) is None:
             cls.models.append(model)
-            await cls._update_cb(SUBSCRIPTION_CHANGE_TYPE_ADD, EnodoModel.to_dict(model))
+            await cls._update_cb(
+                SUBSCRIPTION_CHANGE_TYPE_ADD, EnodoModel.to_dict(model))
             return True
         return False
 
@@ -69,5 +72,6 @@ class EnodoModelManager:
         try:
             save_disk_data(Config.model_save_path, model_list)
         except Exception as e:
-            logging.error(f"Something went wrong when writing enodo models to disk")
+            logging.error(f"Something went wrong when writing \
+                enodo models to disk")
             logging.debug(f"Corresponding error: {e}")

@@ -5,6 +5,7 @@ from aiohttp import web
 from aiohttp_basicauth import BasicAuthMiddleware
 
 from lib.config import Config
+from lib.serverstate import ServerState
 from lib.socket import ClientManager
 from lib.util import safe_json_dumps
 from lib.webserver.auth import EnodoAuth
@@ -29,11 +30,13 @@ class ApiHandlers:
         :return:
         """
         regex_filter = urllib.parse.unquote(
-            request.rel_url.query['filter']) if 'filter' in request.rel_url.query else None
+            request.rel_url.query['filter']) \
+            if 'filter' in request.rel_url.query else None
         # TODO implement filter
 
-        return web.json_response(data=await BaseHandler.resp_get_monitored_series(regex_filter),
-                                 dumps=safe_json_dumps)
+        return web.json_response(
+            data=await BaseHandler.resp_get_monitored_series(regex_filter),
+            dumps=safe_json_dumps)
 
     @classmethod
     @EnodoAuth.auth.required
@@ -43,13 +46,14 @@ class ApiHandlers:
         :param request:
         :return:
         """
-        include_points = True if 'include_points' in request.rel_url.query and request.rel_url.query[
-            'include_points'] == 'true' else False
-
+        include_points = True \
+            if 'include_points' in request.rel_url.query and \
+            request.rel_url.query['include_points'] == 'true' else False
         series_name = unquote(request.match_info['series_name'])
 
         return web.json_response(
-            data=await BaseHandler.resp_get_monitored_series_details(series_name, include_points),
+            data=await BaseHandler.resp_get_monitored_series_details(
+                series_name, include_points),
             dumps=safe_json_dumps)
 
     @classmethod
@@ -72,8 +76,10 @@ class ApiHandlers:
         :param request:
         :return:
         """
-        series_name = urllib.parse.unquote(request.match_info['series_name'])
-        return web.json_response(data={}, status=await BaseHandler.resp_remove_series(series_name))
+        series_name = urllib.parse.unquote(
+            request.match_info['series_name'])
+        return web.json_response(
+            data={}, status=await BaseHandler.resp_remove_series(series_name))
 
     @classmethod
     @EnodoAuth.auth.required
@@ -98,7 +104,8 @@ class ApiHandlers:
         output_type = data.get('output_type')
         output_data = data.get('data')
 
-        resp, status = await BaseHandler.resp_add_event_output(output_type, output_data)
+        resp, status = await BaseHandler.resp_add_event_output(
+            output_type, output_data)
         return web.json_response(data=resp, status=status)
 
     @classmethod
@@ -123,7 +130,9 @@ class ApiHandlers:
         :return:
         """
 
-        return web.json_response(data=await BaseHandler.resp_get_possible_analyser_models(), status=200)
+        return web.json_response(
+            data=await BaseHandler.resp_get_possible_analyser_models(),
+            status=200)
 
     @classmethod
     @EnodoAuth.auth.required
@@ -147,6 +156,18 @@ class ApiHandlers:
         """
         resp = await BaseHandler.resp_get_enodo_hub_status()
         return web.json_response(data=resp, status=200)
+
+    @classmethod
+    async def get_enodo_readiness(cls, request):
+        """
+        Get status of this analyser instance
+        :param request:
+        :return:
+        """
+        ready = ServerState.get_readiness()
+        return web.Response(
+            body="OK\r\n" if ready else "SERVICE UNAVAILABLE\r\n",
+            status=200 if ready else 503)
 
     @classmethod
     @EnodoAuth.auth.required
@@ -181,8 +202,14 @@ class ApiHandlers:
         :return:
         """
         return web.json_response(data={
-            'data': {'listeners': [l.to_dict() for l in ClientManager.listeners.values()],
-                     'workers': [w.to_dict() for w in ClientManager.workers.values()]}}, status=200,
+            'data': {
+                'listeners': [
+                    l.to_dict() for l in ClientManager.listeners.values()],
+                'workers': [
+                    w.to_dict() for w in ClientManager.workers.values()]
+            }
+        },
+            status=200,
             dumps=safe_json_dumps)
 
     @classmethod

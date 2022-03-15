@@ -1,15 +1,17 @@
 import time
 
-from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_NONE, JOB_STATUS_OPEN, JOB_STATUS_PENDING, JOB_STATUS_DONE, JOB_STATUS_FAILED
+from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_NONE, \
+    JOB_STATUS_DONE
 from enodo.model.config.series import SeriesConfigModel, SeriesState
 
 
 class Series:
     # detecting_anomalies_status forecast_status series_analysed_status
-    __slots__ = (
-        'rid', 'name', 'series_config', 'state', '_datapoint_count_lock', 'series_characteristics')
+    __slots__ = ('rid', 'name', 'series_config', 'state',
+                 '_datapoint_count_lock', 'series_characteristics')
 
-    def __init__(self, name, config, state=None, series_characteristics=None, **kwargs):
+    def __init__(self, name, config, state=None,
+                 series_characteristics=None, **kwargs):
         self.rid = name
         self.name = name
         self.series_config = SeriesConfigModel.from_dict(config)
@@ -19,7 +21,7 @@ class Series:
         self.series_characteristics = series_characteristics
 
         self._datapoint_count_lock = False
-        
+
     async def set_datapoints_counter_lock(self, is_locked):
         """
         Set lock so it can or can not be changed
@@ -32,10 +34,15 @@ class Series:
         return self._datapoint_count_lock
 
     def get_errors(self):
-        errors = [job.error for job in EnodoJobManager.get_failed_jobs_for_series(self.name)]
+        from ..enodojobmanager import EnodoJobManager # To stop circular import
+        errors = [
+            job.error
+            for job in EnodoJobManager.get_failed_jobs_for_series(
+                self.name)]
         return errors
 
     def is_ignored(self):
+        from ..enodojobmanager import EnodoJobManager # To stop circular import
         return EnodoJobManager.has_series_failed_jobs(self.name)
 
     async def get_model(self, job_name):
@@ -49,7 +56,8 @@ class Series:
 
     @property
     def base_analysis_job(self):
-        job_config = self.series_config.get_config_for_job_type(JOB_TYPE_BASE_SERIES_ANALYSIS)
+        job_config = self.series_config.get_config_for_job_type(
+            JOB_TYPE_BASE_SERIES_ANALYSIS)
         if job_config is None or job_config is False:
             return False
         return job_config
@@ -58,7 +66,8 @@ class Series:
         return self.series_config.get_config_for_job(job_link_name)
 
     def base_analysis_status(self):
-        job_config = self.series_config.get_config_for_job_type(JOB_TYPE_BASE_SERIES_ANALYSIS)
+        job_config = self.series_config.get_config_for_job_type(
+            JOB_TYPE_BASE_SERIES_ANALYSIS)
         if job_config is None or job_config is False:
             return False
         return self.state.get_job_status(job_config.link_name)
@@ -76,14 +85,16 @@ class Series:
             self.state.datapoint_count += add_to_count
 
     async def schedule_job(self, job_link_name, initial=False):
-        job_config = self.series_config.get_config_for_job(job_link_name)  
-        if job_config is None:                  
+        job_config = self.series_config.get_config_for_job(
+            job_link_name)
+        if job_config is None:
             return False
 
         job_schedule = self.state.get_job_schedule(job_link_name)
-            
+
         if job_schedule is None:
-            job_schedule = {"value": 0, "type": job_config.job_schedule_type}
+            job_schedule = {"value": 0,
+                            "type": job_config.job_schedule_type}
 
         next_value = None
         if job_schedule["type"] == "TS":
@@ -96,27 +107,32 @@ class Series:
             if initial:
                 next_value = self.state.datapoint_count
             elif job_schedule["value"] <= self.state.datapoint_count:
-                next_value = self.state.datapoint_count + job_config.job_schedule
+                next_value = \
+                    self.state.datapoint_count + job_config.job_schedule
 
         if next_value is not None:
             job_schedule['value'] = next_value
             self.state.set_job_schedule(job_link_name, job_schedule)
-            
+
     async def is_job_due(self, job_link_name):
         job_status = self.state.get_job_status(job_link_name)
         job_schedule = self.state.get_job_schedule(job_link_name)
-        
+
         if job_status == JOB_STATUS_NONE or job_status == JOB_STATUS_DONE:
-            job_config = self.series_config.get_config_for_job(job_link_name)
+            job_config = self.series_config.get_config_for_job(
+                job_link_name)
             if job_config.requires_job is not None:
-                required_job_status = self.state.get_job_status(job_config.requires_job)
+                required_job_status = self.state.get_job_status(
+                    job_config.requires_job)
                 if required_job_status is not JOB_STATUS_DONE:
                     return False
             if job_schedule["value"] is None:
                 return True
-            elif job_schedule["type"] == "TS" and job_schedule["value"] <= int(time.time()):
+            elif job_schedule["type"] == "TS" and \
+                job_schedule["value"] <= int(time.time()):
                 return True
-            elif job_schedule["type"] == "N" and job_schedule["value"] <= self.state.datapoint_count:
+            elif job_schedule["type"] == "N" and \
+                job_schedule["value"] <= self.state.datapoint_count:
                 return True
         return False
 
@@ -154,6 +170,3 @@ class Series:
     @classmethod
     def from_dict(cls, data_dict):
         return Series(**data_dict)
-
-
-from ..enodojobmanager import EnodoJobManager

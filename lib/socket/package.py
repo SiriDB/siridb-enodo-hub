@@ -54,9 +54,16 @@ async def read_packet(sock, header_data=None):
 
 
 def create_header(size, type, id):
-    return size.to_bytes(4, byteorder='big') + type.to_bytes(1, byteorder='big') + id.to_bytes(1, byteorder='big')
+    return size.to_bytes(4, byteorder='big') + \
+        type.to_bytes(1, byteorder='big') + \
+        id.to_bytes(1, byteorder='big')
 
 
 def read_header(binary_data):
-    return int.from_bytes(binary_data[:4], 'big'), int.from_bytes(binary_data[4:5], 'big'), int.from_bytes(
-        binary_data[5:6], 'big')
+    return int.from_bytes(
+        binary_data[: 4],
+        'big'), int.from_bytes(
+        binary_data[4: 5],
+        'big'), int.from_bytes(
+        binary_data[5: 6],
+        'big')
