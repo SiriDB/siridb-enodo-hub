@@ -1,8 +1,7 @@
-import json
-from lib.util.util import load_disk_data
 import os
 
 from enodo import EnodoModel
+
 from lib.config import Config
 from lib.util import load_disk_data, save_disk_data
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, \

@@ -2,6 +2,12 @@ from lib.api.apihandlers import ApiHandlers
 
 
 def setup_routes(app, cors):
+    """Add REST API routes
+
+    Args:
+        app (instance): AIOHTTP app instance
+        cors (CorsConfig): cors
+    """
     # Add rest api routes
     app.router.add_get(
         "/api/series", ApiHandlers.get_monitored_series,
