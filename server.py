@@ -7,21 +7,23 @@ import aiohttp_cors
 import socketio
 from aiohttp import web
 from enodo.protocol.packagedata import *
+from enodo.jobs import JOB_STATUS_NONE, JOB_STATUS_DONE
 
 from lib.analyser.model import EnodoModelManager
 from lib.api.apihandlers import ApiHandlers, auth
 from lib.config import Config
 from lib.events.enodoeventmanager import EnodoEventManager
 from lib.enodojobmanager import EnodoJobManager
-from enodo.jobs import JOB_STATUS_NONE, JOB_STATUS_DONE
+
 from lib.logging import prepare_logger
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
 from lib.socket import ClientManager
 from lib.socket.handler import receive_new_series_points, \
     receive_worker_status_update, received_worker_refused
-from lib.socket.package import LISTENER_NEW_SERIES_POINTS, WORKER_UPDATE_BUSY,\
-    WORKER_JOB_RESULT, WORKER_REFUSED, WORKER_JOB_CANCELLED
+from lib.socket.package import LISTENER_NEW_SERIES_POINTS, \
+    WORKER_UPDATE_BUSY, WORKER_JOB_RESULT, WORKER_REFUSED, \
+    WORKER_JOB_CANCELLED
 from lib.socket.socketserver import SocketServer
 from lib.socketio.socketiohandlers import SocketIoHandler
 from lib.socketio.socketiorouter import SocketIoRouter
@@ -49,7 +51,9 @@ class Server:
 
         self._watch_tasks_task = None
 
-    async def start_up(self):
+    async def start_up(self): 
+        """All connections and classes will be prepared
+        """
         # Setup server state object
         await ServerState.async_setup(sio=self.sio)
 
@@ -109,9 +113,7 @@ class Server:
         ServerState.readiness = True
 
     async def clean_up(self):
-        """
-        Cleans up before shutdown
-        :return:
+        """Cleans up before shutdown
         """
         self._watch_series_task.cancel()
         self._check_jobs_task.cancel()
@@ -121,16 +123,21 @@ class Server:
         await self.backend_socket.stop()
 
     async def _manage_connections(self):
+        """Background task to check if all connections are up
+        """
         while ServerState.running:
             await asyncio.sleep(Config.save_to_disk_interval)
             ServerState.tasks_last_runs['manage_connections'] = \
                 datetime.datetime.now()
             logging.debug('Cleaning-up clients')
-            await ClientManager.check_clients_alive(Config.client_max_timeout)
+            await ClientManager.check_clients_alive(
+                Config.client_max_timeout)
             logging.debug('Refreshing SiriDB connection status')
             await ServerState.refresh_siridb_status()
 
     async def watch_tasks(self):
+        """Background task to check if other background tasks are running
+        """
         while ServerState.running:
             await asyncio.sleep(Config.save_to_disk_interval * 2)
             logging.debug('Watching background tasks')
@@ -146,8 +153,14 @@ class Server:
                 logging.error('Watching background tasks failed')
 
     async def _check_for_jobs(self, series, series_name):
-        # Check if series does not have any failed jobs
-        if len(EnodoJobManager.get_failed_jobs_for_series(series_name)):
+        """Private function to check if jobs need to be created
+
+        Args:
+            series (Series): Series instance
+            series_name (string): name of series
+        """
+        # Check if series does have any failed jobs
+        if len(EnodoJobManager.get_failed_jobs_for_series(series_name)) > 0:
             return
 
         # Check if base analysis has already run
@@ -170,6 +183,9 @@ class Server:
                 await series.schedule_job(job_link_name, initial=True)
 
     async def watch_series(self):
+        """Background task to check each series if
+        jobs need to be managed
+        """
         while ServerState.running:
             ServerState.tasks_last_runs['watch_series'] = \
                 datetime.datetime.now()
@@ -204,8 +220,7 @@ class Server:
 
     @staticmethod
     async def _save_to_disk():
-        """
-        Call all save to disk methods from various manager classes
+        """Call all save to disk methods from various manager classes
         """
         await SeriesManager.save_to_disk()
         await EnodoJobManager.save_to_disk()
@@ -213,6 +228,8 @@ class Server:
         await EnodoModelManager.save_to_disk()
 
     async def save_to_disk(self):
+        """Save configs to disk on a set interval
+        """
         while ServerState.running:
             await asyncio.sleep(Config.save_to_disk_interval)
             ServerState.tasks_last_runs['save_to_disk'] = \
@@ -221,6 +238,8 @@ class Server:
             await self._save_to_disk()
 
     async def stop_server(self):
+        """Stop all parts of the server for a clean shutdown
+        """
         logging.info('Stopping Hub...')
         ServerState.readiness = False
         if self.sio is not None:
@@ -264,9 +283,13 @@ class Server:
         print('Bye!')
 
     async def _stop_server_from_aiohttp_cleanup(self, *args, **kwargs):
+        """Stop server when aiohttp can exit
+        """
         await self.stop_server()
 
     def start_server(self):
+        """Start server by loading config and calling other startup functions
+        """
         prepare_logger(self._log_level)
         Config.read_config(self._config_path)
         logging.info('Starting...')

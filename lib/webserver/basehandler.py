@@ -1,13 +1,15 @@
 from aiohttp import web
 from enodo import EnodoModel
 from enodo.model.config.series import SeriesConfigModel
+
+from version import VERSION
+
 from lib.analyser.model import EnodoModelManager
 from lib.events import EnodoEventManager
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
 from lib.siridb.siridb import query_series_data
 from lib.util import regex_valid
-from version import VERSION
 from lib.enodojobmanager import EnodoJobManager, EnodoJob
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
 from lib.config import Config
@@ -18,6 +20,14 @@ class BaseHandler:
 
     @classmethod
     async def resp_get_monitored_series(cls, regex_filter=None):
+        """Get monitored series
+
+        Args:
+            regex_filter (string, optional): filter by regex. Defaults to None.
+
+        Returns:
+            dict: dict with data
+        """
         if regex_filter is not None:
             if not regex_valid(regex_filter):
                 return {'data': []}
@@ -27,6 +37,16 @@ class BaseHandler:
     @classmethod
     async def resp_get_monitored_series_details(cls, series_name,
                                                 include_points=False):
+        """Get monitored series details
+
+        Args:
+            series_name (string): name of series
+            include_points (bool, optional): if points need to be returned.
+                Defaults to False.
+
+        Returns:
+            dict: dict with data
+        """
         series = await SeriesManager.get_series(series_name)
 
         if series is None:
@@ -42,31 +62,70 @@ class BaseHandler:
 
     @classmethod
     async def resp_get_event_outputs(cls):
+        """get all event output steams
+
+        Returns:
+            dict: dict with data
+        """
         return {'data': [
             output.to_dict() for output in EnodoEventManager.outputs]}, 200
 
     @classmethod
     async def resp_add_event_output(cls, output_type, data):
+        """create event output stream
+
+        Args:
+            output_type (int): output type
+            data (dict): data for output stream
+
+        Returns:
+            dict: dict with data
+        """
         output = await EnodoEventManager.create_event_output(output_type, data)
         return {'data': output.to_dict()}, 201
 
     @classmethod
     async def resp_update_event_output(cls, output_id, data):
+        """Update event output stream
+
+        Args:
+            output_id (int): id of an existing stream
+            data (dict): data for output stream
+
+        Returns:
+            dict: dict with data
+        """
         output = await EnodoEventManager.update_event_output(output_id, data)
         return {'data': output.to_dict()}, 201
 
     @classmethod
     async def resp_remove_event_output(cls, output_id):
+        """remove output stream
+
+        Args:
+            output_id (int): id of an existing output stream
+
+        Returns:
+            dict: dict with data
+        """
         await EnodoEventManager.remove_event_output(output_id)
         return {'data': None}, 200
 
     @classmethod
     async def resp_add_series(cls, data):
+        """Add series for monitoring
+
+        Args:
+            data (dict): config of series
+
+        Returns:
+            dict: dict with data
+        """
         try:
             series_config = SeriesConfigModel.from_dict(
                 data.get('config'))
         except Exception as e:
-            return {'error': f'Invalid series config', 'message': str(e)}, 400
+            return {'error': 'Invalid series config', 'message': str(e)}, 400
         for job_config in list(series_config.job_config.values()):
             model_parameters = job_config.model_params
 
@@ -90,6 +149,15 @@ class BaseHandler:
 
     @classmethod
     async def resp_update_series(cls, series_name, data):
+        """Update series
+
+        Args:
+            series_name (string): name of series
+            data (dict): config of series
+
+        Returns:
+            dict: dict with data
+        """
         required_fields = ['config']
         if not all(required_field in data
                    for required_field in required_fields):
@@ -122,6 +190,14 @@ class BaseHandler:
 
     @classmethod
     async def resp_remove_series(cls, series_name):
+        """Remove series
+
+        Args:
+            series_name (string): name of series
+
+        Returns:
+            dict: dict with data
+        """
         if await SeriesManager.remove_series(series_name):
             await EnodoJobManager.cancel_jobs_for_series(series_name)
             EnodoJobManager.remove_failed_jobs_for_series(series_name)
@@ -152,12 +228,26 @@ class BaseHandler:
 
     @classmethod
     async def resp_get_possible_analyser_models(cls):
+        """Get all models that are available
+
+        Returns:
+            dict: dict with data
+        """
         data = {'models': [EnodoModel.to_dict(
             model) for model in EnodoModelManager.models]}
         return {'data': data}
 
     @classmethod
     async def resp_add_model(cls, data):
+        """Add model
+
+        Args:
+            data (dict): config of model
+
+        Returns:
+            dict: dict with data
+            dict: dict with error message
+        """
         try:
             await EnodoModelManager.add_model(data['model_name'],
                                               data['model_arguments'])
@@ -169,8 +259,7 @@ class BaseHandler:
 
     @classmethod
     async def resp_get_enodo_hub_status(cls):
-        data = {'version': VERSION}
-        return {'data': data}
+        return {'data': {'version': VERSION}}
 
     @classmethod
     async def resp_get_enodo_config(cls):
@@ -178,6 +267,14 @@ class BaseHandler:
 
     @classmethod
     async def resp_set_config(cls, data):
+        """Update config
+
+        Args:
+            data (dict): config/settings
+
+        Returns:
+            dict: dict with boolean if succesful
+        """
         section = data.get('section')
         keys_and_values = data.get('entries')
         for key in keys_and_values:

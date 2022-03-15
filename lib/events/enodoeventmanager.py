@@ -3,9 +3,9 @@ import logging
 import time
 import os
 import uuid
-
-import aiohttp
 import json
+import aiohttp
+
 from jinja2 import Environment
 
 from lib.config import Config
@@ -39,8 +39,8 @@ ENODO_EVENT_SEVERITY_LEVELS = [
 
 class EnodoEvent:
     """
-    EnodoEvent class. Holds data for an event (error/warning/etc) that occured. 
-    No state data is saved.
+    EnodoEvent class. Holds data for an event (error/warning/etc) 
+    that occured. No state data is saved.
     """
     __slots__ = ('title', 'message', 'event_type',
                  'series_name', 'ts', 'severity', 'uuid')
