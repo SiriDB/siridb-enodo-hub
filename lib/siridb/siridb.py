@@ -82,3 +82,40 @@ async def query_group_expression_by_name(siridb_client, group_name):
         return None
 
     return groups[0][0]
+
+
+async def query_series_forecasts(siridb_client, series_name, selector="*"):
+    result = None
+    try:
+        result = await siridb_client.query(
+            f'select {selector} from \enodo_{series_name}_forecast_*\\')
+    except (QueryError, InsertError, ServerError, PoolError,
+            AuthenticationError, UserAuthError) as e:
+        print("Connection problem with SiriDB server")
+        pass
+    return result
+
+
+async def query_series_anomalies(siridb_client, series_name, selector="*"):
+    result = None
+    try:
+        result = await siridb_client.query(
+            f'select {selector} from \enodo_{series_name}_anomalies_*\\')
+    except (QueryError, InsertError, ServerError, PoolError,
+            AuthenticationError, UserAuthError) as e:
+        print("Connection problem with SiriDB server")
+        pass
+    return result
+
+
+async def query_series_static_rules_hits(
+        siridb_client, series_name, selector="*"):
+    result = None
+    try:
+        result = await siridb_client.query(
+            f'select {selector} from \enodo_{series_name}_static_rules_*\\')
+    except (QueryError, InsertError, ServerError, PoolError,
+            AuthenticationError, UserAuthError) as e:
+        print("Connection problem with SiriDB server")
+        pass
+    return result

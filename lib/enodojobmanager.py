@@ -361,7 +361,9 @@ class EnodoJobManager:
         if job_type == JOB_TYPE_FORECAST_SERIES:
             try:
                 await SeriesManager.add_forecast_to_series(
-                    data.get('name'), data.get('points'))
+                    data.get('name'),
+                    job.job_config.link_name,
+                    data.get('points'))
                 await series.set_job_status(
                     job.job_config.link_name, JOB_STATUS_DONE)
                 await series.schedule_job(job.job_config.link_name)
@@ -378,7 +380,9 @@ class EnodoJobManager:
                     data.get('anomalies')) > 0:
                 try:
                     await SeriesManager.add_anomalies_to_series(
-                        data.get('name'), data.get('anomalies'))
+                        data.get('name'),
+                        job.job_config.link_name,
+                        data.get('anomalies'))
                     await series.set_job_status(
                         job.job_config.link_name, JOB_STATUS_DONE)
                     await series.schedule_job(job.job_config.link_name)

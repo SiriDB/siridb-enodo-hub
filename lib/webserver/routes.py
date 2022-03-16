@@ -15,8 +15,22 @@ def setup_routes(app, cors):
     app.router.add_post(
         "/api/series", ApiHandlers.add_series)
     app.router.add_get(
-        "/api/series/{series_name}", ApiHandlers.get_monitored_series_details,
+        "/api/series/{series_name}", ApiHandlers.get_single_monitored_series,
         allow_head=False)
+
+    app.router.add_get(
+        "/api/series/{series_name}/forecasts",
+        ApiHandlers.get_series_forecast,
+        allow_head=False)
+    app.router.add_get(
+        "/api/series/{series_name}/anomlies",
+        ApiHandlers.get_series_anomalies,
+        allow_head=False)
+    app.router.add_get(
+        "/api/series/{series_name}/static_rules",
+        ApiHandlers.get_series_static_rules_hits,
+        allow_head=False)
+
     app.router.add_delete(
         "/api/series/{series_name}", ApiHandlers.remove_series)
     app.router.add_get(

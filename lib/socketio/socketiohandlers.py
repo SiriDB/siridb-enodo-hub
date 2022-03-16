@@ -62,8 +62,32 @@ class SocketIoHandler:
     @socketio_auth_required
     async def get_series_details(cls, sid, data, event):
         series_name = data.get('series_name')
-        resp = await BaseHandler.resp_get_monitored_series_details(
-            series_name, include_points=True)
+        resp = await BaseHandler.resp_get_single_monitored_series(
+            series_name)
+        return safe_json_dumps(resp)
+
+    @classmethod
+    @socketio_auth_required
+    async def get_series_forecasts(cls, sid, data, event):
+        series_name = data.get('series_name')
+        resp = await BaseHandler.resp_get_series_forecasts(
+            series_name)
+        return safe_json_dumps(resp)
+
+    @classmethod
+    @socketio_auth_required
+    async def get_series_anomalies(cls, sid, data, event):
+        series_name = data.get('series_name')
+        resp = await BaseHandler.resp_get_series_anomalies(
+            series_name)
+        return safe_json_dumps(resp)
+
+    @classmethod
+    @socketio_auth_required
+    async def get_series_static_rules_hits(cls, sid, data, event):
+        series_name = data.get('series_name')
+        resp = await BaseHandler.resp_get_series_static_rules_hits(
+            series_name)
         return safe_json_dumps(resp)
 
     @classmethod

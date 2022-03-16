@@ -150,36 +150,37 @@ class SeriesManager:
         series = cls._series.get(series_name, None)
         if series is not None:
             await series.add_to_datapoints_count(value)
-        elif series_name not in cls._series and \
-                series_name in Config.names_enabled_series_for_analysis:
+        elif series_name not in cls._series:
             await cls.add_series(series_name)
 
     @classmethod
-    async def add_forecast_to_series(cls, series_name, points):
+    async def add_forecast_to_series(cls, series_name,
+                                     job_config_name, points):
         series = cls._series.get(series_name, None)
         if series is not None:
             await drop_series(
                 ServerState.get_siridb_forecast_conn(),
-                f'forecast_{series_name}')
+                f'enodo_{series_name}_forecast_{job_config_name}')
             await insert_points(
                 ServerState.get_siridb_forecast_conn(),
-                f'forecast_{series_name}', points)
+                f'enodo_{series_name}_forecast_{job_config_name}', points)
 
     @classmethod
-    async def add_anomalies_to_series(cls, series_name, points):
+    async def add_anomalies_to_series(cls, series_name, job_config_name, points):
         series = cls._series.get(series_name, None)
         if series is not None:
             event = EnodoEvent(
                 'Anomaly detected!',
-                f'{len(points)} anomalies detected for series {series_name}',
+                f'{len(points)} anomalies detected for series {series_name} \
+                    via job {job_config_name}',
                 ENODO_EVENT_ANOMALY_DETECTED, series=series)
             await EnodoEventManager.handle_event(event)
             await drop_series(
                 ServerState.get_siridb_forecast_conn(),
-                f'anomalies_{series_name}')
+                f'enodo_{series_name}_anomalies_{job_config_name}')
             await insert_points(
                 ServerState.get_siridb_forecast_conn(),
-                f'anomalies_{series_name}', points)
+                f'enodo_{series_name}_anomalies_{job_config_name}', points)
 
     @classmethod
     async def get_series_forecast(cls, series_name):
