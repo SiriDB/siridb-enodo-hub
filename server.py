@@ -168,21 +168,21 @@ class Server:
         if series.base_analysis_status() == JOB_STATUS_NONE:
             base_analysis_job = series.base_analysis_job
             await EnodoJobManager.create_job(
-                base_analysis_job.link_name, series_name)
+                base_analysis_job.config_name, series_name)
         # Only continue if base analysis has finished
         if series.base_analysis_status() != JOB_STATUS_DONE:
             return
 
         # loop through scheduled jobs:
         job_schedules = series.state.get_all_job_schedules()
-        for job_link_name in series.series_config.job_config:
-            if job_link_name in job_schedules and \
-                    await series.is_job_due(job_link_name):
-                await EnodoJobManager.create_job(job_link_name, series_name)
+        for job_config_name in series.series_config.job_config:
+            if job_config_name in job_schedules and \
+                    await series.is_job_due(job_config_name):
+                await EnodoJobManager.create_job(job_config_name, series_name)
                 continue
-            elif job_link_name not in job_schedules:
+            elif job_config_name not in job_schedules:
                 # Job has not been schedules yet, let's add it
-                await series.schedule_job(job_link_name, initial=True)
+                await series.schedule_job(job_config_name, initial=True)
 
     async def watch_series(self):
         """Background task to check each series if

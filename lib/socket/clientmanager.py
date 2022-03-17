@@ -298,6 +298,6 @@ class ClientManager:
                 await EnodoJobManager.cancel_job(job)
                 series = await cls.series_manager.get_series(job.series_name)
                 await series.set_job_status(
-                    job.job_config.link_name, JOB_STATUS_OPEN)
+                    job.job_config.config_name, JOB_STATUS_OPEN)
                 logging.info(
                     f'Setting for series job status pending to false...')

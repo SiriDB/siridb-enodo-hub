@@ -124,10 +124,10 @@ class EnodoJobManager:
         return [job for job in cls._active_jobs if job.worker_id == worker_id]
 
     @classmethod
-    async def create_job(cls, job_link_name, series_name):
+    async def create_job(cls, job_config_name, series_name):
         series = await SeriesManager.get_series(series_name)
-        await series.set_job_status(job_link_name, JOB_STATUS_OPEN)
-        job_config = series.get_job(job_link_name)
+        await series.set_job_status(job_config_name, JOB_STATUS_OPEN)
+        job_config = series.get_job(job_config_name)
         job_id = await cls._get_next_job_id()
         job = EnodoJob(job_id, series_name, job_config,
                        job_data=None)  # TODO: Catch exception
@@ -324,7 +324,7 @@ class EnodoJobManager:
 
                     worker = await ClientManager.get_free_worker(
                         next_job.series_name, next_job.job_config.job_type,
-                        await series.get_model(next_job.job_config.link_name))
+                        await series.get_model(next_job.job_config.config_name))
                     if worker is None:
                         continue
 
@@ -362,11 +362,11 @@ class EnodoJobManager:
             try:
                 await SeriesManager.add_forecast_to_series(
                     data.get('name'),
-                    job.job_config.link_name,
+                    job.job_config.config_name,
                     data.get('points'))
                 await series.set_job_status(
-                    job.job_config.link_name, JOB_STATUS_DONE)
-                await series.schedule_job(job.job_config.link_name)
+                    job.job_config.config_name, JOB_STATUS_DONE)
+                await series.schedule_job(job.job_config.config_name)
                 await SeriesManager.series_changed(
                     SUBSCRIPTION_CHANGE_TYPE_UPDATE, data.get('name'))
             except Exception as e:
@@ -381,11 +381,11 @@ class EnodoJobManager:
                 try:
                     await SeriesManager.add_anomalies_to_series(
                         data.get('name'),
-                        job.job_config.link_name,
+                        job.job_config.config_name,
                         data.get('anomalies'))
                     await series.set_job_status(
-                        job.job_config.link_name, JOB_STATUS_DONE)
-                    await series.schedule_job(job.job_config.link_name)
+                        job.job_config.config_name, JOB_STATUS_DONE)
+                    await series.schedule_job(job.job_config.config_name)
                     await SeriesManager.series_changed(
                         SUBSCRIPTION_CHANGE_TYPE_UPDATE, data.get('name'))
                 except Exception as e:
@@ -399,8 +399,8 @@ class EnodoJobManager:
                     'data').get('characteristics')
                 series.state.health = data.get('data').get('health')
                 await series.set_job_status(
-                    job.job_config.link_name, JOB_STATUS_DONE)
-                await series.schedule_job(job.job_config.link_name)
+                    job.job_config.config_name, JOB_STATUS_DONE)
+                await series.schedule_job(job.job_config.config_name)
                 await SeriesManager.series_changed(
                     SUBSCRIPTION_CHANGE_TYPE_UPDATE, data.get('name'))
             except Exception as e:
@@ -410,8 +410,8 @@ class EnodoJobManager:
         elif job_type == JOB_TYPE_STATIC_RULES:
             try:
                 await series.set_job_status(
-                    job.job_config.link_name, JOB_STATUS_DONE)
-                await series.schedule_job(job.job_config.link_name)
+                    job.job_config.config_name, JOB_STATUS_DONE)
+                await series.schedule_job(job.job_config.config_name)
                 if len(data.get('failed_checks')):
                     for key in data.get('failed_checks'):
                         event = EnodoEvent(
