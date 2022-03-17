@@ -214,21 +214,6 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
-    async def add_analyser_models(cls, request):
-        """Returns list of possible models with corresponding parameters
-
-        Args:
-            request (Request): aiohttp request
-
-        Returns:
-            _type_: _description_
-        """
-        data = await request.json()
-        resp, status = await BaseHandler.resp_add_model(data)
-        return web.json_response(data=resp, status=status)
-
-    @classmethod
-    @EnodoAuth.auth.required
     async def get_siridb_enodo_status(cls, request):
         """Get status of enodo hub
 

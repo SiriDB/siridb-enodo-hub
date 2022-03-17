@@ -276,26 +276,6 @@ class BaseHandler:
         return {'data': data}
 
     @classmethod
-    async def resp_add_model(cls, data):
-        """Add model
-
-        Args:
-            data (dict): config of model
-
-        Returns:
-            dict: dict with data
-            dict: dict with error message
-        """
-        try:
-            await EnodoModelManager.add_model(data['model_name'],
-                                              data['model_arguments'])
-            data = [EnodoModel.to_dict(m)
-                    for m in EnodoModelManager.models]
-            return {'data': data}, 201
-        except Exception:
-            return {'error': 'Incorrect model data'}, 400
-
-    @classmethod
     async def resp_get_enodo_hub_status(cls):
         return {'data': {'version': VERSION}}
 
