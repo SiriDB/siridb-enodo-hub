@@ -71,6 +71,6 @@ class EnodoModelManager:
         try:
             save_disk_data(Config.model_save_path, model_list)
         except Exception as e:
-            logging.error(f"Something went wrong when writing \
-                enodo models to disk")
+            logging.error(f"Something went wrong when writing"
+                          f"enodo models to disk")
             logging.debug(f"Corresponding error: {e}")

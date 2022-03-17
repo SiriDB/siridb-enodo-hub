@@ -1,5 +1,8 @@
+import re
+
 from siridb.connector.lib.exceptions import QueryError, InsertError, \
     ServerError, PoolError, AuthenticationError, UserAuthError
+
 
 
 # @classmethod
@@ -88,7 +91,7 @@ async def query_series_forecasts(siridb_client, series_name, selector="*"):
     result = None
     try:
         result = await siridb_client.query(
-            f'select {selector} from \enodo_{series_name}_forecast_*\\')
+            f'select {selector} from /enodo_{re.escape(series_name)}_forecast_.*?$/')
     except (QueryError, InsertError, ServerError, PoolError,
             AuthenticationError, UserAuthError) as e:
         print("Connection problem with SiriDB server")
@@ -100,7 +103,7 @@ async def query_series_anomalies(siridb_client, series_name, selector="*"):
     result = None
     try:
         result = await siridb_client.query(
-            f'select {selector} from \enodo_{series_name}_anomalies_*\\')
+            f'select {selector} from /enodo_{series_name}_anomalies_*/')
     except (QueryError, InsertError, ServerError, PoolError,
             AuthenticationError, UserAuthError) as e:
         print("Connection problem with SiriDB server")
@@ -113,7 +116,7 @@ async def query_series_static_rules_hits(
     result = None
     try:
         result = await siridb_client.query(
-            f'select {selector} from \enodo_{series_name}_static_rules_*\\')
+            f'select {selector} from /enodo_{series_name}_static_rules_*/')
     except (QueryError, InsertError, ServerError, PoolError,
             AuthenticationError, UserAuthError) as e:
         print("Connection problem with SiriDB server")

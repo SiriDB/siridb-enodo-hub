@@ -236,5 +236,6 @@ class SeriesManager:
             save_disk_data(Config.series_save_path, serialized_data)
         except Exception as e:
             logging.error(
-                f"Something went wrong when writing seriesmanager data to disk")
+                f"Something went wrong when writing "
+                f"seriesmanager data to disk")
             logging.debug(f"Corresponding error: {e}")

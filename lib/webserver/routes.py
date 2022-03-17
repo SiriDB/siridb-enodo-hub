@@ -23,7 +23,7 @@ def setup_routes(app, cors):
         ApiHandlers.get_series_forecast,
         allow_head=False)
     app.router.add_get(
-        "/api/series/{series_name}/anomlies",
+        "/api/series/{series_name}/anomalies",
         ApiHandlers.get_series_anomalies,
         allow_head=False)
     app.router.add_get(

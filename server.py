@@ -1,6 +1,7 @@
 import datetime
 
 import asyncio
+from email.mime import base
 import logging
 
 import aiohttp_cors
@@ -171,6 +172,7 @@ class Server:
         # Only continue if base analysis has finished
         if series.base_analysis_status() != JOB_STATUS_DONE:
             return
+
         # loop through scheduled jobs:
         job_schedules = series.state.get_all_job_schedules()
         for job_link_name in series.series_config.job_config:
@@ -178,7 +180,7 @@ class Server:
                     await series.is_job_due(job_link_name):
                 await EnodoJobManager.create_job(job_link_name, series_name)
                 continue
-            else:
+            elif job_link_name not in job_schedules:
                 # Job has not been schedules yet, let's add it
                 await series.schedule_job(job_link_name, initial=True)
 

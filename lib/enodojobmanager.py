@@ -126,11 +126,11 @@ class EnodoJobManager:
     @classmethod
     async def create_job(cls, job_link_name, series_name):
         series = await SeriesManager.get_series(series_name)
+        await series.set_job_status(job_link_name, JOB_STATUS_OPEN)
         job_config = series.get_job(job_link_name)
         job_id = await cls._get_next_job_id()
         job = EnodoJob(job_id, series_name, job_config,
                        job_data=None)  # TODO: Catch exception
-        await series.set_job_status(job_link_name, JOB_STATUS_OPEN)
         await cls._add_job(job)
 
     @classmethod
@@ -329,14 +329,14 @@ class EnodoJobManager:
                         continue
 
                     logging.info(
-                        f"Adding series: sending {next_job.series_name} to \
-                            Worker for job type {next_job.job_config.job_type}")
+                        f"Adding series: sending {next_job.series_name} to "
+                        f"Worker for job type {next_job.job_config.job_type}")
                     await cls._send_worker_job_request(worker, next_job)
                     worker.is_going_busy = True
                     await cls._activate_job(next_job, worker.client_id)
                 except Exception as e:
                     logging.error(
-                        f"Something went wrong when trying to activate job")
+                        "Something went wrong when trying to activate job")
                     logging.debug(f"Corresponding error: {e}")
                 finally:
                     cls._unlock()
@@ -390,8 +390,8 @@ class EnodoJobManager:
                         SUBSCRIPTION_CHANGE_TYPE_UPDATE, data.get('name'))
                 except Exception as e:
                     logging.error(
-                        f"Something went wrong when receiving \
-                            anomaly detection job")
+                        f"Something went wrong when receiving"
+                        f"anomaly detection job")
                     logging.debug(f"Corresponding error: {e}")
         elif job_type == JOB_TYPE_BASE_SERIES_ANALYSIS:
             try:
@@ -483,8 +483,8 @@ class EnodoJobManager:
             await ClientManager.check_for_pending_series(worker)
         except Exception as e:
             logging.error(
-                f"Something went wrong when \
-                    receiving from worker to cancel job")
+                f"Something went wrong when"
+                f"receiving from worker to cancel job")
             logging.debug(f"Corresponding error: {e}")
 
     @classmethod
