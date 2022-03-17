@@ -19,8 +19,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - A job can require an other job the be run beforehand by using the `requires_job` property
 
 ### Fixed
-
-- 
+- PEP8 guidelines
 
 ## [0.1.0-beta3.0.0] - 2021-08-13
 
