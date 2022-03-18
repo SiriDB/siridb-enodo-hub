@@ -26,6 +26,15 @@ class SocketIoRouter:
             event='/api/series/details',
             handler=SocketIoHandler.get_series_details)
         self._sio_on(
+            event='/api/series/forecasts',
+            handler=SocketIoHandler.get_series_forecasts)
+        self._sio_on(
+            event='/api/series/details',
+            handler=SocketIoHandler.get_series_anomalies)
+        self._sio_on(
+            event='/api/series/details',
+            handler=SocketIoHandler.get_series_static_rules_hits)
+        self._sio_on(
             event='/api/series/delete',
             handler=SocketIoHandler.remove_series)
         self._sio_on(

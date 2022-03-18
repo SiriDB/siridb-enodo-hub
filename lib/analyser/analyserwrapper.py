@@ -5,7 +5,15 @@ GENERAL_PARAMETERS = {
 
 
 async def setup_default_model_arguments(model_arguments):
-    for key in GENERAL_PARAMETERS.keys():
+    """Setup default model params
+
+    Args:
+        model_arguments (dict): model params
+
+    Returns:
+        dict: params
+    """
+    for key in GENERAL_PARAMETERS:
         if key not in model_arguments:
             model_arguments[key] = GENERAL_PARAMETERS[key]
 
