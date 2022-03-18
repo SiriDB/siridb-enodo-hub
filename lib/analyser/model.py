@@ -73,4 +73,5 @@ class EnodoModelManager:
         except Exception as e:
             logging.error(f"Something went wrong when writing"
                           f"enodo models to disk")
-            logging.debug(f"Corresponding error: {e}")
+            logging.debug(f"Corresponding error: {e}, "
+                          f'exception class: {e.__class__.__name__}')

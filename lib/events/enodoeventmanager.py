@@ -168,7 +168,9 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
             except Exception as e:
                 logging.warning(
                     'Calling EnodoEventOutput webhook failed')
-                logging.debug(f'Corresponding error: {e}')
+                logging.debug(
+                    f'Corresponding error: {e}, '
+                    f'exception class: {e.__class__.__name__}')
 
     def update(self, data):
         self.url = data.get('url') if data.get(
@@ -319,7 +321,8 @@ class EnodoEventManager:
         except Exception as e:
             logging.error(
                 f"Something went wrong when writing eventmanager data to disk")
-            logging.debug(f"Corresponding error: {e}")
+            logging.debug(f"Corresponding error: {e}, "
+                          f'exception class: {e.__class__.__name__}')
 
 
 async def internal_updates_event_output_subscribers(change_type, data):

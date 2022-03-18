@@ -337,7 +337,9 @@ class EnodoJobManager:
                 except Exception as e:
                     logging.error(
                         "Something went wrong when trying to activate job")
-                    logging.debug(f"Corresponding error: {e}")
+                    logging.debug(
+                        f"Corresponding error: {e}, "
+                        f'exception class: {e.__class__.__name__}')
                 finally:
                     cls._unlock()
             await cls.clean_jobs()
@@ -372,7 +374,9 @@ class EnodoJobManager:
             except Exception as e:
                 logging.error(
                     f"Something went wrong when receiving forecast job")
-                logging.debug(f"Corresponding error: {e}")
+                logging.debug(
+                    f"Corresponding error: {e}, "
+                    f'exception class: {e.__class__.__name__}')
         elif job_type == JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES:
             if isinstance(
                     data.get('anomalies'),
@@ -392,7 +396,9 @@ class EnodoJobManager:
                     logging.error(
                         f"Something went wrong when receiving"
                         f"anomaly detection job")
-                    logging.debug(f"Corresponding error: {e}")
+                    logging.debug(
+                        f"Corresponding error: {e}, "
+                        f'exception class: {e.__class__.__name__}')
         elif job_type == JOB_TYPE_BASE_SERIES_ANALYSIS:
             try:
                 series.series_characteristics = data.get(
@@ -406,7 +412,9 @@ class EnodoJobManager:
             except Exception as e:
                 logging.error(
                     f"Something went wrong when receiving base analysis job")
-                logging.debug(f"Corresponding error: {e}")
+                logging.debug(
+                    f"Corresponding error: {e}, "
+                    f'exception class: {e.__class__.__name__}')
         elif job_type == JOB_TYPE_STATIC_RULES:
             try:
                 await series.set_job_status(
@@ -428,7 +436,9 @@ class EnodoJobManager:
             except Exception as e:
                 logging.error(
                     f"Something went wrong when receiving static rules job")
-                logging.debug(f"Corresponding error: {e}")
+                logging.debug(
+                    f"Corresponding error: {e}, "
+                    f'exception class: {e.__class__.__name__}')
         else:
             logging.error(f"Received unknown job type: {job_type}")
 
@@ -448,7 +458,8 @@ class EnodoJobManager:
                 f"Something went wrong when sending job request to worker")
             import traceback
             traceback.print_exc()
-            logging.debug(f"Corresponding error: {e}")
+            logging.debug(f"Corresponding error: {e}, "
+                          f'exception class: {e.__class__.__name__}')
 
     @classmethod
     async def _send_worker_cancel_job(cls, worker_id, job_id):
@@ -465,7 +476,8 @@ class EnodoJobManager:
         except Exception as e:
             logging.error(
                 f"Something went wrong when sending worker to cancel job")
-            logging.debug(f"Corresponding error: {e}")
+            logging.debug(f"Corresponding error: {e}, "
+                          f'exception class: {e.__class__.__name__}')
 
     @classmethod
     async def receive_worker_cancelled_job(cls, writer, packet_type,
@@ -485,7 +497,8 @@ class EnodoJobManager:
             logging.error(
                 f"Something went wrong when"
                 f"receiving from worker to cancel job")
-            logging.debug(f"Corresponding error: {e}")
+            logging.debug(f"Corresponding error: {e}, "
+                          f'exception class: {e.__class__.__name__}')
 
     @classmethod
     async def get_open_queue(cls):
@@ -504,7 +517,8 @@ class EnodoJobManager:
         except Exception as e:
             logging.error(
                 f"Something went wrong when saving jobmanager data to disk")
-            logging.debug(f"Corresponding error: {e}")
+            logging.debug(f"Corresponding error: {e}, "
+                          f'exception class: {e.__class__.__name__}')
         cls._unlock()
 
     @classmethod

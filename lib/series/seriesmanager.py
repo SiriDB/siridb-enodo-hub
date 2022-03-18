@@ -238,4 +238,5 @@ class SeriesManager:
             logging.error(
                 f"Something went wrong when writing "
                 f"seriesmanager data to disk")
-            logging.debug(f"Corresponding error: {e}")
+            logging.debug(f"Corresponding error: {e}, "
+                          f'exception class: {e.__class__.__name__}')
