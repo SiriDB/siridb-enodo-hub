@@ -3,7 +3,7 @@ test/*
 .idea
 .idea/*
 .idea/vcs.xml
-todo.txt
+restapi.md
 
 *.pyc
 *.pyo

@@ -1,5 +1,4 @@
 import functools
-from lib.series.seriesmanager import SeriesManager
 
 from lib.socketio.subscriptionmanager import SubscriptionManager
 from lib.util import safe_json_dumps
@@ -63,7 +62,32 @@ class SocketIoHandler:
     @socketio_auth_required
     async def get_series_details(cls, sid, data, event):
         series_name = data.get('series_name')
-        resp = await BaseHandler.resp_get_monitored_series_details(series_name, include_points=True)
+        resp = await BaseHandler.resp_get_single_monitored_series(
+            series_name)
+        return safe_json_dumps(resp)
+
+    @classmethod
+    @socketio_auth_required
+    async def get_series_forecasts(cls, sid, data, event):
+        series_name = data.get('series_name')
+        resp = await BaseHandler.resp_get_series_forecasts(
+            series_name)
+        return safe_json_dumps(resp)
+
+    @classmethod
+    @socketio_auth_required
+    async def get_series_anomalies(cls, sid, data, event):
+        series_name = data.get('series_name')
+        resp = await BaseHandler.resp_get_series_anomalies(
+            series_name)
+        return safe_json_dumps(resp)
+
+    @classmethod
+    @socketio_auth_required
+    async def get_series_static_rules_hits(cls, sid, data, event):
+        series_name = data.get('series_name')
+        resp = await BaseHandler.resp_get_series_static_rules_hits(
+            series_name)
         return safe_json_dumps(resp)
 
     @classmethod
@@ -87,7 +111,8 @@ class SocketIoHandler:
         else:
             series_name = data.get('name')
             if series_name is not None:
-                resp = {'status': await BaseHandler.resp_remove_series(series_name)}
+                resp = {'status':
+                        await BaseHandler.resp_remove_series(series_name)}
             else:
                 resp = {'error': 'Missing required field(s)'}
         return safe_json_dumps(resp)
@@ -96,14 +121,14 @@ class SocketIoHandler:
     @socketio_auth_required
     async def update_series(cls, sid, data, event):
         if not isinstance(data, dict):
-            resp = {'error': 'Incorrect data'}
+            return safe_json_dumps({'error': 'Incorrect data'})
+        series_name = data.get('name')
+        series_data = data.get('data')
+        if series_name is not None:
+            resp, status = await BaseHandler.resp_update_series(
+                series_name, series_data)
         else:
-            series_name = data.get('name')
-            series_data = data.get('data')
-            if series_name is not None:
-                resp, status = await BaseHandler.resp_update_series(series_name, series_data)
-            else:
-                resp = {'error': 'Missing required field(s)'}
+            resp = {'error': 'Missing required field(s)'}
         return safe_json_dumps(resp)
 
     @classmethod
@@ -129,7 +154,8 @@ class SocketIoHandler:
     @classmethod
     @socketio_auth_required
     async def resolve_failed_job(cls, sid, data, event=None):
-        return await BaseHandler.resp_resolve_failed_job(data.get('series_name'))
+        return await BaseHandler.resp_resolve_failed_job(
+            data.get('series_name'))
 
     @classmethod
     @socketio_auth_required
@@ -141,14 +167,16 @@ class SocketIoHandler:
     async def add_event_output(cls, sid, data, event=None):
         output_type = data.get('output_type')
         output_data = data.get('data')
-        return await BaseHandler.resp_add_event_output(output_type, output_data)
+        return await BaseHandler.resp_add_event_output(
+            output_type, output_data)
 
     @classmethod
     @socketio_auth_required
     async def update_event_output(cls, sid, data, event=None):
         output_id = data.get('id')
         output_data = data.get('data')
-        return await BaseHandler.resp_update_event_output(output_id, output_data)
+        return await BaseHandler.resp_update_event_output(
+            output_id, output_data)
 
     @classmethod
     @socketio_auth_required
@@ -284,7 +312,8 @@ class SocketIoHandler:
             }, room='job_updates')
 
     @classmethod
-    async def internal_updates_series_subscribers(cls, change_type, series, name=None):
+    async def internal_updates_series_subscribers(cls, change_type,
+                                                  series, name=None):
         if cls._sio is not None:
             await cls._sio.emit('update', {
                 'resource': 'series',
@@ -292,7 +321,8 @@ class SocketIoHandler:
                 'resourceData': series
             }, room='series_updates')
 
-        filtered_subs = await SubscriptionManager.get_subscriptions_for_series_name(name)
+        filtered_subs = \
+            await SubscriptionManager.get_subscriptions_for_series_name(name)
         for sub in filtered_subs:
             await cls._sio.emit('update', {
                 'resource': 'series',
@@ -301,7 +331,8 @@ class SocketIoHandler:
             }, room=sub.get('sid'))
 
     @classmethod
-    async def internal_updates_enodo_models_subscribers(cls, change_type, model_data):
+    async def internal_updates_enodo_models_subscribers(cls, change_type,
+                                                        model_data):
         if cls._sio is not None:
             await cls._sio.emit('update', {
                 'resource': 'enodo_model',

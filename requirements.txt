@@ -5,7 +5,7 @@ aiohttp_cors==0.7.0
 jinja2==2.11.3
 marshmallow==3.10.0
 psutil==5.8.0
-python-enodo==0.1.16
+python-enodo==0.2.1
 python-socketio==5.0.4
 qpack==0.0.17
 siridb-connector==2.0.8

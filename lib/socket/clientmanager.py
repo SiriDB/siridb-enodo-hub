@@ -2,7 +2,8 @@ import datetime
 import logging
 
 from enodo import WorkerConfigModel
-from enodo.model.config.worker import WORKER_MODE_GLOBAL, WORKER_MODE_DEDICATED_JOB_TYPE, \
+from enodo.model.config.worker import WORKER_MODE_GLOBAL, \
+    WORKER_MODE_DEDICATED_JOB_TYPE, \
     WORKER_MODE_DEDICATED_SERIES
 from enodo.jobs import JOB_STATUS_OPEN
 from enodo import EnodoModel
@@ -12,11 +13,13 @@ from lib.analyser.model import EnodoModelManager
 from lib.events.enodoeventmanager import EnodoEvent, EnodoEventManager, \
     ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE
 from .package import *
-    
+
 
 class EnodoClient:
 
-    def __init__(self, client_id, ip_address, writer, version="unknown", last_seen=None, online=True):
+    def __init__(
+            self, client_id, ip_address, writer, version="unknown",
+            last_seen=None, online=True):
         self.client_id = client_id
         self.ip_address = ip_address
         self.writer = writer
@@ -41,20 +44,30 @@ class EnodoClient:
 
 
 class ListenerClient(EnodoClient):
-    def __init__(self, client_id, ip_address, writer, version="unknown", last_seen=None):
+    def __init__(
+            self, client_id, ip_address, writer, version="unknown",
+            last_seen=None):
         super().__init__(client_id, ip_address, writer, version, last_seen)
 
 
 class WorkerClient(EnodoClient):
-    def __init__(self, client_id, ip_address, writer, supported_models, version="unknown", last_seen=None, busy=False, worker_config=None):
+    def __init__(
+            self, client_id, ip_address, writer, supported_models,
+            version="unknown", last_seen=None, busy=False,
+            worker_config=None):
         super().__init__(client_id, ip_address, writer, version, last_seen)
         self.busy = busy
         self.is_going_busy = False
-        supported_models = [EnodoModel.from_dict(model_data) for model_data in supported_models]
-        self.supported_models = {model.name: model for model in supported_models}
+        supported_models = [
+            EnodoModel.from_dict(model_data)
+            for model_data in supported_models]
+        self.supported_models = {model.name: model
+                                 for model in supported_models}
 
         if worker_config is None:
-            worker_config = WorkerConfigModel(WORKER_MODE_GLOBAL, dedicated_job_type=None, dedicated_series_name=None)
+            worker_config = WorkerConfigModel(
+                WORKER_MODE_GLOBAL, dedicated_job_type=None,
+                dedicated_series_name=None)
         self.worker_config = worker_config
 
     def support_model_for_job(self, job_type, model_name):
@@ -103,7 +116,9 @@ class ClientManager:
 
     @classmethod
     def get_busy_worker_count(cls):
-        busy_workers = [cls.workers[worker_id] for worker_id in cls.workers if cls.workers[worker_id].busy is True]
+        busy_workers = [cls.workers[worker_id]
+                        for worker_id in cls.workers
+                        if cls.workers[worker_id].busy is True]
         return len(busy_workers)
 
     @classmethod
@@ -116,14 +131,19 @@ class ClientManager:
                 continue
             if w.worker_config.mode == WORKER_MODE_DEDICATED_SERIES:
                 if cls._dedicated_for_series[w.worker_config.series] is None:
-                    cls._dedicated_for_series[w.worker_config.series] = [worker_id]
+                    cls._dedicated_for_series[w.worker_config.series] = [
+                        worker_id]
                 else:
-                    cls._dedicated_for_series[w.worker_config.series].append(worker_id)
+                    cls._dedicated_for_series[w.worker_config.series].append(
+                        worker_id)
             elif w.worker_config.mode == WORKER_MODE_DEDICATED_JOB_TYPE:
-                if cls._dedicated_for_job_type[w.worker_config.job_type] is None:
-                    cls._dedicated_for_job_type[w.worker_config.job_type] = [worker_id]
+                if cls._dedicated_for_job_type[
+                        w.worker_config.job_type] is None:
+                    cls._dedicated_for_job_type[w.worker_config.job_type] = [
+                        worker_id]
                 else:
-                    cls._dedicated_for_job_type[w.worker_config.job_type].append(worker_id)
+                    cls._dedicated_for_job_type[
+                        w.worker_config.job_type].append(worker_id)
 
     @classmethod
     async def listener_connected(cls, peername, writer, client_data):
@@ -140,9 +160,9 @@ class ClientManager:
         client_id = client_data.get('client_id')
         if client_id not in cls.workers:
             client = WorkerClient(client_id, peername, writer,
-                                    client_data.get('models'),
-                                    client_data.get('version', None),
-                                    busy=client_data.get('busy', None))
+                                  client_data.get('models'),
+                                  client_data.get('version', None),
+                                  busy=client_data.get('busy', None))
             await cls.add_client(client)
         else:
             await cls.workers.get(client_id).reconnected(peername, writer)
@@ -153,7 +173,8 @@ class ClientManager:
             cls.listeners[client.client_id] = client
         elif isinstance(client, WorkerClient):
             for model_name in client.supported_models:
-                await EnodoModelManager.add_enodo_model(client.supported_models[model_name])
+                await EnodoModelManager.add_enodo_model(
+                    client.supported_models[model_name])
             cls.workers[client.client_id] = client
             await cls._refresh_dedicated_cache()
 
@@ -184,7 +205,8 @@ class ClientManager:
             for worker_id in cls._dedicated_for_series[series_name]:
                 worker = cls.workers.get(worker_id)
                 if not worker.busy and not worker.is_going_busy:
-                    if worker.support_model_for_job(job_type, model_name):
+                    if worker.support_model_for_job(
+                            job_type, model_name):
                         return worker
 
         # Check if there is a worker free that's dedicated for the job_type
@@ -192,12 +214,14 @@ class ClientManager:
             for worker_id in cls._dedicated_for_series[job_type]:
                 worker = cls.workers.get(worker_id)
                 if not worker.busy and not worker.is_going_busy:
-                    if worker.support_model_for_job(job_type, model_name):
+                    if worker.support_model_for_job(
+                            job_type, model_name):
                         return worker
 
-        for worker_id in cls.workers: 
+        for worker_id in cls.workers:
             worker = cls.workers.get(worker_id)
-            if worker.worker_config.mode == WORKER_MODE_GLOBAL and not worker.busy and not worker.is_going_busy:
+            if worker.worker_config.mode == WORKER_MODE_GLOBAL and \
+                    not worker.busy and not worker.is_going_busy:
                 if worker.support_model_for_job(job_type, model_name):
                     return worker
 
@@ -210,7 +234,6 @@ class ClientManager:
             if listener.online:
                 cls.update_listener(listener, data)
 
-
     @classmethod
     def update_listener(cls, listener, data):
         update = qpack.packb(data)
@@ -221,7 +244,8 @@ class ClientManager:
     async def check_clients_alive(cls, max_timeout):
         for client in cls.listeners:
             listener = cls.listeners.get(client)
-            if listener.online and (datetime.datetime.now() - listener.last_seen) \
+            if listener.online and \
+                (datetime.datetime.now() - listener.last_seen) \
                     .total_seconds() > max_timeout:
                 logging.info(f'Lost connection to listener: {client}')
                 listener.online = False
@@ -255,19 +279,25 @@ class ClientManager:
             return
 
         if client.online:
-            logging.error(f'Client {client_id} went offline without goodbye')
+            logging.error(
+                f'Client {client_id} went offline without goodbye')
             client.online = False
-            event = EnodoEvent('Lost client', f'Client {client_id} went offline without goodbye',
-                               ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE)
+            event = EnodoEvent(
+                'Lost client',
+                f'Client {client_id} went offline without goodbye',
+                ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE)
             await EnodoEventManager.handle_event(event)
 
     @classmethod
     async def check_for_pending_series(cls, client):
-        from ..enodojobmanager import EnodoJobManager ## To stop circular import
-        pending_jobs = EnodoJobManager.get_active_jobs_by_worker(client.client_id)
+        from ..enodojobmanager import EnodoJobManager  # To stop circular import
+        pending_jobs = EnodoJobManager.get_active_jobs_by_worker(
+            client.client_id)
         if len(pending_jobs) > 0:
             for job in pending_jobs:
                 await EnodoJobManager.cancel_job(job)
                 series = await cls.series_manager.get_series(job.series_name)
-                await series.set_job_status(job.job_type, JOB_STATUS_OPEN)
-                logging.info(f'Setting for series job status pending to false...')
+                await series.set_job_status(
+                    job.job_config.config_name, JOB_STATUS_OPEN)
+                logging.info(
+                    f'Setting for series job status pending to false...')
