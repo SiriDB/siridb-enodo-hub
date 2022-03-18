@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Jobs get an unique identifier `config_name`, which can be set to now the `config_name` beforehand
 - Jobs can be silenced by the silenced property in the job config. This makes sure no events will be created for the job's results.
 - A job can require an other job the be run beforehand by using the `requires_job` property
+- Config section `enodo` renamed to `worker` because of env prefix `ENODO_`
 
 ### Fixed
 - PEP8 guidelines
