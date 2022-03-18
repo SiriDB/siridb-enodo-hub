@@ -128,10 +128,10 @@ class Series:
                     return False
             if job_schedule["value"] is None:
                 return True
-            elif job_schedule["type"] == "TS" and \
+            if job_schedule["type"] == "TS" and \
                 job_schedule["value"] <= int(time.time()):
                 return True
-            elif job_schedule["type"] == "N" and \
+            if job_schedule["type"] == "N" and \
                 job_schedule["value"] <= self.state.datapoint_count:
                 return True
         return False

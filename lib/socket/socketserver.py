@@ -79,13 +79,13 @@ class SocketServer:
         w_client = await ClientManager.get_worker_by_id(client_id)
         if l_client is not None:
             logging.info(
-                f'Listener {client_id} is going down, \
-                    removing from client list...')
+                f'Listener {client_id} is going down'
+                'removing from client list...')
             await ClientManager.set_listener_offline(client_id)
         elif w_client is not None:
             logging.info(
-                f'Worker {client_id} is going down, \
-                    removing from client list...')
+                f'Worker {client_id} is going down'
+                'removing from client list...')
             await ClientManager.set_worker_offline(client_id)
 
     async def _handle_heartbeat(self, writer, packet_id, data):
@@ -158,8 +158,8 @@ class SocketServer:
         if client_data.get('client_type') == 'listener':
             update = qpack.packb(
                 SeriesManager.get_listener_series_info())
-            header = create_header(len(update), UPDATE_SERIES, packet_id)
+            header = create_header(
+                len(update),
+                UPDATE_SERIES, packet_id)
             writer.write(header + update)
             return client_id, True
-
-        

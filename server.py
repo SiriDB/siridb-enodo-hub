@@ -180,7 +180,7 @@ class Server:
                     await series.is_job_due(job_config_name):
                 await EnodoJobManager.create_job(job_config_name, series_name)
                 continue
-            elif job_config_name not in job_schedules:
+            if job_config_name not in job_schedules:
                 # Job has not been schedules yet, let's add it
                 await series.schedule_job(job_config_name, initial=True)
 

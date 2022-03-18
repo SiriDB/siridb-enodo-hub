@@ -8,7 +8,7 @@ from lib.exceptions.enodoexception import EnodoInvalidConfigException, \
     EnodoException
 
 EMPTY_CONFIG_FILE = {
-    'enodo': {
+    'hub': {
         'basic_auth_username': 'enodo',
         'basic_auth_password': 'enodo',
         'log_path': '',
@@ -64,7 +64,7 @@ class EnodoConfigParser(RawConfigParser):
             pass
 
         if self.env_support:
-            env_value = os.getenv(option.upper())
+            env_value = os.getenv(f"ENODO_{section.upper()}_{option.upper()}")
             if env_value is not None:
                 value = env_value
 
@@ -236,34 +236,34 @@ class Config:
 
         # Enodo
         cls.basic_auth_username = cls._config.get_r(
-            'enodo', 'basic_auth_username', required=False, default=None)
+           'hub', 'basic_auth_username', required=False, default=None)
         cls.basic_auth_password = cls._config.get_r(
-            'enodo', 'basic_auth_password', required=False, default=None)
+           'hub', 'basic_auth_password', required=False, default=None)
 
         cls.client_max_timeout = cls.to_int(
-            cls._config.get_r('enodo', 'client_max_timeout'))
+            cls._config.get_r('hub', 'client_max_timeout'))
         if cls.client_max_timeout < 35:  # min value enforcement
             cls.client_max_timeout = 35
         cls.socket_server_host = cls._config.get_r(
-            'enodo', 'internal_socket_server_hostname')
+           'hub', 'internal_socket_server_hostname')
         cls.socket_server_port = cls.to_int(
-            cls._config.get_r('enodo', 'internal_socket_server_port'))
+            cls._config.get_r('hub', 'internal_socket_server_port'))
         cls.save_to_disk_interval = cls.to_int(
-            cls._config.get_r('enodo', 'save_to_disk_interval'))
+            cls._config.get_r('hub', 'save_to_disk_interval'))
         cls.enable_rest_api = cls.to_bool(
             cls._config.get_r(
-                'enodo', 'enable_rest_api', required=False,
+               'hub', 'enable_rest_api', required=False,
                 default='true'),
             True)
         cls.enable_socket_io_api = cls.to_bool(
             cls._config.get_r(
-                'enodo', 'enable_socket_io_api', required=False,
+               'hub', 'enable_socket_io_api', required=False,
                 default='false'),
             False)
         cls.base_dir = cls._config.get_r(
-            'enodo', 'enodo_base_save_path')
+           'hub', 'enodo_base_save_path')
         cls.disable_safe_mode = cls.to_bool(
-            cls._config.get_r('enodo', 'disable_safe_mode'), False)
+            cls._config.get_r('hub', 'disable_safe_mode'), False)
         cls.log_path = os.path.join(cls.base_dir, 'log.log')
         cls.series_save_path = os.path.join(
             cls.base_dir, 'data/series.json')
