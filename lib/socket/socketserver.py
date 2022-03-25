@@ -26,8 +26,7 @@ class SocketServer:
         loop = loop or asyncio.get_event_loop()
         self._server_running = True
         coro = asyncio.start_server(
-            self._handle_client_connection, self._hostname, self._port,
-            loop=loop)
+            self._handle_client_connection, self._hostname, self._port)
         self._server = loop.create_task(coro)
         self._server_coro = coro
 

@@ -420,13 +420,17 @@ class EnodoJobManager:
                 await series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
                 await series.schedule_job(job.job_config.config_name)
+                await SeriesManager.add_static_rule_hits_to_series(
+                    data.get('name'),
+                    job.job_config.config_name,
+                    data.get('failed_checks'))
                 if len(data.get('failed_checks')):
-                    for key in data.get('failed_checks'):
+                    for failed_check in data.get('failed_checks'):
                         event = EnodoEvent(
                             'Static rule failed!',
-                            f'Series {data.get("name")} failed a \
-                                static rule ({key}): \
-                                    {data.get("failed_checks")[key]}',
+                            (f'Series {data.get("name")} failed a'
+                             f'static rule at ({failed_check[0]}):'
+                             f'{failed_check[1]}'),
                             ENODO_EVENT_STATIC_RULE_FAIL,
                             series=series)
                         await EnodoEventManager.handle_event(

@@ -166,7 +166,8 @@ class SeriesManager:
                 f'enodo_{series_name}_forecast_{job_config_name}', points)
 
     @classmethod
-    async def add_anomalies_to_series(cls, series_name, job_config_name, points):
+    async def add_anomalies_to_series(cls, series_name,
+                                      job_config_name, points):
         series = cls._series.get(series_name, None)
         if series is not None:
             event = EnodoEvent(
@@ -181,6 +182,18 @@ class SeriesManager:
             await insert_points(
                 ServerState.get_siridb_forecast_conn(),
                 f'enodo_{series_name}_anomalies_{job_config_name}', points)
+
+    @classmethod
+    async def add_static_rule_hits_to_series(cls, series_name,
+                                             job_config_name, points):
+        series = cls._series.get(series_name, None)
+        if series is not None:
+            await drop_series(
+                ServerState.get_siridb_forecast_conn(),
+                f'enodo_{series_name}_static_rules_{job_config_name}')
+            await insert_points(
+                ServerState.get_siridb_forecast_conn(),
+                f'enodo_{series_name}_static_rules_{job_config_name}', points)
 
     @classmethod
     async def get_series_forecast(cls, series_name):
