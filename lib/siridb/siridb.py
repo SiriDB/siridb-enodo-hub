@@ -50,7 +50,7 @@ async def query_series_data(siridb_client, series_name, selector="*"):
 async def drop_series(siridb_client, series_name):
     result = None
     try:
-        result = await siridb_client.query(f'drop series "{series_name}"')
+        result = await siridb_client.query(f'drop series {series_name}')
     except (QueryError, InsertError, ServerError, PoolError,
             AuthenticationError, UserAuthError) as e:
         print("Connection problem with SiriDB server")

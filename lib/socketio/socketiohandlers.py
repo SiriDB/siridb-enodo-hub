@@ -37,10 +37,12 @@ class SocketIoHandler:
         password = data.get('password')
 
         if not await EnodoAuth.auth.check_credentials(user, password, None):
-            raise ConnectionRefusedError('authentication failed')
+            return False
 
         async with cls._sio.session(sid) as session:
             session['auth'] = True
+        
+        return True
 
     @classmethod
     async def disconnect(cls, sid):

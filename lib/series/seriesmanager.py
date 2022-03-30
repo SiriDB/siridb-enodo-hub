@@ -141,9 +141,16 @@ class SeriesManager:
         if series_name in cls._series:
             await cls.series_changed(
                 SUBSCRIPTION_CHANGE_TYPE_DELETE, series_name)
+            await cls.cleanup_series(series_name)
             del cls._series[series_name]
             return True
         return False
+
+    @classmethod
+    async def cleanup_series(cls, series_name):
+        await drop_series(
+                ServerState.get_siridb_forecast_conn(),
+                f"/enodo_{re.escape(series_name)}.*?.*?$/")
 
     @classmethod
     async def add_to_datapoint_counter(cls, series_name, value):
@@ -160,7 +167,7 @@ class SeriesManager:
         if series is not None:
             await drop_series(
                 ServerState.get_siridb_forecast_conn(),
-                f'enodo_{series_name}_forecast_{job_config_name}')
+                f'"enodo_{series_name}_forecast_{job_config_name}"')
             await insert_points(
                 ServerState.get_siridb_forecast_conn(),
                 f'enodo_{series_name}_forecast_{job_config_name}', points)
@@ -178,7 +185,7 @@ class SeriesManager:
             await EnodoEventManager.handle_event(event)
             await drop_series(
                 ServerState.get_siridb_forecast_conn(),
-                f'enodo_{series_name}_anomalies_{job_config_name}')
+                f'"enodo_{series_name}_anomalies_{job_config_name}"')
             await insert_points(
                 ServerState.get_siridb_forecast_conn(),
                 f'enodo_{series_name}_anomalies_{job_config_name}', points)
@@ -190,7 +197,7 @@ class SeriesManager:
         if series is not None:
             await drop_series(
                 ServerState.get_siridb_forecast_conn(),
-                f'enodo_{series_name}_static_rules_{job_config_name}')
+                f'"enodo_{series_name}_static_rules_{job_config_name}"')
             await insert_points(
                 ServerState.get_siridb_forecast_conn(),
                 f'enodo_{series_name}_static_rules_{job_config_name}', points)

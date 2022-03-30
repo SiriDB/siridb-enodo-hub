@@ -79,12 +79,12 @@ class SocketServer:
         if l_client is not None:
             logging.info(
                 f'Listener {client_id} is going down'
-                'removing from client list...')
+                ' removing from client list...')
             await ClientManager.set_listener_offline(client_id)
         elif w_client is not None:
             logging.info(
                 f'Worker {client_id} is going down'
-                'removing from client list...')
+                ' removing from client list...')
             await ClientManager.set_worker_offline(client_id)
 
     async def _handle_heartbeat(self, writer, packet_id, data):
@@ -136,13 +136,16 @@ class SocketServer:
         elif client_data.get('client_type') == 'worker':
             supported_models = client_data.get('models')
             if supported_models is None or len(supported_models) < 1:
-                response = create_header(0, HANDSHAKE_FAIL, packet_id)
-                writer.write(response)
-                return client_id, False
+                logging.warning(
+                    f"New worker connected with id : {client_id}"
+                    ", but has no installed modules")
 
             if version.parse(
                     client_data.get('version')) < version.parse(
                     ENODO_HUB_WORKER_MIN_VERSION):
+                logging.warning(
+                    f"Worker with id : {client_id} tried to connect,"
+                    "but has incompatible version")
                 response = create_header(0, HANDSHAKE_FAIL, packet_id)
                 writer.write(response)
                 return client_id, False
