@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Added
 - Seperate endpoints for fetching analysis result data
+- Cleanup on series removal (siridb analytics results)
 
 ### Changed
 - Changed series config and job config. Job config is now a list of jobs. Not categorised by job type. Forecast, anomaly detection jobs can be in the list multiple times. 
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Jobs can be silenced by the silenced property in the job config. This makes sure no events will be created for the job's results.
 - A job can require an other job the be run beforehand by using the `requires_job` property
 - Config section `enodo` renamed to `hub` because of env prefix `ENODO_`
+- Job response handling updated
 
 ### Fixed
 - PEP8 guidelines
