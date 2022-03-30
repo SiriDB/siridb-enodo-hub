@@ -34,8 +34,8 @@ from lib.webserver.routes import setup_routes
 
 class Server:
 
-    def __init__(self, loop, port, config_path, log_level='info'):
-        self.loop = loop
+    def __init__(self, port, config_path, log_level='info'):
+        self.loop = None
         self.port = port
         self.app = None
         self.sio = None
@@ -52,9 +52,11 @@ class Server:
 
         self._watch_tasks_task = None
 
-    async def start_up(self): 
+    async def start_up(self):
         """All connections and classes will be prepared
         """
+
+        self.loop = asyncio.get_running_loop()
         # Setup server state object
         await ServerState.async_setup(sio=self.sio)
 
@@ -216,7 +218,8 @@ class Server:
                     logging.error(
                         f"Something went wrong when trying to create new job")
                     logging.debug(
-                        f"Corresponding error: {e}")
+                        f"Corresponding error: {e}, "
+                        f'exception class: {e.__class__.__name__}')
 
             await asyncio.sleep(Config.watcher_interval)
 
@@ -274,7 +277,7 @@ class Server:
         logging.info('...Stopping all running tasks')
         logging.info('...Going down in 1')
         await asyncio.sleep(1)
-        for task in asyncio.Task.all_tasks():
+        for task in asyncio.all_tasks():
             try:
                 task.cancel()
                 await asyncio.wait([task])
@@ -288,6 +291,11 @@ class Server:
         """Stop server when aiohttp can exit
         """
         await self.stop_server()
+
+    async def _start_server_from_aiohttp_startup(self, *args, **kwargs):
+        """Start server when aiohttp starts
+        """
+        await self.start_up()
 
     def start_server(self):
         """Start server by loading config and calling other startup functions
@@ -327,9 +335,11 @@ class Server:
             logging.getLogger(
                 'siridb.connector').setLevel(logging.ERROR)
 
-        self.app.on_shutdown.append(
+        self.app.on_cleanup.append(
             self._stop_server_from_aiohttp_cleanup)
-        self.loop.run_until_complete(self.start_up())
+        self.app.on_startup.append(
+            self._start_server_from_aiohttp_startup)
+            
         try:
             web.run_app(
                 self.app, print=print_custom_aiohttp_startup_message,

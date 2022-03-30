@@ -4,7 +4,6 @@ from siridb.connector.lib.exceptions import QueryError, InsertError, \
     ServerError, PoolError, AuthenticationError, UserAuthError
 
 
-
 # @classmethod
 async def query_series_datapoint_count(siridb_client, series_name):
     count = None
@@ -51,7 +50,7 @@ async def query_series_data(siridb_client, series_name, selector="*"):
 async def drop_series(siridb_client, series_name):
     result = None
     try:
-        result = await siridb_client.query(f'drop series "{series_name}"')
+        result = await siridb_client.query(f'drop series {series_name}')
     except (QueryError, InsertError, ServerError, PoolError,
             AuthenticationError, UserAuthError) as e:
         print("Connection problem with SiriDB server")
@@ -91,7 +90,8 @@ async def query_series_forecasts(siridb_client, series_name, selector="*"):
     result = None
     try:
         result = await siridb_client.query(
-            f'select {selector} from /enodo_{re.escape(series_name)}_forecast_.*?$/')
+            f'select {selector} from '
+            f'/enodo_{re.escape(series_name)}_forecast_.*?$/')
     except (QueryError, InsertError, ServerError, PoolError,
             AuthenticationError, UserAuthError) as e:
         print("Connection problem with SiriDB server")
@@ -103,7 +103,8 @@ async def query_series_anomalies(siridb_client, series_name, selector="*"):
     result = None
     try:
         result = await siridb_client.query(
-            f'select {selector} from /enodo_{re.escape(series_name)}_anomalies_*?$/')
+            f'select {selector} from '
+            f'/enodo_{re.escape(series_name)}_anomalies_.*?$/')
     except (QueryError, InsertError, ServerError, PoolError,
             AuthenticationError, UserAuthError) as e:
         print("Connection problem with SiriDB server")
@@ -116,7 +117,8 @@ async def query_series_static_rules_hits(
     result = None
     try:
         result = await siridb_client.query(
-            f'select {selector} from /enodo_{re.escape(series_name)}_static_rules_*?$/')
+            f'select {selector} from '
+            f'/enodo_{re.escape(series_name)}_static_rules_.*?$/')
     except (QueryError, InsertError, ServerError, PoolError,
             AuthenticationError, UserAuthError) as e:
         print("Connection problem with SiriDB server")

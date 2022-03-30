@@ -347,30 +347,31 @@ class EnodoJobManager:
 
     @classmethod
     async def receive_job_result(cls, writer, packet_type,
-                                 packet_id, data, client_id):
-        job_id = data.get('job_id')
+                                 packet_id, job_response, client_id):
+        job_id = job_response.get('job_id')
 
-        if data.get('error') is not None:
+        if job_response.get('error') is not None:
             logging.error(
-                f"Error returned by worker for series {data.get('name')}")
-            await cls.set_job_failed(job_id, data.get('error'))
+                "Error returned by worker for series "
+                f"{job_response.get('name')}")
+            await cls.set_job_failed(job_id, job_response.get('error'))
             return
 
-        job_type = data.get('job_type')
+        job_type = job_response.get('job_type')
         job = await cls.get_activated_job(job_id)
         await cls.deactivate_job(job_id)
-        series = await SeriesManager.get_series(data.get('name'))
+        series = await SeriesManager.get_series(job_response.get('name'))
         if job_type == JOB_TYPE_FORECAST_SERIES:
             try:
                 await SeriesManager.add_forecast_to_series(
-                    data.get('name'),
+                    job_response.get('name'),
                     job.job_config.config_name,
-                    data.get('points'))
+                    job_response.get('data'))
                 await series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
                 await series.schedule_job(job.job_config.config_name)
                 await SeriesManager.series_changed(
-                    SUBSCRIPTION_CHANGE_TYPE_UPDATE, data.get('name'))
+                    SUBSCRIPTION_CHANGE_TYPE_UPDATE, job_response.get('name'))
             except Exception as e:
                 logging.error(
                     f"Something went wrong when receiving forecast job")
@@ -379,19 +380,19 @@ class EnodoJobManager:
                     f'exception class: {e.__class__.__name__}')
         elif job_type == JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES:
             if isinstance(
-                    data.get('anomalies'),
+                    job_response.get('data'),
                     list) and len(
-                    data.get('anomalies')) > 0:
+                    job_response.get('data')) > 0:
                 try:
                     await SeriesManager.add_anomalies_to_series(
-                        data.get('name'),
+                        job_response.get('name'),
                         job.job_config.config_name,
-                        data.get('anomalies'))
+                        job_response.get('data'))
                     await series.set_job_status(
                         job.job_config.config_name, JOB_STATUS_DONE)
                     await series.schedule_job(job.job_config.config_name)
                     await SeriesManager.series_changed(
-                        SUBSCRIPTION_CHANGE_TYPE_UPDATE, data.get('name'))
+                        SUBSCRIPTION_CHANGE_TYPE_UPDATE, job_response.get('name'))
                 except Exception as e:
                     logging.error(
                         f"Something went wrong when receiving"
@@ -401,14 +402,13 @@ class EnodoJobManager:
                         f'exception class: {e.__class__.__name__}')
         elif job_type == JOB_TYPE_BASE_SERIES_ANALYSIS:
             try:
-                series.series_characteristics = data.get(
-                    'data').get('characteristics')
-                series.state.health = data.get('data').get('health')
+                series.series_characteristics = job_response.get('characteristics')
+                series.state.health = job_response.get('health')
                 await series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
                 await series.schedule_job(job.job_config.config_name)
                 await SeriesManager.series_changed(
-                    SUBSCRIPTION_CHANGE_TYPE_UPDATE, data.get('name'))
+                    SUBSCRIPTION_CHANGE_TYPE_UPDATE, job_response.get('name'))
             except Exception as e:
                 logging.error(
                     f"Something went wrong when receiving base analysis job")
@@ -420,19 +420,23 @@ class EnodoJobManager:
                 await series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
                 await series.schedule_job(job.job_config.config_name)
-                if len(data.get('failed_checks')):
-                    for key in data.get('failed_checks'):
+                await SeriesManager.add_static_rule_hits_to_series(
+                    job_response.get('name'),
+                    job.job_config.config_name,
+                    job_response.get('data'))
+                if len(job_response.get('data')):
+                    for failed_check in job_response.get('data'):
                         event = EnodoEvent(
                             'Static rule failed!',
-                            f'Series {data.get("name")} failed a \
-                                static rule ({key}): \
-                                    {data.get("failed_checks")[key]}',
+                            (f'Series {job_response.get("name")} failed a'
+                             f'static rule at ({failed_check[0]}):'
+                             f'{failed_check[1]}'),
                             ENODO_EVENT_STATIC_RULE_FAIL,
                             series=series)
                         await EnodoEventManager.handle_event(
                             event, series=series)
                 await SeriesManager.series_changed(
-                    SUBSCRIPTION_CHANGE_TYPE_UPDATE, data.get('name'))
+                    SUBSCRIPTION_CHANGE_TYPE_UPDATE, job_response.get('name'))
             except Exception as e:
                 logging.error(
                     f"Something went wrong when receiving static rules job")

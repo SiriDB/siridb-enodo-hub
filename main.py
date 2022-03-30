@@ -1,5 +1,4 @@
 import argparse
-import asyncio
 import os
 
 from lib.config import Config
@@ -19,7 +18,5 @@ if __name__ == '__main__':
         Config.create_standard_config_file(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default.conf'))
         exit()
 
-    loop = asyncio.get_event_loop()
-
-    server = Server(loop, parser.parse_args().port, parser.parse_args().config, parser.parse_args().log_level)
+    server = Server(parser.parse_args().port, parser.parse_args().config, parser.parse_args().log_level)
     server.start_server()
