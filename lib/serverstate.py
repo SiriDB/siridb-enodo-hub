@@ -1,3 +1,4 @@
+from aiojobs import create_scheduler
 from siridb.connector import SiriDBClient
 from lib.config import Config
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_INITIAL
@@ -11,6 +12,7 @@ class ServerState:
     tasks_last_runs = {}
     siridb_conn_status = {}
     readiness = None
+    scheduler = None
 
     @classmethod
     async def async_setup(cls, sio):
@@ -31,6 +33,8 @@ class ServerState:
             'data_conn': False,
             'analysis_conn': False
         }
+
+        cls.scheduler = await create_scheduler()
 
         await cls.refresh_siridb_status()
 

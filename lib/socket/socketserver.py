@@ -6,6 +6,7 @@ from packaging import version
 import qpack
 
 from lib.series.seriesmanager import SeriesManager
+from lib.serverstate import ServerState
 from . import ClientManager
 from .package import *
 
@@ -25,15 +26,12 @@ class SocketServer:
     async def create(self, loop=None):
         loop = loop or asyncio.get_event_loop()
         self._server_running = True
-        coro = asyncio.start_server(
-            self._handle_client_connection, self._hostname, self._port)
-        self._server = loop.create_task(coro)
-        self._server_coro = coro
+        self._server = await ServerState.scheduler.spawn(asyncio.start_server(
+            self._handle_client_connection, self._hostname, self._port))
 
     async def stop(self):
         self._server_running = False
-        await self._server
-        self._server.cancel()
+        await self._server.close()
 
     async def _handle_client_connection(self, reader, writer):
         connected = True

@@ -1,12 +1,14 @@
 import datetime
 
 import asyncio
-from email.mime import base
 import logging
+import signal
 
 import aiohttp_cors
+from markupsafe import functools
 import socketio
 from aiohttp import web
+from aiojobs.aiohttp import setup, create_scheduler
 from enodo.protocol.packagedata import *
 from enodo.jobs import JOB_STATUS_NONE, JOB_STATUS_DONE
 
@@ -51,12 +53,19 @@ class Server:
         self._connection_management_task = None
 
         self._watch_tasks_task = None
+        self._shutdown_trigger = False
 
     async def start_up(self):
         """All connections and classes will be prepared
         """
 
         self.loop = asyncio.get_running_loop()
+
+        for signame in ('SIGINT', 'SIGTERM'):
+            self.loop.add_signal_handler(
+                getattr(signal, signame),
+                lambda: asyncio.ensure_future(self.stop_server()))
+
         # Setup server state object
         await ServerState.async_setup(sio=self.sio)
 
@@ -99,17 +108,12 @@ class Server:
             SocketIoHandler.internal_updates_enodo_models_subscribers)
         await EnodoModelManager.load_from_disk()
 
-        # Setup background tasks
-        self._watch_series_task = self.loop.create_task(
-            self.watch_series())
-        self._save_to_disk_task = self.loop.create_task(
-            self.save_to_disk())
-        self._check_jobs_task = self.loop.create_task(
-            EnodoJobManager.check_for_jobs())
-        self._connection_management_task = self.loop.create_task(
-            self._manage_connections())
-        self._watch_tasks_task = self.loop.create_task(
-            self.watch_tasks())
+        schedular = ServerState.scheduler
+        # self._watch_series_task = await scheduler.spawn(self.watch_series())
+        # self._save_to_disk_task = await scheduler.spawn(self.save_to_disk())
+        # self._check_jobs_task = await scheduler.spawn(EnodoJobManager.check_for_jobs())
+        # self._connection_management_task = await scheduler.spawn(self._manage_connections())
+        # self._watch_tasks_task = await scheduler.spawn(self.watch_tasks())
 
         # Open backend socket connection
         await self.backend_socket.create()
@@ -118,11 +122,7 @@ class Server:
     async def clean_up(self):
         """Cleans up before shutdown
         """
-        self._watch_series_task.cancel()
-        self._check_jobs_task.cancel()
-        self._save_to_disk_task.cancel()
-        self._connection_management_task.cancel()
-        self._watch_tasks_task.cancel()
+        await ServerState.scheduler.close()
         await self.backend_socket.stop()
 
     async def _manage_connections(self):
@@ -245,24 +245,23 @@ class Server:
     async def stop_server(self):
         """Stop all parts of the server for a clean shutdown
         """
+        if self._shutdown_trigger:
+            return
+        self._shutdown_trigger = True
         logging.info('Stopping Hub...')
         ServerState.readiness = False
         if self.sio is not None:
             clients = []
             if '/' in self.sio.manager.rooms and \
                     None in self.sio.manager.rooms['/']:
-                clients = self.sio.manager.rooms['/'][None]
+                clients = [sid for sid in self.sio.manager.rooms['/'][None]]
             for sid in clients:
-                if sid is not None:
-                    if sid in self.sio.eio.sockets:
-                        try:
-                            socket = self.sio.eio.sockets[sid]
-                        except KeyError:  # pragma: no cover
-                            # the socket was already closed or gone
-                            pass
-                        else:
-                            await socket.close(wait=False)
-                            del self.sio.eio.sockets[sid]
+                await self.sio.disconnect(sid)
+            rooms = self.sio.manager.rooms
+            self.sio.manager.set_server(None)
+            for room in rooms:
+                print("closing room: ", room)
+                await self.sio.close_room(room)
 
             await asyncio.sleep(1)
             del self.sio
@@ -276,13 +275,17 @@ class Server:
 
         logging.info('...Stopping all running tasks')
         logging.info('...Going down in 1')
+
         await asyncio.sleep(1)
-        for task in asyncio.all_tasks():
+        tasks = [task for task in asyncio.all_tasks() if task is not
+             asyncio.current_task()]
+        for task in tasks:
             try:
                 task.cancel()
                 await asyncio.wait([task])
             except asyncio.CancelledError as _:
                 pass
+        await asyncio.gather(*tasks, return_exceptions=True)
 
         self.loop.stop()
         print('Bye!')
@@ -322,11 +325,10 @@ class Server:
         if Config.enable_socket_io_api:
             logging.info('Socket.io API enabled')
             self.sio = socketio.AsyncServer(async_mode='aiohttp',
-                                            ping_timeout=60,
-                                            ping_interval=25,
-                                            cookie=None,
-                                            cors_allowed_origins='*',
-                                            logger=False)
+                                            # ping_timeout=60,
+                                            # ping_interval=25,
+                                            # cookie=None,
+                                            cors_allowed_origins='*')
             self.sio.attach(self.app)
 
             logging.getLogger('aiohttp').setLevel(logging.ERROR)
@@ -339,7 +341,10 @@ class Server:
             self._stop_server_from_aiohttp_cleanup)
         self.app.on_startup.append(
             self._start_server_from_aiohttp_startup)
-            
+
+        # Setup aiojobs
+        setup(self.app)
+
         try:
             web.run_app(
                 self.app, print=print_custom_aiohttp_startup_message,
