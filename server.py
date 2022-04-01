@@ -108,12 +108,14 @@ class Server:
             SocketIoHandler.internal_updates_enodo_models_subscribers)
         await EnodoModelManager.load_from_disk()
 
-        schedular = ServerState.scheduler
-        # self._watch_series_task = await scheduler.spawn(self.watch_series())
-        # self._save_to_disk_task = await scheduler.spawn(self.save_to_disk())
-        # self._check_jobs_task = await scheduler.spawn(EnodoJobManager.check_for_jobs())
-        # self._connection_management_task = await scheduler.spawn(self._manage_connections())
-        # self._watch_tasks_task = await scheduler.spawn(self.watch_tasks())
+        scheduler = ServerState.scheduler
+        self._watch_series_task = await scheduler.spawn(self.watch_series())
+        self._save_to_disk_task = await scheduler.spawn(self.save_to_disk())
+        self._check_jobs_task = await scheduler.spawn(
+            EnodoJobManager.check_for_jobs())
+        self._connection_management_task = await scheduler.spawn(
+            self._manage_connections())
+        self._watch_tasks_task = await scheduler.spawn(self.watch_tasks())
 
         # Open backend socket connection
         await self.backend_socket.create()
@@ -254,7 +256,9 @@ class Server:
             clients = []
             if '/' in self.sio.manager.rooms and \
                     None in self.sio.manager.rooms['/']:
-                clients = [sid for sid in self.sio.manager.rooms['/'][None]]
+                clients = [sid
+                           for sid in self.sio.manager.rooms['/']
+                           [None]]
             for sid in clients:
                 await self.sio.disconnect(sid)
             rooms = self.sio.manager.rooms
@@ -278,7 +282,7 @@ class Server:
 
         await asyncio.sleep(1)
         tasks = [task for task in asyncio.all_tasks() if task is not
-             asyncio.current_task()]
+                 asyncio.current_task()]
         for task in tasks:
             try:
                 task.cancel()
