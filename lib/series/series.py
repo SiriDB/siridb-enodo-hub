@@ -34,7 +34,7 @@ class Series:
         return self._datapoint_count_lock
 
     def get_errors(self):
-        from ..enodojobmanager import EnodoJobManager # To stop circular import
+        from ..enodojobmanager import EnodoJobManager  # To stop circular import
         errors = [
             job.error
             for job in EnodoJobManager.get_failed_jobs_for_series(
@@ -42,7 +42,7 @@ class Series:
         return errors
 
     def is_ignored(self):
-        from ..enodojobmanager import EnodoJobManager # To stop circular import
+        from ..enodojobmanager import EnodoJobManager  # To stop circular import
         return EnodoJobManager.has_series_failed_jobs(self.name)
 
     async def get_model(self, job_name):
@@ -118,22 +118,32 @@ class Series:
         job_status = self.state.get_job_status(job_config_name)
         job_schedule = self.state.get_job_schedule(job_config_name)
 
-        if job_status == JOB_STATUS_NONE or job_status == JOB_STATUS_DONE:
+        if job_status in [JOB_STATUS_NONE, JOB_STATUS_DONE]:
             job_config = self.series_config.get_config_for_job(
                 job_config_name)
             if job_config.requires_job is not None:
                 required_job_status = self.state.get_job_status(
                     job_config.requires_job)
                 if required_job_status is not JOB_STATUS_DONE:
+                    self.state.set_job_check_status(
+                        job_config_name,
+                        f"Waiting for required job {job_config.requires_job}")
                     return False
             if job_schedule["value"] is None:
                 return True
             if job_schedule["type"] == "TS" and \
-                job_schedule["value"] <= int(time.time()):
+                    job_schedule["value"] <= int(time.time()):
                 return True
             if job_schedule["type"] == "N" and \
-                job_schedule["value"] <= self.state.datapoint_count:
+                    job_schedule["value"] <= self.state.datapoint_count:
                 return True
+            self.state.set_job_check_status(
+                job_config_name,
+                "Not yet scheduled")
+            return False
+        self.state.set_job_check_status(
+            job_config_name,
+            "Already active")
         return False
 
     def update(self, data):
@@ -160,6 +170,7 @@ class Series:
             'datapoint_count': self.state.datapoint_count,
             'job_statuses': self.state.job_statuses.to_dict(),
             'job_schedule': self.state.job_schedule.to_dict(),
+            'job_check_statuses': self.state.job_check_statuses.to_dict(),
             'config': self.series_config.to_dict(),
             'ignore': self.is_ignored(),
             'error': self.get_errors(),

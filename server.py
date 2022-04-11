@@ -206,8 +206,7 @@ class Server:
                 # Check if requirement of min amount of datapoints is met
                 if series.get_datapoints_count() is None:
                     continue
-                if series.series_config.min_data_points is not None and \
-                        series.get_datapoints_count() is not None:
+                if series.series_config.min_data_points is not None:
                     if series.get_datapoints_count() < \
                             series.series_config.min_data_points:
                         continue

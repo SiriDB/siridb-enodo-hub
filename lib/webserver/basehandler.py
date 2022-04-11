@@ -174,10 +174,12 @@ class BaseHandler:
                     model.model_arguments.keys()) > 0:
                 return {'error': 'Missing model parameters'}, 400
             for m_args in model.model_arguments:
-                if m_args.get("required") and \
+                if job_config.job_type in m_args.get("job_types", []) and \
+                        m_args.get("required") and \
                         m_args.get('name') not in model_parameters.keys():
-                    return {'error': f'Missing required model parameter \
-                        {m_args.get("name")}'}, 400
+                    return {'error': "Missing required model parameter '"
+                            f"{m_args.get('name')}' for job type "
+                            f"{job_config.job_type}"}, 400
 
         if not await SeriesManager.add_series(data):
             return {'error': 'Something went wrong when adding the series. \
