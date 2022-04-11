@@ -163,7 +163,7 @@ class BaseHandler:
             series_config = SeriesConfigModel(**data.get('config'))
         except Exception as e:
             return {'error': 'Invalid series config', 'message': str(e)}, 400
-        for job_config in list(series_config.job_config.values()):
+        for job_config in series_config.job_config:
             model_parameters = job_config.model_params
 
             model = await EnodoModelManager.get_model(job_config.model)

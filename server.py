@@ -218,6 +218,8 @@ class Server:
                 except Exception as e:
                     logging.error(
                         f"Something went wrong when trying to create new job")
+                    import traceback
+                    traceback.print_exc()
                     logging.debug(
                         f"Corresponding error: {e}, "
                         f'exception class: {e.__class__.__name__}')
