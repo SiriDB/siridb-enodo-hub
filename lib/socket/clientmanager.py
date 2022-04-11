@@ -59,7 +59,7 @@ class WorkerClient(EnodoClient):
         self.busy = busy
         self.is_going_busy = False
         supported_models = [
-            EnodoModel.from_dict(model_data)
+            EnodoModel(**model_data)
             for model_data in supported_models]
         self.supported_models = {model.name: model
                                  for model in supported_models}
@@ -88,7 +88,7 @@ class WorkerClient(EnodoClient):
         extra_dict = {
             'busy': self.busy,
             'jobs_and_models': self.supported_models,
-            'worker_config': self.worker_config.to_dict()
+            'worker_config': self.worker_config
         }
         return {**base_dict, **extra_dict}
 

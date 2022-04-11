@@ -453,7 +453,7 @@ class EnodoJobManager:
             job_data = EnodoJobRequestDataModel(
                 job_id=job.rid, job_config=job.job_config,
                 series_name=job.series_name,
-                series_config=series.series_config.to_dict())
+                series_config=series.series_config)
             data = qpack.packb(job_data.serialize())
             header = create_header(len(data), WORKER_JOB, 0)
             worker.writer.write(header + data)

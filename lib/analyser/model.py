@@ -1,4 +1,5 @@
 import os
+import logging
 
 from enodo import EnodoModel
 
@@ -29,14 +30,14 @@ class EnodoModelManager:
             model = EnodoModel(name, model_arguments)
             cls.models.append(model)
             await cls._update_cb(
-                SUBSCRIPTION_CHANGE_TYPE_ADD, EnodoModel.to_dict(model))
+                SUBSCRIPTION_CHANGE_TYPE_ADD, model)
 
     @classmethod
     async def add_enodo_model(cls, model):
         if await cls.get_model(model.name) is None:
             cls.models.append(model)
             await cls._update_cb(
-                SUBSCRIPTION_CHANGE_TYPE_ADD, EnodoModel.to_dict(model))
+                SUBSCRIPTION_CHANGE_TYPE_ADD, model)
             return True
         return False
 
@@ -57,7 +58,7 @@ class EnodoModelManager:
 
         if isinstance(data, list):
             for model_data in data:
-                model = EnodoModel.from_dict(model_data)
+                model = EnodoModel(**model_data)
                 cls.models.append(model)
 
     @classmethod
@@ -66,12 +67,12 @@ class EnodoModelManager:
         if cls.models is None:
             return
         for model in cls.models:
-            model_list.append(EnodoModel.to_dict(model))
+            model_list.append(model)
 
         try:
             save_disk_data(Config.model_save_path, model_list)
         except Exception as e:
-            logging.error(f"Something went wrong when writing"
-                          f"enodo models to disk")
+            logging.error("Something went wrong when writing"
+                          "enodo models to disk")
             logging.debug(f"Corresponding error: {e}, "
                           f'exception class: {e.__class__.__name__}')

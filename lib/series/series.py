@@ -14,10 +14,10 @@ class Series:
                  series_characteristics=None, **kwargs):
         self.rid = name
         self.name = name
-        self.series_config = SeriesConfigModel.from_dict(config)
+        self.series_config = SeriesConfigModel(**config)
         if state is None:
             state = {}
-        self.state = SeriesState.from_dict(state)
+        self.state = SeriesState(**state)
         self.series_characteristics = series_characteristics
 
         self._datapoint_count_lock = False
@@ -149,7 +149,7 @@ class Series:
     def update(self, data):
         config = data.get('config')
         if config is not None:
-            self.series_config = SeriesConfigModel.from_dict(config)
+            self.series_config = SeriesConfigModel(**config)
 
         return True
 
@@ -158,9 +158,9 @@ class Series:
             return {
                 'name': self.name,
                 'datapoint_count': self.state.datapoint_count,
-                'job_statuses': self.state.job_schedule.to_dict(),
-                'job_schedule': self.state.job_schedule.to_dict(),
-                'config': self.series_config.to_dict(),
+                'job_statuses': self.state.job_schedule,
+                'job_schedule': self.state.job_schedule,
+                'config': self.series_config,
                 'series_characteristics': self.series_characteristics,
                 'health': self.state.health
             }
@@ -168,10 +168,10 @@ class Series:
             'rid': self.rid,
             'name': self.name,
             'datapoint_count': self.state.datapoint_count,
-            'job_statuses': self.state.job_statuses.to_dict(),
-            'job_schedule': self.state.job_schedule.to_dict(),
-            'job_check_statuses': self.state.job_check_statuses.to_dict(),
-            'config': self.series_config.to_dict(),
+            'job_statuses': self.state.job_statuses,
+            'job_schedule': self.state.job_schedule,
+            'job_check_statuses': self.state.job_check_statuses,
+            'config': self.series_config,
             'ignore': self.is_ignored(),
             'error': self.get_errors(),
             'series_characteristics': self.series_characteristics,

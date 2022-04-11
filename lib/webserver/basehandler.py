@@ -160,8 +160,7 @@ class BaseHandler:
             dict: dict with data
         """
         try:
-            series_config = SeriesConfigModel.from_dict(
-                data.get('config'))
+            series_config = SeriesConfigModel(**data.get('config'))
         except Exception as e:
             return {'error': 'Invalid series config', 'message': str(e)}, 400
         for job_config in list(series_config.job_config.values()):
@@ -203,7 +202,7 @@ class BaseHandler:
                    for required_field in required_fields):
             return {'error': 'Something went wrong when updating the series. \
                 Missing required fields'}, 400
-        series_config = SeriesConfigModel.from_dict(data.get('config'))
+        series_config = SeriesConfigModel(**data.get('config'))
         for job_config in list(series_config.job_config.values()):
             model_parameters = job_config.model_params
 
@@ -273,8 +272,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        data = {'models': [EnodoModel.to_dict(
-            model) for model in EnodoModelManager.models]}
+        data = {'models': EnodoModelManager.models}
         return {'data': data}
 
     @classmethod
