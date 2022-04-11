@@ -6,6 +6,7 @@ import datetime
 
 import qpack
 from enodo.jobs import *
+from enodo.model.config.series import SeriesJobConfigModel
 from enodo.protocol.packagedata import EnodoJobDataModel, \
     EnodoJobRequestDataModel
 
@@ -45,6 +46,8 @@ class EnodoJob:
         for slot in cls.__slots__:
             if isinstance(getattr(job, slot), datetime.datetime):
                 resp[slot] = int(getattr(job, slot).timestamp())
+            elif isinstance(getattr(job, slot), SeriesJobConfigModel):
+                resp[slot] = getattr(job, slot).to_dict()
             else:
                 resp[slot] = getattr(job, slot)
         return resp
