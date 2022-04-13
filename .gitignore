@@ -1,6 +1,6 @@
 test
 test/*
-build/*
+build
 .idea
 .idea/*
 .idea/vcs.xml
