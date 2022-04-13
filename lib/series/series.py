@@ -45,8 +45,8 @@ class Series:
         from ..enodojobmanager import EnodoJobManager  # To stop circular import
         return EnodoJobManager.has_series_failed_jobs(self.name)
 
-    async def get_model(self, job_name):
-        return self.series_config.get_config_for_job(job_name).model
+    async def get_module(self, job_name):
+        return self.series_config.get_config_for_job(job_name).module
 
     async def get_job_status(self, job_config_name):
         return self.state.get_job_status(job_config_name)

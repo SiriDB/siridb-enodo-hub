@@ -198,8 +198,8 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
-    async def get_possible_analyser_models(cls, request):
-        """Returns list of possible models with corresponding parameters
+    async def get_possible_analyser_modules(cls, request):
+        """Returns list of possible modules with corresponding parameters
 
         Args:
             request (Request): aiohttp request
@@ -209,7 +209,7 @@ class ApiHandlers:
         """
 
         return web.json_response(
-            data=await BaseHandler.resp_get_possible_analyser_models(),
+            data=await BaseHandler.resp_get_possible_analyser_modules(),
             status=200)
 
     @classmethod

@@ -12,7 +12,7 @@ from aiojobs.aiohttp import setup, create_scheduler
 from enodo.protocol.packagedata import *
 from enodo.jobs import JOB_STATUS_NONE, JOB_STATUS_DONE
 
-from lib.analyser.model import EnodoModelManager
+from lib.analyser.model import EnodoModuleManager
 from lib.api.apihandlers import ApiHandlers, auth
 from lib.config import Config
 from lib.events.enodoeventmanager import EnodoEventManager
@@ -94,7 +94,7 @@ class Server:
             SocketIoRouter(self.sio)
 
         # Setup internal managers for handling and managing series,
-        # clients, jobs, events and models
+        # clients, jobs, events and modules
         await SeriesManager.prepare(
             SocketIoHandler.internal_updates_series_subscribers)
         await SeriesManager.read_from_disk()
@@ -104,9 +104,9 @@ class Server:
         await EnodoJobManager.load_from_disk()
         await EnodoEventManager.async_setup()
         await EnodoEventManager.load_from_disk()
-        await EnodoModelManager.async_setup(
-            SocketIoHandler.internal_updates_enodo_models_subscribers)
-        await EnodoModelManager.load_from_disk()
+        await EnodoModuleManager.async_setup(
+            SocketIoHandler.internal_updates_enodo_modules_subscribers)
+        await EnodoModuleManager.load_from_disk()
 
         scheduler = ServerState.scheduler
         self._watch_series_task = await scheduler.spawn(self.watch_series())
@@ -233,7 +233,7 @@ class Server:
         await SeriesManager.save_to_disk()
         await EnodoJobManager.save_to_disk()
         await EnodoEventManager.save_to_disk()
-        await EnodoModelManager.save_to_disk()
+        await EnodoModuleManager.save_to_disk()
 
     async def save_to_disk(self):
         """Save configs to disk on a set interval

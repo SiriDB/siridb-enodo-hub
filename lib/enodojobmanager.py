@@ -324,7 +324,7 @@ class EnodoJobManager:
 
                     worker = await ClientManager.get_free_worker(
                         next_job.series_name, next_job.job_config.job_type,
-                        await series.get_model(next_job.job_config.config_name))
+                        await series.get_module(next_job.job_config.config_name))
                     if worker is None:
                         continue
 

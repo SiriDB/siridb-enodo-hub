@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased] - yyyy-mm-dd
 
+### Changed
+- Refactored model to be renamed to module
+
+### Fixed
+- Fixed socketio serialisation of config classes on emit
+
 ## [0.1.0-beta3.2.0] - yyyy-mm-dd
 
 ### Added

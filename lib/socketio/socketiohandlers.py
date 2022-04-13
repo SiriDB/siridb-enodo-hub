@@ -136,8 +136,8 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
-    async def get_enodo_models(cls, sid, data, event=None):
-        return await BaseHandler.resp_get_possible_analyser_models()
+    async def get_enodo_modules(cls, sid, data, event=None):
+        return await BaseHandler.resp_get_possible_analyser_modules()
 
     @classmethod
     @socketio_auth_required
@@ -235,10 +235,10 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
-    async def subscribe_enodo_models(cls, sid, data, event):
+    async def subscribe_enodo_modules(cls, sid, data, event):
         if cls._sio is not None:
-            cls._sio.enter_room(sid, 'enodo_model_updates')
-            return await BaseHandler.resp_get_possible_analyser_models()
+            cls._sio.enter_room(sid, 'enodo_module_updates')
+            return await BaseHandler.resp_get_possible_analyser_modules()
 
     @classmethod
     @socketio_auth_required
@@ -249,9 +249,9 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
-    async def unsubscribe_enodo_models(cls, sid, data, event):
+    async def unsubscribe_enodo_modules(cls, sid, data, event):
         if cls._sio is not None:
-            cls._sio.leave_room(sid, 'enodo_model_updates')
+            cls._sio.leave_room(sid, 'enodo_module_updates')
 
     @classmethod
     @socketio_auth_required
@@ -334,11 +334,11 @@ class SocketIoHandler:
             }, room=sub.get('sid'))
 
     @classmethod
-    async def internal_updates_enodo_models_subscribers(cls, change_type,
-                                                        model_data):
+    async def internal_updates_enodo_modules_subscribers(cls, change_type,
+                                                        module_data):
         if cls._sio is not None:
             await cls._sio.emit('update', {
-                'resource': 'enodo_model',
+                'resource': 'enodo_module',
                 'updateType': change_type,
-                'resourceData': model_data
-            }, room='enodo_model_updates')
+                'resourceData': module_data
+            }, room='enodo_module_updates')
