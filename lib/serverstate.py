@@ -8,7 +8,7 @@ class ServerState:
     running = None
     sio = None
     siridb_data_client = None
-    siridb_forecast_client = None
+    siridb_output_client = None
     tasks_last_runs = {}
     siridb_conn_status = {}
     readiness = None
@@ -57,7 +57,7 @@ class ServerState:
 
     @classmethod
     async def setup_siridb_connection(cls):
-        data_config, forecast_config = Config.get_siridb_settings()
+        data_config, output_config = Config.get_siridb_settings()
 
         if cls.siridb_data_client is not None:
             cls.stop()
@@ -67,16 +67,16 @@ class ServerState:
             keepalive=True)
         await cls.siridb_data_client.connect()
         if not cls._siridb_config_equal(
-                data_config, forecast_config):
-            if cls.siridb_forecast_client is not None:
-                cls.siridb_forecast_client.close()
-            cls.siridb_forecast_client = SiriDBClient(
-                **forecast_config,
+                data_config, output_config):
+            if cls.siridb_output_client is not None:
+                cls.siridb_output_client.close()
+            cls.siridb_output_client = SiriDBClient(
+                **output_config,
                 keepalive=True)
-            await cls.siridb_forecast_client.connect()
-        elif cls.siridb_forecast_client is not None:
-            cls.siridb_forecast_client.close()
-            cls.siridb_forecast_client = None
+            await cls.siridb_output_client.connect()
+        elif cls.siridb_output_client is not None:
+            cls.siridb_output_client.close()
+            cls.siridb_output_client = None
 
         await cls.refresh_siridb_status()
 
@@ -85,26 +85,26 @@ class ServerState:
         return cls.siridb_data_client
 
     @classmethod
-    def get_siridb_forecast_conn(cls):
-        if cls.siridb_forecast_client is None:
+    def get_siridb_output_conn(cls):
+        if cls.siridb_output_client is None:
             return cls.siridb_data_client
-        return cls.siridb_forecast_client
+        return cls.siridb_output_client
 
     @classmethod
     def get_siridb_data_conn_status(cls):
         return cls.siridb_data_client.connected
 
     @classmethod
-    def get_siridb_forecast_conn_status(cls):
-        if cls.siridb_forecast_client is None:
+    def get_siridb_output_conn_status(cls):
+        if cls.siridb_output_client is None:
             return cls.siridb_data_client.connected
-        return cls.siridb_forecast_client.connected
+        return cls.siridb_output_client.connected
 
     @classmethod
     async def refresh_siridb_status(cls):
         status = {}
         status['data_conn'] = cls.get_siridb_data_conn_status()
-        status['analysis_conn'] = cls.get_siridb_forecast_conn_status()
+        status['analysis_conn'] = cls.get_siridb_output_conn_status()
 
         if status != cls.siridb_conn_status:
             cls.siridb_conn_status = status
@@ -119,5 +119,5 @@ class ServerState:
     def stop(cls):
         if cls.siridb_data_client is not None:
             cls.siridb_data_client.close()
-        if cls.siridb_forecast_client is not None:
-            cls.siridb_forecast_client.close()
+        if cls.siridb_output_client is not None:
+            cls.siridb_output_client.close()

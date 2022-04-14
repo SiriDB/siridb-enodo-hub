@@ -41,7 +41,7 @@ EMPTY_SETTINGS_FILE = {
         'password': '',
         'database': '',
     },
-    'siridb_forecast': {
+    'siridb_output': {
         'host': '',
         'port': '',
         'user': '',
@@ -95,11 +95,11 @@ class Config:
     siridb_database = None
 
     # Siridb forecast
-    siridb_forecast_host = None
-    siridb_forecast_port = None
-    siridb_forecast_user = None
-    siridb_forecast_password = None
-    siridb_forecast_database = None
+    siridb_output_host = None
+    siridb_output_port = None
+    siridb_output_user = None
+    siridb_output_password = None
+    siridb_output_database = None
 
     # Enodo
     base_dir = None
@@ -207,10 +207,10 @@ class Config:
             "dbname": cls.siridb_database,
             "hostlist": [(cls.siridb_host, cls.siridb_port)]
         }, {
-            "username":  cls.siridb_forecast_user,
-            "password": cls.siridb_forecast_password,
-            "dbname": cls.siridb_forecast_database,
-            "hostlist": [(cls.siridb_forecast_host, cls.siridb_forecast_port)]
+            "username":  cls.siridb_output_user,
+            "password": cls.siridb_output_password,
+            "dbname": cls.siridb_output_database,
+            "hostlist": [(cls.siridb_output_host, cls.siridb_output_port)]
         }
 
     @classmethod
@@ -290,19 +290,19 @@ class Config:
         cls.siridb_database = cls._settings.get_r('siridb', 'database')
 
         # SiriDB Forecast
-        cls.siridb_forecast_host = cls._settings.get_r(
-            'siridb_forecast',
+        cls.siridb_output_host = cls._settings.get_r(
+            'siridb_output',
             'host')
-        cls.siridb_forecast_port = cls.to_int(
-            cls._settings.get_r('siridb_forecast', 'port'))
-        cls.siridb_forecast_user = cls._settings.get_r(
-            'siridb_forecast',
+        cls.siridb_output_port = cls.to_int(
+            cls._settings.get_r('siridb_output', 'port'))
+        cls.siridb_output_user = cls._settings.get_r(
+            'siridb_output',
             'user')
-        cls.siridb_forecast_password = cls._settings.get_r(
-            'siridb_forecast',
+        cls.siridb_output_password = cls._settings.get_r(
+            'siridb_output',
             'password')
-        cls.siridb_forecast_database = cls._settings.get_r(
-            'siridb_forecast',
+        cls.siridb_output_database = cls._settings.get_r(
+            'siridb_output',
             'database')
 
     @staticmethod
@@ -339,7 +339,7 @@ class Config:
                 "password",
                 "database"
             ],
-            "siridb_forecast": [
+            "siridb_output": [
                 "host",
                 "port",
                 "user",
