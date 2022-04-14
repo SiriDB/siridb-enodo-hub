@@ -154,7 +154,7 @@ class SeriesManager:
     @classmethod
     async def cleanup_series(cls, series_name):
         await drop_series(
-            ServerState.get_siridb_forecast_conn(),
+            ServerState.get_siridb_output_conn(),
             f"/enodo_{re.escape(series_name)}.*?.*?$/")
 
     @classmethod
@@ -171,10 +171,10 @@ class SeriesManager:
         series = cls._series.get(series_name, None)
         if series is not None:
             await drop_series(
-                ServerState.get_siridb_forecast_conn(),
+                ServerState.get_siridb_output_conn(),
                 f'"enodo_{series_name}_forecast_{job_config_name}"')
             await insert_points(
-                ServerState.get_siridb_forecast_conn(),
+                ServerState.get_siridb_output_conn(),
                 f'enodo_{series_name}_forecast_{job_config_name}', points)
 
     @classmethod
@@ -189,10 +189,10 @@ class SeriesManager:
                 ENODO_EVENT_ANOMALY_DETECTED, series=series)
             await EnodoEventManager.handle_event(event)
             await drop_series(
-                ServerState.get_siridb_forecast_conn(),
+                ServerState.get_siridb_output_conn(),
                 f'"enodo_{series_name}_anomalies_{job_config_name}"')
             await insert_points(
-                ServerState.get_siridb_forecast_conn(),
+                ServerState.get_siridb_output_conn(),
                 f'enodo_{series_name}_anomalies_{job_config_name}', points)
 
     @classmethod
@@ -201,16 +201,16 @@ class SeriesManager:
         series = cls._series.get(series_name, None)
         if series is not None:
             await drop_series(
-                ServerState.get_siridb_forecast_conn(),
+                ServerState.get_siridb_output_conn(),
                 f'"enodo_{series_name}_static_rules_{job_config_name}"')
             await insert_points(
-                ServerState.get_siridb_forecast_conn(),
+                ServerState.get_siridb_output_conn(),
                 f'enodo_{series_name}_static_rules_{job_config_name}', points)
 
     @classmethod
     async def get_series_forecast(cls, series_name):
         values = await query_series_data(
-            ServerState.get_siridb_forecast_conn(), f'forecast_{series_name}')
+            ServerState.get_siridb_output_conn(), f'forecast_{series_name}')
         if values is not None:
             return values.get(f'forecast_{series_name}', None)
         return None
@@ -218,7 +218,7 @@ class SeriesManager:
     @classmethod
     async def get_series_anomalies(cls, series_name):
         values = await query_series_data(
-            ServerState.get_siridb_forecast_conn(), f'anomalies_{series_name}')
+            ServerState.get_siridb_output_conn(), f'anomalies_{series_name}')
         if values is not None:
             return values.get(f'anomalies_{series_name}', None)
         return None

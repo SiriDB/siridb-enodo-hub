@@ -64,7 +64,7 @@ class BaseHandler:
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_forecasts(
-            ServerState.get_siridb_data_conn(), series_name)}
+            ServerState.get_siridb_output_conn(), series_name)}
 
     @classmethod
     async def resp_get_series_anomalies(cls, series_name):
@@ -80,7 +80,7 @@ class BaseHandler:
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_anomalies(
-            ServerState.get_siridb_data_conn(), series_name)}
+            ServerState.get_siridb_output_conn(), series_name)}
 
     @classmethod
     async def resp_get_series_static_rules_hits(cls, series_name):
@@ -96,7 +96,7 @@ class BaseHandler:
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_static_rules_hits(
-            ServerState.get_siridb_data_conn(), series_name)}
+            ServerState.get_siridb_output_conn(), series_name)}
 
     @classmethod
     async def resp_get_event_outputs(cls):
