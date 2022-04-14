@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 - Fixed socketio serialisation of config classes on emit
+- SiriDB output db selection/config
 
 ## [0.1.0-beta3.2.0] - yyyy-mm-dd
 
