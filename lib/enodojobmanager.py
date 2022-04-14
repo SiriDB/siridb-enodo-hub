@@ -47,7 +47,7 @@ class EnodoJob:
             if isinstance(getattr(job, slot), datetime.datetime):
                 resp[slot] = int(getattr(job, slot).timestamp())
             elif isinstance(getattr(job, slot), SeriesJobConfigModel):
-                resp[slot] = getattr(job, slot).to_dict()
+                resp[slot] = getattr(job, slot)
             else:
                 resp[slot] = getattr(job, slot)
         return resp
