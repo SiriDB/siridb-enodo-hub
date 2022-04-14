@@ -1,10 +1,10 @@
 from aiohttp import web
-from enodo import EnodoModel
+from enodo import EnodoModule
 from enodo.model.config.series import SeriesConfigModel
 
 from version import VERSION
 
-from lib.analyser.model import EnodoModelManager
+from lib.analyser.model import EnodoModuleManager
 from lib.events import EnodoEventManager
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
@@ -160,24 +160,25 @@ class BaseHandler:
             dict: dict with data
         """
         try:
-            series_config = SeriesConfigModel.from_dict(
-                data.get('config'))
+            series_config = SeriesConfigModel(**data.get('config'))
         except Exception as e:
             return {'error': 'Invalid series config', 'message': str(e)}, 400
-        for job_config in list(series_config.job_config.values()):
-            model_parameters = job_config.model_params
+        for job_config in series_config.job_config.values():
+            module_parameters = job_config.module_params
 
-            model = await EnodoModelManager.get_model(job_config.model)
-            if model is None:
-                return {'error': 'Unknown model'}, 400
-            if model_parameters is None and len(
-                    model.model_arguments.keys()) > 0:
-                return {'error': 'Missing model parameters'}, 400
-            for m_args in model.model_arguments:
-                if m_args.get("required") and \
-                        m_args.get('name') not in model_parameters.keys():
-                    return {'error': f'Missing required model parameter \
-                        {m_args.get("name")}'}, 400
+            module = await EnodoModuleManager.get_module(job_config.module)
+            if module is None:
+                return {'error': 'Unknown module'}, 400
+            if module_parameters is None and len(
+                    module.module_arguments.keys()) > 0:
+                return {'error': 'Missing module parameters'}, 400
+            for m_args in module.module_arguments:
+                if job_config.job_type in m_args.get("job_types", []) and \
+                        m_args.get("required") and \
+                        m_args.get('name') not in module_parameters.keys():
+                    return {'error': "Missing required module parameter '"
+                            f"{m_args.get('name')}' for job type "
+                            f"{job_config.job_type}"}, 400
 
         if not await SeriesManager.add_series(data):
             return {'error': 'Something went wrong when adding the series. \
@@ -201,18 +202,18 @@ class BaseHandler:
                    for required_field in required_fields):
             return {'error': 'Something went wrong when updating the series. \
                 Missing required fields'}, 400
-        series_config = SeriesConfigModel.from_dict(data.get('config'))
+        series_config = SeriesConfigModel(**data.get('config'))
         for job_config in list(series_config.job_config.values()):
-            model_parameters = job_config.model_params
+            module_parameters = job_config.module_params
 
-            model = await EnodoModelManager.get_model(job_config.model)
-            if model is None:
-                return {'error': 'Unknown model'}, 400
-            if model_parameters is None and len(
-                    model.model_arguments.keys()) > 0:
+            module = await EnodoModuleManager.get_module(job_config.module)
+            if module is None:
+                return {'error': 'Unknown module'}, 400
+            if module_parameters is None and len(
+                    module.module_arguments.keys()) > 0:
                 return {'error': 'Missing required fields'}, 400
-            for key in model.model_arguments:
-                if key not in model_parameters.keys():
+            for key in module.module_arguments:
+                if key not in module_parameters.keys():
                     return {'error': f'Missing required field {key}'}, 400
 
         series = await SeriesManager.get_series(series_name)
@@ -265,14 +266,13 @@ class BaseHandler:
             'data': EnodoJobManager.remove_failed_jobs_for_series(series_name)}
 
     @classmethod
-    async def resp_get_possible_analyser_models(cls):
-        """Get all models that are available
+    async def resp_get_possible_analyser_modules(cls):
+        """Get all modules that are available
 
         Returns:
             dict: dict with data
         """
-        data = {'models': [EnodoModel.to_dict(
-            model) for model in EnodoModelManager.models]}
+        data = {'modules': EnodoModuleManager.modules}
         return {'data': data}
 
     @classmethod

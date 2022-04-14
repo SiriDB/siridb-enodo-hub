@@ -44,19 +44,24 @@ class SeriesManager:
 
     @classmethod
     async def add_series(cls, series):
+        if await cls._add_series(series):
+            logging.info(f"Added new series: {series.get('name')}")
+            return True
+        return False
+
+    @classmethod
+    async def _add_series(cls, series):
         if series.get('name') in cls._series:
             return False
         if await does_series_exist(
                 ServerState.get_siridb_data_conn(), series.get('name')):
             collected_datapoints = await query_series_datapoint_count(
                 ServerState.get_siridb_data_conn(), series.get('name'))
-            if collected_datapoints:
+            if collected_datapoints is not None:
                 cls._series[series.get(
                     'name')] = Series.from_dict(series)
                 cls._series[series.get(
                     'name')].state.datapoint_count = collected_datapoints
-                logging.info(
-                    f"Added new series: {series.get('name')}")
                 await cls.series_changed(
                     SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name'))
                 await cls.update_listeners(cls.get_listener_series_info())
@@ -149,8 +154,8 @@ class SeriesManager:
     @classmethod
     async def cleanup_series(cls, series_name):
         await drop_series(
-                ServerState.get_siridb_forecast_conn(),
-                f"/enodo_{re.escape(series_name)}.*?.*?$/")
+            ServerState.get_siridb_forecast_conn(),
+            f"/enodo_{re.escape(series_name)}.*?.*?$/")
 
     @classmethod
     async def add_to_datapoint_counter(cls, series_name, value):
@@ -234,7 +239,9 @@ class SeriesManager:
             series_data = data.get('series')
             if series_data is not None:
                 for s in series_data:
-                    cls._series[s.get('name')] = Series.from_dict(s)
+                    await cls._add_series(s)
+                    # cls._series[s.get('name')] = Series.from_dict(s)
+                    # cls._series[s.get('name')]
             label_data = data.get('labels')
             if label_data is not None:
                 for l in label_data:

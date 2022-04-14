@@ -116,7 +116,7 @@ class Config:
     enable_socket_io_api = None
     internal_security_token = None
     jobs_save_path = None
-    model_save_path = None
+    module_save_path = None
     disable_safe_mode = None
 
     # Enodo Events
@@ -271,8 +271,8 @@ class Config:
             cls.base_dir, 'data/jobs.json')
         cls.event_outputs_save_path = os.path.join(
             cls.base_dir, 'data/outputs.json')
-        cls.model_save_path = os.path.join(
-            cls.base_dir, 'data/models.json')
+        cls.module_save_path = os.path.join(
+            cls.base_dir, 'data/modules.json')
         cls.max_in_queue_before_warning = cls.to_int(
             cls._config.get_r('events', 'max_in_queue_before_warning'))
 

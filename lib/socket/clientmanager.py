@@ -6,10 +6,10 @@ from enodo.model.config.worker import WORKER_MODE_GLOBAL, \
     WORKER_MODE_DEDICATED_JOB_TYPE, \
     WORKER_MODE_DEDICATED_SERIES
 from enodo.jobs import JOB_STATUS_OPEN
-from enodo import EnodoModel
+from enodo import EnodoModule
 import qpack
 
-from lib.analyser.model import EnodoModelManager
+from lib.analyser.model import EnodoModuleManager
 from lib.events.enodoeventmanager import EnodoEvent, EnodoEventManager, \
     ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE
 from .package import *
@@ -52,17 +52,17 @@ class ListenerClient(EnodoClient):
 
 class WorkerClient(EnodoClient):
     def __init__(
-            self, client_id, ip_address, writer, supported_models,
+            self, client_id, ip_address, writer, supported_modules,
             version="unknown", last_seen=None, busy=False,
             worker_config=None):
         super().__init__(client_id, ip_address, writer, version, last_seen)
         self.busy = busy
         self.is_going_busy = False
-        supported_models = [
-            EnodoModel.from_dict(model_data)
-            for model_data in supported_models]
-        self.supported_models = {model.name: model
-                                 for model in supported_models}
+        supported_modules = [
+            EnodoModule(**module_data)
+            for module_data in supported_modules]
+        self.supported_modules = {module.name: module
+                                 for module in supported_modules}
 
         if worker_config is None:
             worker_config = WorkerConfigModel(
@@ -70,9 +70,9 @@ class WorkerClient(EnodoClient):
                 dedicated_series_name=None)
         self.worker_config = worker_config
 
-    def support_model_for_job(self, job_type, model_name):
-        model = self.supported_models.get(model_name)
-        if model is not None and model.support_job_type(job_type):
+    def support_module_for_job(self, job_type, module_name):
+        module = self.supported_modules.get(module_name)
+        if module is not None and module.support_job_type(job_type):
             return True
         return False
 
@@ -87,8 +87,8 @@ class WorkerClient(EnodoClient):
         base_dict = super().to_dict()
         extra_dict = {
             'busy': self.busy,
-            'jobs_and_models': self.supported_models,
-            'worker_config': self.worker_config.to_dict()
+            'jobs_and_modules': self.supported_modules,
+            'worker_config': self.worker_config
         }
         return {**base_dict, **extra_dict}
 
@@ -160,7 +160,7 @@ class ClientManager:
         client_id = client_data.get('client_id')
         if client_id not in cls.workers:
             client = WorkerClient(client_id, peername, writer,
-                                  client_data.get('models'),
+                                  client_data.get('modules'),
                                   client_data.get('version', None),
                                   busy=client_data.get('busy', None))
             await cls.add_client(client)
@@ -172,9 +172,9 @@ class ClientManager:
         if isinstance(client, ListenerClient):
             cls.listeners[client.client_id] = client
         elif isinstance(client, WorkerClient):
-            for model_name in client.supported_models:
-                await EnodoModelManager.add_enodo_model(
-                    client.supported_models[model_name])
+            for module_name in client.supported_modules:
+                await EnodoModuleManager.add_enodo_module(
+                    client.supported_modules[module_name])
             cls.workers[client.client_id] = client
             await cls._refresh_dedicated_cache()
 
@@ -199,14 +199,14 @@ class ClientManager:
         return cls._dedicated_for_job_type
 
     @classmethod
-    async def get_free_worker(cls, series_name, job_type, model_name):
+    async def get_free_worker(cls, series_name, job_type, module_name):
         # Check if there is a worker free that's dedicated for the series
         if cls._dedicated_for_series.get(series_name) is not None:
             for worker_id in cls._dedicated_for_series[series_name]:
                 worker = cls.workers.get(worker_id)
                 if not worker.busy and not worker.is_going_busy:
-                    if worker.support_model_for_job(
-                            job_type, model_name):
+                    if worker.support_module_for_job(
+                            job_type, module_name):
                         return worker
 
         # Check if there is a worker free that's dedicated for the job_type
@@ -214,15 +214,15 @@ class ClientManager:
             for worker_id in cls._dedicated_for_series[job_type]:
                 worker = cls.workers.get(worker_id)
                 if not worker.busy and not worker.is_going_busy:
-                    if worker.support_model_for_job(
-                            job_type, model_name):
+                    if worker.support_module_for_job(
+                            job_type, module_name):
                         return worker
 
         for worker_id in cls.workers:
             worker = cls.workers.get(worker_id)
             if worker.worker_config.mode == WORKER_MODE_GLOBAL and \
                     not worker.busy and not worker.is_going_busy:
-                if worker.support_model_for_job(job_type, model_name):
+                if worker.support_module_for_job(job_type, module_name):
                     return worker
 
         return None

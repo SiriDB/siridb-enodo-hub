@@ -53,8 +53,8 @@ class SocketIoRouter:
             event='/api/event/output/delete',
             handler=SocketIoHandler.remove_event_output)
         self._sio_on(
-            event='/api/enodo/models',
-            handler=SocketIoHandler.get_enodo_models)
+            event='/api/enodo/modules',
+            handler=SocketIoHandler.get_enodo_modules)
         self._sio_on(
             event='/api/enodo/status',
             handler=SocketIoHandler.get_enodo_hub_status)
@@ -102,8 +102,8 @@ class SocketIoRouter:
             event='/subscribe/filtered/series',
             handler=SocketIoHandler.subscribe_filtered_series)
         self._sio_on(
-            event='/subscribe/enodo/model',
-            handler=SocketIoHandler.subscribe_enodo_models)
+            event='/subscribe/enodo/module',
+            handler=SocketIoHandler.subscribe_enodo_modules)
         self._sio_on(
             event='/subscribe/event/output',
             handler=SocketIoHandler.subscribe_event_output)
