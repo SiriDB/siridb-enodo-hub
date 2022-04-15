@@ -1,5 +1,8 @@
 from aiohttp import web
-from enodo import EnodoModule
+
+from siridb.connector.lib.exceptions import QueryError, InsertError, \
+    ServerError, PoolError, AuthenticationError, UserAuthError
+
 from enodo.model.config.series import SeriesConfigModel
 
 from version import VERSION
@@ -97,6 +100,27 @@ class BaseHandler:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_static_rules_hits(
             ServerState.get_siridb_output_conn(), series_name)}
+
+    @classmethod
+    async def resp_run_siridb_query(cls, query):
+        """Run siridb query
+
+        Args:
+            query (string): siridb query, free format
+
+        Returns:
+            dict with siridb response
+        """
+        output = None
+        try:
+            result = await ServerState.get_siridb_data_conn().query(
+                query)
+        except (QueryError, InsertError, ServerError, PoolError,
+                AuthenticationError, UserAuthError) as _:
+            return {'data': output}, 400
+        else:
+            output = result
+        return {'data': output}, 200
 
     @classmethod
     async def resp_get_event_outputs(cls):

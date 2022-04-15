@@ -69,6 +69,11 @@ def setup_routes(app, cors):
         "/api/enodo/clients", ApiHandlers.get_connected_clients,
         allow_head=False)
 
+    # SiriDB proxy
+    app.router.add_get(
+        "/api/siridb/query", ApiHandlers.run_siridb_query,
+        allow_head=False)
+
     # Add non api routes
     app.router.add_get(
         "/status/ready", ApiHandlers.get_enodo_readiness,

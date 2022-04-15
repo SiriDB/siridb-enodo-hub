@@ -29,10 +29,10 @@ class SocketIoRouter:
             event='/api/series/forecasts',
             handler=SocketIoHandler.get_series_forecasts)
         self._sio_on(
-            event='/api/series/details',
+            event='/api/series/anomalies',
             handler=SocketIoHandler.get_series_anomalies)
         self._sio_on(
-            event='/api/series/details',
+            event='/api/series/static_rules',
             handler=SocketIoHandler.get_series_static_rules_hits)
         self._sio_on(
             event='/api/series/delete',
@@ -88,6 +88,9 @@ class SocketIoRouter:
         self._sio_on(
             event='/api/enodo/labels/delete',
             handler=SocketIoHandler.remove_enodo_label)
+        self._sio_on(
+            event='/api/siridb/query',
+            handler=SocketIoHandler.run_siridb_query)
 
         self._setup_listen_events()
 
