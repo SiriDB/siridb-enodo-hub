@@ -244,8 +244,8 @@ class SeriesManager:
                     # cls._series[s.get('name')]
             label_data = data.get('labels')
             if label_data is not None:
-                for l in label_data:
-                    cls._labels[l.get('grouptag')] = l
+                for la in label_data:
+                    cls._labels[la.get('grouptag')] = la
 
     @classmethod
     async def save_to_disk(cls):

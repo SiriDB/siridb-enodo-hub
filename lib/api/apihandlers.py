@@ -301,9 +301,9 @@ class ApiHandlers:
         return web.json_response(data={
             'data': {
                 'listeners': [
-                    l.to_dict() for l in ClientManager.listeners.values()],
+                    li.to_dict() for li in ClientManager.listeners.values()],
                 'workers': [
-                    w.to_dict() for w in ClientManager.workers.values()]
+                    wo.to_dict() for wo in ClientManager.workers.values()]
             }
         },
             status=200,
