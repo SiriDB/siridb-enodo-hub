@@ -43,6 +43,6 @@ jobs:
         with:
           context: .
           push: true
-          file: docker/Dockerfile
+          file: Dockerfile
           tags: ghcr.io/siridb/enodo-hub:${{ steps.get_version.outputs.VERSION }},ghcr.io/siridb/enodo-hub:latest
           labels: ${{ steps.meta.outputs.labels }}
