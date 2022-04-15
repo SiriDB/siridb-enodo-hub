@@ -1,9 +1,10 @@
-name: Deploy
+name: Deploy Version/Latest
 
 on:
   push:
     tags:
-      - "*-*"  # v0.1.0-alpha0, v0.1.0-alpha1 etc.
+      - "*"
+      - "!*-*"  # exclude *-alpha etc.
 
 env:
   REGISTRY: ghcr.io
@@ -43,5 +44,5 @@ jobs:
           context: .
           push: true
           file: docker/Dockerfile
-          tags: ghcr.io/SiriDB/enodo-hub:${{ steps.get_version.outputs.VERSION }}
+          tags: ghcr.io/SiriDB/enodo-hub:${{ steps.get_version.outputs.VERSION }},ghcr.io/SiriDB/enodo-hub:latest
           labels: ${{ steps.meta.outputs.labels }}

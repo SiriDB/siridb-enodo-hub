@@ -11,12 +11,10 @@ EMPTY_CONFIG_FILE = {
     'hub': {
         'basic_auth_username': 'enodo',
         'basic_auth_password': 'enodo',
-        'log_path': '',
         'client_max_timeout': '35',
         'internal_socket_server_hostname': 'localhost',
         'internal_socket_server_port': '9103',
-        'series_save_path': '',
-        'enodo_base_save_path': '',
+        'base_path': '',
         'save_to_disk_interval': '20',
         'enable_rest_api': 'true',
         'enable_socket_io_api': 'false',
@@ -105,7 +103,6 @@ class Config:
     base_dir = None
     basic_auth_username = None
     basic_auth_password = None
-    log_path = None
     client_max_timeout = None
     socket_server_host = None
     socket_server_port = None
@@ -264,10 +261,9 @@ class Config:
                 default='false'),
             False)
         cls.base_dir = cls._config.get_r(
-           'hub', 'enodo_base_save_path')
+           'hub', 'base_path')
         cls.disable_safe_mode = cls.to_bool(
             cls._config.get_r('hub', 'disable_safe_mode'), False)
-        cls.log_path = os.path.join(cls.base_dir, 'log.log')
         cls.series_save_path = os.path.join(
             cls.base_dir, 'data/series.json')
         cls.jobs_save_path = os.path.join(
