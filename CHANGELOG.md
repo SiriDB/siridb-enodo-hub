@@ -7,18 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased] - yyyy-mm-dd
 
-### Changed
-- Refactored model to be renamed to module
-
-### Fixed
-- Fixed socketio serialisation of config classes on emit
-- SiriDB output db selection/config
-
-## [0.1.0-beta3.2.0] - yyyy-mm-dd
+## [0.1.0-beta3.2.2] - yyyy-mm-dd
 
 ### Added
 - Seperate endpoints for fetching analysis result data
 - Cleanup on series removal (siridb analytics results)
+- Endpoint as proxy for querying SiriDB data db
 
 ### Changed
 - Changed series config and job config. Job config is now a list of jobs. Not categorised by job type. Forecast, anomaly detection jobs can be in the list multiple times. 
@@ -27,9 +21,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - A job can require an other job the be run beforehand by using the `requires_job` property
 - Config section `enodo` renamed to `hub` because of env prefix `ENODO_`
 - Job response handling updated
+- Refactored model to be renamed to module
 
 ### Fixed
 - PEP8 guidelines
+- Fixed socketio serialisation of config classes on emit
+- SiriDB output db selection/config
 
 ## [0.1.0-beta3.0.0] - 2021-08-13
 
