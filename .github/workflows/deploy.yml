@@ -3,7 +3,7 @@ name: Deploy
 on:
   push:
     tags:
-      - "*-*"  # v0.1.0-alpha0, v0.1.0-alpha1 etc.
+      - "*-*"  # 0.1.0-alpha1.0.0, 0.1.0-beta1.0.0 etc.
 
 env:
   REGISTRY: ghcr.io
