@@ -318,9 +318,9 @@ class ApiHandlers:
         return web.json_response(data={
             'data': {
                 'listeners': [
-                    l.to_dict() for l in ClientManager.listeners.values()],
+                    li.to_dict() for li in ClientManager.listeners.values()],
                 'workers': [
-                    w.to_dict() for w in ClientManager.workers.values()]
+                    wo.to_dict() for wo in ClientManager.workers.values()]
             }
         },
             status=200,
@@ -370,7 +370,8 @@ class ApiHandlers:
         JSON POST data:
             description (String): description of the label
             name (String): name of the label
-            series_config (Object): series config to assign to child series of label
+            series_config (Object): series config to assign to child series
+                                    of label
         """
         data = await request.json()
         resp = await BaseHandler.resp_add_enodo_label(data)

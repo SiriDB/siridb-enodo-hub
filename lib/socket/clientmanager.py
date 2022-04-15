@@ -61,8 +61,9 @@ class WorkerClient(EnodoClient):
         supported_modules = [
             EnodoModule(**module_data)
             for module_data in supported_modules]
-        self.supported_modules = {module.name: module
-                                 for module in supported_modules}
+        self.supported_modules = {
+            module.name: module
+            for module in supported_modules}
 
         if worker_config is None:
             worker_config = WorkerConfigModel(
@@ -290,7 +291,8 @@ class ClientManager:
 
     @classmethod
     async def check_for_pending_series(cls, client):
-        from ..enodojobmanager import EnodoJobManager  # To stop circular import
+        # To stop circular import
+        from ..enodojobmanager import EnodoJobManager
         pending_jobs = EnodoJobManager.get_active_jobs_by_worker(
             client.client_id)
         if len(pending_jobs) > 0:

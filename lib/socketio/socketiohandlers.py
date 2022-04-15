@@ -41,7 +41,7 @@ class SocketIoHandler:
 
         async with cls._sio.session(sid) as session:
             session['auth'] = True
-        
+
         return True
 
     @classmethod
@@ -342,8 +342,8 @@ class SocketIoHandler:
             }, room=sub.get('sid'))
 
     @classmethod
-    async def internal_updates_enodo_modules_subscribers(cls, change_type,
-                                                        module_data):
+    async def internal_updates_enodo_modules_subscribers(
+            cls, change_type, module_data):
         if cls._sio is not None:
             await cls._sio.emit('update', {
                 'resource': 'enodo_module',
