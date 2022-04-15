@@ -327,7 +327,8 @@ class EnodoJobManager:
 
                     worker = await ClientManager.get_free_worker(
                         next_job.series_name, next_job.job_config.job_type,
-                        await series.get_module(next_job.job_config.config_name))
+                        await series.get_module(
+                            next_job.job_config.config_name))
                     if worker is None:
                         continue
 
@@ -395,7 +396,8 @@ class EnodoJobManager:
                         job.job_config.config_name, JOB_STATUS_DONE)
                     await series.schedule_job(job.job_config.config_name)
                     await SeriesManager.series_changed(
-                        SUBSCRIPTION_CHANGE_TYPE_UPDATE, job_response.get('name'))
+                        SUBSCRIPTION_CHANGE_TYPE_UPDATE,
+                        job_response.get('name'))
                 except Exception as e:
                     logging.error(
                         f"Something went wrong when receiving"
@@ -405,7 +407,8 @@ class EnodoJobManager:
                         f'exception class: {e.__class__.__name__}')
         elif job_type == JOB_TYPE_BASE_SERIES_ANALYSIS:
             try:
-                series.series_characteristics = job_response.get('characteristics')
+                series.series_characteristics = \
+                    job_response.get('characteristics')
                 series.state.health = job_response.get('health')
                 await series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)

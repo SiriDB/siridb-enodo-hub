@@ -353,7 +353,8 @@ class ApiHandlers:
         JSON POST data:
             description (String): description of the label
             name (String): name of the label
-            series_config (Object): series config to assign to child series of label
+            series_config (Object): series config to assign to child series
+                                    of label
         """
         data = await request.json()
         resp = await BaseHandler.resp_add_enodo_label(data)
