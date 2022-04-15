@@ -34,7 +34,8 @@ class Series:
         return self._datapoint_count_lock
 
     def get_errors(self):
-        from ..enodojobmanager import EnodoJobManager  # To stop circular import
+        # To stop circular import
+        from ..enodojobmanager import EnodoJobManager
         errors = [
             job.error
             for job in EnodoJobManager.get_failed_jobs_for_series(
@@ -42,7 +43,8 @@ class Series:
         return errors
 
     def is_ignored(self):
-        from ..enodojobmanager import EnodoJobManager  # To stop circular import
+        # To stop circular import
+        from ..enodojobmanager import EnodoJobManager
         return EnodoJobManager.has_series_failed_jobs(self.name)
 
     async def get_module(self, job_name):

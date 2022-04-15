@@ -71,8 +71,8 @@ class EnodoConfigParser(RawConfigParser):
         if value is None:
             if required:
                 raise EnodoInvalidConfigException(
-                    f'Invalid config, missing option "{option}" in section \
-                        "{section}" or environment variable "{option.upper()}"')
+                    f'Invalid config, missing option "{option}" in section '
+                    f'"{section}" or environment variable "{option.upper()}"')
             return default
         return value
 
@@ -139,7 +139,8 @@ class Config:
     @classmethod
     def setup_internal_security_token(cls):
         """
-        Method checks if a token is already setup, if not, it will generate one.
+        Method checks if a token is already setup,
+        if not, it will generate one.
         (used for handshakes in internal communication)
 
         This method can only be called after the configfile is parsed
@@ -252,12 +253,14 @@ class Config:
             cls._config.get_r('hub', 'save_to_disk_interval'))
         cls.enable_rest_api = cls.to_bool(
             cls._config.get_r(
-               'hub', 'enable_rest_api', required=False,
+                'hub', 'enable_rest_api',
+                required=False,
                 default='true'),
             True)
         cls.enable_socket_io_api = cls.to_bool(
             cls._config.get_r(
-               'hub', 'enable_socket_io_api', required=False,
+                'hub', 'enable_socket_io_api',
+                required=False,
                 default='false'),
             False)
         cls.base_dir = cls._config.get_r(

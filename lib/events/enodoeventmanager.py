@@ -39,7 +39,7 @@ ENODO_EVENT_SEVERITY_LEVELS = [
 
 class EnodoEvent:
     """
-    EnodoEvent class. Holds data for an event (error/warning/etc) 
+    EnodoEvent class. Holds data for an event (error/warning/etc)
     that occured. No state data is saved.
     """
     __slots__ = ('title', 'message', 'event_type',
@@ -126,9 +126,9 @@ class EnodoEventOutput:
 
 class EnodoEventOutputWebhook(EnodoEventOutput):
     """
-    EnodoEventOutputWebhook Class. Class to describe webhook method as 
-    output method of events. This method uses a template which can be 
-    used {{ event.var }} will be replaced with a instance variable named var 
+    EnodoEventOutputWebhook Class. Class to describe webhook method as
+    output method of events. This method uses a template which can be
+    used {{ event.var }} will be replaced with a instance variable named var
     on the event instance
     """
 
@@ -280,7 +280,7 @@ class EnodoEventManager:
     async def handle_event(cls, event, series=None):
         if isinstance(event, EnodoEvent):
             if event.event_type in ENODO_SERIES_RELATED_EVENT_TYPES:
-                if series is not None and series.is_ignored() == True:
+                if series is not None and series.is_ignored() is True:
                     return False
             for output in cls.outputs:
                 await output.send_event(event)
