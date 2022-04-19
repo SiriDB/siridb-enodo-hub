@@ -1,4 +1,5 @@
 import datetime
+from time import time
 
 import asyncio
 import logging
@@ -8,7 +9,7 @@ import aiohttp_cors
 from markupsafe import functools
 import socketio
 from aiohttp import web
-from aiojobs.aiohttp import setup, create_scheduler
+from aiojobs.aiohttp import setup
 from enodo.protocol.packagedata import *
 from enodo.jobs import JOB_STATUS_NONE, JOB_STATUS_DONE
 
@@ -126,6 +127,30 @@ class Server:
         """
         await ServerState.scheduler.close()
         await self.backend_socket.stop()
+
+    async def wait_for_queue(self):
+        """Wait for queue to be empty or until max amount of seconds
+        """
+        logging.info("...Start waiting for queue to be empty")
+        start_ts = time()
+        current_ts = start_ts
+        queues_empty = EnodoJobManager.get_open_jobs_count() == 0 and \
+            EnodoJobManager.get_active_jobs_count() == 0
+        while (current_ts - start_ts) < 60 and not queues_empty:
+            current_ts = time()
+            queues_empty = EnodoJobManager.get_open_jobs_count(
+            ) == 0 and EnodoJobManager.get_active_jobs_count() == 0
+            await asyncio.sleep(1)
+
+        if not queues_empty:
+            logging.info(
+                "...Queue is not empty, but hit max time limit,"
+                "canceling jobs")
+            await EnodoJobManager.clear_jobs()
+        else:
+            logging.info(
+                "...Queue is empty, closing task to work queue")
+        ServerState.work_queue = False
 
     async def _manage_connections(self):
         """Background task to check if all connections are up
@@ -271,12 +296,15 @@ class Server:
             await asyncio.sleep(1)
             del self.sio
             self.sio = None
-        logging.info('...Saving data to disk')
-        await self._save_to_disk()
+
         ServerState.running = False
-        ServerState.stop()
+        await self.wait_for_queue()
         logging.info('...Doing clean up')
         await self.clean_up()
+        logging.info('...Saving data to disk')
+        await self._save_to_disk()
+
+        ServerState.stop()
 
         logging.info('...Stopping all running tasks')
         logging.info('...Going down in 1')

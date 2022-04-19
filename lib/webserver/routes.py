@@ -78,6 +78,9 @@ def setup_routes(app, cors):
     app.router.add_get(
         "/status/ready", ApiHandlers.get_enodo_readiness,
         allow_head=False)
+    app.router.add_get(
+        "/status/live", ApiHandlers.get_enodo_liveness,
+        allow_head=False)
 
     # Configure CORS on all routes.
     for route in list(app.router.routes()):

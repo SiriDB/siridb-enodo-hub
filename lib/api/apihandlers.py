@@ -259,6 +259,19 @@ class ApiHandlers:
             status=200 if ready else 503)
 
     @classmethod
+    async def get_enodo_liveness(cls, request):
+        """Get liveness status of this analyser instance
+
+        Args:
+            request (Request): aiohttp request
+
+        Returns:
+            _type_: _description_
+        """
+        return web.Response(
+            body="OK\r\n", status=200)
+
+    @classmethod
     @EnodoAuth.auth.required
     async def get_event_log(cls, request):
         """Returns enodo event log

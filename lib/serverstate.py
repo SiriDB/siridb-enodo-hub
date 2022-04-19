@@ -6,6 +6,7 @@ from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_INITIAL
 
 class ServerState:
     running = None
+    work_queue = None
     sio = None
     siridb_data_client = None
     siridb_output_client = None
@@ -17,6 +18,7 @@ class ServerState:
     @classmethod
     async def async_setup(cls, sio):
         cls.running = True
+        cls.work_queue = True
         cls.readiness = False
         cls.sio = sio
 
