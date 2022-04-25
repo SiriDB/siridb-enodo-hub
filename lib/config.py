@@ -62,7 +62,8 @@ class EnodoConfigParser(RawConfigParser):
             pass
 
         if self.env_support:
-            env_value = os.getenv(f"ENODO_{section.upper()}_{option.upper()}")
+            env_variable = f"ENODO_{section.upper()}_{option.upper()}"
+            env_value = os.getenv(env_variable)
             if env_value is not None:
                 value = env_value
 
@@ -70,7 +71,7 @@ class EnodoConfigParser(RawConfigParser):
             if required:
                 raise EnodoInvalidConfigException(
                     f'Invalid config, missing option "{option}" in section '
-                    f'"{section}" or environment variable "{option.upper()}"')
+                    f'"{section}" or environment variable "{env_variable}"')
             return default
         return value
 
