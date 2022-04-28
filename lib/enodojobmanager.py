@@ -112,7 +112,7 @@ class EnodoJobManager:
 
     @classmethod
     def get_open_jobs_count(cls):
-        return len(cls._active_jobs)
+        return len(cls._open_jobs)
 
     @classmethod
     def get_active_jobs_count(cls):

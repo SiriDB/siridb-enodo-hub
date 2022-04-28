@@ -4,7 +4,7 @@ aiohttp_basicauth==1.0.0
 aiohttp_cors==0.7.0
 jinja2==3.1.0
 psutil==5.9.0
-python-enodo==0.2.10
+python-enodo==0.2.11
 python-socketio==5.5.2
 qpack==0.0.19
 siridb-connector==2.0.8
