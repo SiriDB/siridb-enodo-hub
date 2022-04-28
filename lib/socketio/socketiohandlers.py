@@ -94,6 +94,14 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
+    async def run_siridb_query(cls, sid, data, event):
+        query = data.get('query')
+        resp, status = await BaseHandler.resp_run_siridb_query(
+            query)
+        return safe_json_dumps(resp)
+
+    @classmethod
+    @socketio_auth_required
     async def create_series(cls, sid, data, event):
         if not isinstance(data, dict):
             resp = {'error': 'Incorrect data'}
@@ -102,8 +110,7 @@ class SocketIoHandler:
             if series_name is not None:
                 resp, status = await BaseHandler.resp_add_series(data)
             else:
-                pass
-        resp = {'error': 'Missing required field(s)'}
+                resp = {'error': 'Missing required field(s)'}
         return safe_json_dumps(resp)
 
     @classmethod

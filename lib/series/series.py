@@ -159,25 +159,18 @@ class Series:
         if static_only:
             return {
                 'name': self.name,
-                'datapoint_count': self.state.datapoint_count,
-                'job_statuses': self.state.job_schedule,
-                'job_schedule': self.state.job_schedule,
+                'state': self.state,
                 'config': self.series_config,
-                'series_characteristics': self.series_characteristics,
-                'health': self.state.health
+                'series_characteristics': self.series_characteristics
             }
         return {
             'rid': self.rid,
             'name': self.name,
-            'datapoint_count': self.state.datapoint_count,
-            'job_statuses': self.state.job_statuses,
-            'job_schedule': self.state.job_schedule,
-            'job_check_statuses': self.state.job_check_statuses,
+            'state': self.state,
             'config': self.series_config,
             'ignore': self.is_ignored(),
             'error': self.get_errors(),
-            'series_characteristics': self.series_characteristics,
-            'health': self.state.health
+            'series_characteristics': self.series_characteristics
         }
 
     @classmethod

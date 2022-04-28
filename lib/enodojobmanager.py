@@ -112,7 +112,7 @@ class EnodoJobManager:
 
     @classmethod
     def get_open_jobs_count(cls):
-        return len(cls._active_jobs)
+        return len(cls._open_jobs)
 
     @classmethod
     def get_active_jobs_count(cls):
@@ -125,6 +125,28 @@ class EnodoJobManager:
     @classmethod
     def get_active_jobs_by_worker(cls, worker_id):
         return [job for job in cls._active_jobs if job.worker_id == worker_id]
+
+    @classmethod
+    async def clear_jobs(cls):
+        jobs = []
+        for job in cls._active_jobs:
+            jobs.append(job)
+        for job in jobs:
+            await cls._lock()
+            cls._deactivate_job(job)
+            cls._unlock()
+            await cls._send_worker_cancel_job(job.worker_id, job.rid)
+            series = await SeriesManager.get_series(job.series_name)
+            await series.set_job_status(job.job_config.config_name,
+                                        JOB_STATUS_NONE)
+        jobs = []
+        for job in cls._open_jobs:
+            jobs.append(job)
+        for job in jobs:
+            cls._open_jobs.remove(job)
+            series = await SeriesManager.get_series(job.series_name)
+            await series.set_job_status(job.job_config.config_name,
+                                        JOB_STATUS_NONE)
 
     @classmethod
     async def create_job(cls, job_config_name, series_name):
@@ -309,7 +331,7 @@ class EnodoJobManager:
 
     @classmethod
     async def check_for_jobs(cls):
-        while ServerState.running:
+        while ServerState.work_queue:
             ServerState.tasks_last_runs['check_jobs'] = datetime.datetime.now(
             )
             if len(cls._open_jobs) == 0:
