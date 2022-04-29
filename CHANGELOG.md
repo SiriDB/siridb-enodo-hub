@@ -7,13 +7,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased] - yyyy-mm-dd
 
-## [0.1.0-beta3.2.2] - yyyy-mm-dd
+## [0.1.0-beta3.2.2] - 2022-04-29
 
 ### Added
 - Seperate endpoints for fetching analysis result data
 - Cleanup on series removal (siridb analytics results)
 - Endpoint as proxy for querying SiriDB data db
 - Friendly shutdown to clear queue
+- Force shutdown support
+- Online status of clients exposed to API
 
 ### Changed
 - Changed series config and job config. Job config is now a list of jobs. Not categorised by job type. Forecast, anomaly detection jobs can be in the list multiple times. 
