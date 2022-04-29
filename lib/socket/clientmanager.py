@@ -40,7 +40,8 @@ class EnodoClient:
                 'ip_address': self.ip_address,
                 'writer': self.writer,
                 'last_seen': self.last_seen,
-                'version': self.version}
+                'version': self.version,
+                'online': self.online}
 
 
 class ListenerClient(EnodoClient):

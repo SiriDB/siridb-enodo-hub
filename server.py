@@ -6,7 +6,6 @@ import logging
 import signal
 
 import aiohttp_cors
-from markupsafe import functools
 import socketio
 from aiohttp import web
 from aiojobs.aiohttp import setup
@@ -55,6 +54,7 @@ class Server:
 
         self._watch_tasks_task = None
         self._shutdown_trigger = False
+        self._force_shutdown = False
 
     async def start_up(self):
         """All connections and classes will be prepared
@@ -136,16 +136,22 @@ class Server:
         current_ts = start_ts
         queues_empty = EnodoJobManager.get_open_jobs_count() == 0 and \
             EnodoJobManager.get_active_jobs_count() == 0
-        while (current_ts - start_ts) < 60 and not queues_empty:
+        while (current_ts - start_ts) < 60 and not queues_empty and \
+                not self._force_shutdown:
             current_ts = time()
             queues_empty = EnodoJobManager.get_open_jobs_count(
             ) == 0 and EnodoJobManager.get_active_jobs_count() == 0
             await asyncio.sleep(1)
 
         if not queues_empty:
-            logging.info(
-                "...Queue is not empty, but hit max time limit,"
-                "canceling jobs")
+            if self._force_shutdown:
+                logging.info(
+                    "...Queue is not empty, but shutdown is forced, "
+                    "canceling jobs")
+            else:
+                logging.info(
+                    "...Queue is not empty, but hit max time limit, "
+                    "canceling jobs")
             await EnodoJobManager.clear_jobs()
         else:
             logging.info(
@@ -274,6 +280,7 @@ class Server:
         """Stop all parts of the server for a clean shutdown
         """
         if self._shutdown_trigger:
+            self._force_shutdown = True
             return
         self._shutdown_trigger = True
         logging.info('Stopping Hub...')
