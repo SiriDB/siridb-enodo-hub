@@ -225,7 +225,6 @@ class ClientManager:
                             job_type, module_name):
                         return worker
 
-        
         for worker_id in cls.workers:
             worker = cls.workers.get(worker_id)
             if worker.worker_config.mode == WORKER_MODE_GLOBAL and \

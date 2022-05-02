@@ -332,7 +332,7 @@ class BaseHandler:
             await ServerState.setup_siridb_data_connection()
         elif changed and section == "siridb_output":
             await ServerState.setup_siridb_output_connection()
-        
+
         return {'data': True}
 
     @classmethod

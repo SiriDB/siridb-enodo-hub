@@ -22,7 +22,6 @@ class ServerState:
     readiness = None
     scheduler = None
 
-
     @classmethod
     async def async_setup(cls, sio):
         cls.running = True
@@ -93,7 +92,7 @@ class ServerState:
             if cls.siridb_output_client is not None:
                 cls.siridb_output_client.close()
                 cls.siridb_output_client = None
-        
+
             if not cls._siridb_config_equal(data_config, output_config):
                 cls.siridb_output_client = SiriDBClient(
                     **output_config,
