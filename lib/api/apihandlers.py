@@ -56,10 +56,9 @@ class ApiHandlers:
             _type_: _description_
         """
         series_name = unquote(request.match_info['series_name'])
-
-        return web.json_response(
-            data=await BaseHandler.resp_get_single_monitored_series(
-                series_name), dumps=safe_json_dumps)
+        data, status = await BaseHandler.resp_get_single_monitored_series(
+                series_name)
+        return web.json_response(data, dumps=safe_json_dumps, status=status)
 
     @classmethod
     @EnodoAuth.auth.required

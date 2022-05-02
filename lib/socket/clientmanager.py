@@ -85,6 +85,11 @@ class WorkerClient(EnodoClient):
     def get_config(self):
         return self.worker_config
 
+    async def reconnected(self, ip_address, writer):
+        await super().reconnected(ip_address, writer)
+        self.busy = False
+        self.is_going_busy = False
+
     def to_dict(self):
         base_dict = super().to_dict()
         extra_dict = {
@@ -220,6 +225,7 @@ class ClientManager:
                             job_type, module_name):
                         return worker
 
+        
         for worker_id in cls.workers:
             worker = cls.workers.get(worker_id)
             if worker.worker_config.mode == WORKER_MODE_GLOBAL and \

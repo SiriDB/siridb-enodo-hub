@@ -214,7 +214,10 @@ class Config:
 
     @classmethod
     def update_settings(cls, section, key, value):
+        if cls._settings[section][key] == value:
+            return True
         cls._settings[section][key] = value
+        return False
 
     @classmethod
     def write_settings(cls):
