@@ -306,7 +306,7 @@ class BaseHandler:
 
     @classmethod
     async def resp_get_enodo_config(cls):
-        return {'data': Config.get_settings()}
+        return {'data': Config.get_settings(include_secrets=False)}
 
     @classmethod
     async def resp_set_config(cls, data):

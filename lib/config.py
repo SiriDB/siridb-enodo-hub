@@ -238,16 +238,16 @@ class Config:
 
         # Enodo
         cls.basic_auth_username = cls._config.get_r(
-           'hub', 'basic_auth_username', required=False, default=None)
+            'hub', 'basic_auth_username', required=False, default=None)
         cls.basic_auth_password = cls._config.get_r(
-           'hub', 'basic_auth_password', required=False, default=None)
+            'hub', 'basic_auth_password', required=False, default=None)
 
         cls.client_max_timeout = cls.to_int(
             cls._config.get_r('hub', 'client_max_timeout'))
         if cls.client_max_timeout < 35:  # min value enforcement
             cls.client_max_timeout = 35
         cls.socket_server_host = cls._config.get_r(
-           'hub', 'internal_socket_server_hostname')
+            'hub', 'internal_socket_server_hostname')
         cls.socket_server_port = cls.to_int(
             cls._config.get_r('hub', 'internal_socket_server_port'))
         cls.save_to_disk_interval = cls.to_int(
@@ -265,7 +265,7 @@ class Config:
                 default='false'),
             False)
         cls.base_dir = cls._config.get_r(
-           'hub', 'base_path')
+            'hub', 'base_path')
         cls.disable_safe_mode = cls.to_bool(
             cls._config.get_r('hub', 'disable_safe_mode'), False)
         cls.series_save_path = os.path.join(
@@ -328,9 +328,25 @@ class Config:
         else:
             return default
 
+    @staticmethod
+    def _remove_dict_key_recursive(data, keys):
+        Config._remove_dict_key_recursive(
+            data[keys[0]],
+            keys[1:]) if len(keys) > 1 else data.pop(
+            keys[0],
+            None)
+
     @classmethod
-    def get_settings(cls):
-        return cls._settings._sections
+    def get_settings(cls, include_secrets=True):
+        if not include_secrets:
+            secret_paths = [
+                ["siridb", "password"],
+                ["siridb_output", "password"]]
+            data = cls._settings._sections
+        for secret in secret_paths:
+            cls._remove_dict_key_recursive(data, secret)
+
+        return data
 
     @staticmethod
     def is_runtime_configurable(section, key):
