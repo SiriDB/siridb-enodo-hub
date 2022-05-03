@@ -7,12 +7,12 @@ from enodo.model.config.worker import WORKER_MODE_GLOBAL, \
     WORKER_MODE_DEDICATED_SERIES
 from enodo.jobs import JOB_STATUS_OPEN
 from enodo import EnodoModule
+from enodo.protocol.package import UPDATE_SERIES, create_header
 import qpack
 
-from lib.analyser.model import EnodoModuleManager
-from lib.events.enodoeventmanager import EnodoEvent, EnodoEventManager, \
+from lib.modulemanager import EnodoModuleManager
+from lib.eventmanager import EnodoEvent, EnodoEventManager, \
     ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE
-from .package import *
 
 
 class EnodoClient:
@@ -298,7 +298,7 @@ class ClientManager:
     @classmethod
     async def check_for_pending_series(cls, client):
         # To stop circular import
-        from ..enodojobmanager import EnodoJobManager
+        from ..jobmanager import EnodoJobManager
         pending_jobs = EnodoJobManager.get_active_jobs_by_worker(
             client.client_id)
         if len(pending_jobs) > 0:

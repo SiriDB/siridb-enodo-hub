@@ -9,14 +9,15 @@ from enodo.jobs import *
 from enodo.model.config.series import SeriesJobConfigModel
 from enodo.protocol.packagedata import EnodoJobDataModel, \
     EnodoJobRequestDataModel
+from enodo.protocol.package import create_header, WORKER_JOB, \
+    WORKER_JOB_CANCEL
 
-from .events.enodoeventmanager import EnodoEvent, EnodoEventManager, \
+from .eventmanager import EnodoEvent, EnodoEventManager, \
     ENODO_EVENT_JOB_QUEUE_TOO_LONG, ENODO_EVENT_STATIC_RULE_FAIL
 from .config import Config
 from .series.seriesmanager import SeriesManager
 from .serverstate import ServerState
 from .socket import ClientManager
-from .socket.package import create_header, WORKER_JOB, WORKER_JOB_CANCEL
 from .socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
 from lib.util import load_disk_data, save_disk_data
 from .socketio import SUBSCRIPTION_CHANGE_TYPE_DELETE, \
