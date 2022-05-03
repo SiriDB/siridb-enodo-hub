@@ -64,7 +64,7 @@ class SocketIoHandler:
     @socketio_auth_required
     async def get_series_details(cls, sid, data, event):
         series_name = data.get('series_name')
-        resp = await BaseHandler.resp_get_single_monitored_series(
+        resp, status = await BaseHandler.resp_get_single_monitored_series(
             series_name)
         return safe_json_dumps(resp)
 

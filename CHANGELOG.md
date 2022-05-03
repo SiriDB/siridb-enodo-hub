@@ -5,7 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased] - yyyy-mm-dd
+## [0.1.0-beta3.2.3] - 2022-05-02
+
+### Added
+- Implemented use_max_points property in job configs
+  
+### Fixed
+- Bug with worker is_going_busy status on reconnect
+- Fixed return http status on not found when fetching series details
+- Fixed issue with siridb connect when changing settings
 
 ## [0.1.0-beta3.2.2] - 2022-04-29
 

@@ -1,4 +1,5 @@
 from aiohttp import web
+import logging
 
 from siridb.connector.lib.exceptions import QueryError, InsertError, \
     ServerError, PoolError, AuthenticationError, UserAuthError
@@ -49,9 +50,9 @@ class BaseHandler:
         """
         series = await SeriesManager.get_series(series_name)
         if series is None:
-            return web.json_response(data={'data': ''}, status=404)
+            return {'data': ''}, 404
         series_data = series.to_dict()
-        return {'data': series_data}
+        return {'data': series_data}, 200
 
     @classmethod
     async def resp_get_series_forecasts(cls, series_name):
@@ -319,13 +320,19 @@ class BaseHandler:
         """
         section = data.get('section')
         keys_and_values = data.get('entries')
+        changed = False
         for key in keys_and_values:
             if Config.is_runtime_configurable(section, key):
-                Config.update_settings(
+                changed = changed or Config.update_settings(
                     section, key, keys_and_values[key])
         Config.write_settings()
         Config.setup_settings_variables()
-        await ServerState.setup_siridb_connection()
+
+        if changed and section == "siridb":
+            await ServerState.setup_siridb_data_connection()
+        elif changed and section == "siridb_output":
+            await ServerState.setup_siridb_output_connection()
+
         return {'data': True}
 
     @classmethod

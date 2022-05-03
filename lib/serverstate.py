@@ -1,6 +1,10 @@
+from asyncio import Lock
+import logging
+
 from aiojobs import create_scheduler
 from siridb.connector import SiriDBClient
 from lib.config import Config
+from lib.siridb.siridb import query_time_unit
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_INITIAL
 
 
@@ -10,8 +14,11 @@ class ServerState:
     sio = None
     siridb_data_client = None
     siridb_output_client = None
+    siridb_data_client_lock = None
+    siridb_output_client_lock = None
     tasks_last_runs = {}
     siridb_conn_status = {}
+    siridb_ts_unit = None
     readiness = None
     scheduler = None
 
@@ -21,8 +28,11 @@ class ServerState:
         cls.work_queue = True
         cls.readiness = False
         cls.sio = sio
+        cls.siridb_data_client_lock = Lock()
+        cls.siridb_output_client_lock = Lock()
 
-        await cls.setup_siridb_connection()
+        await cls.setup_siridb_data_connection()
+        await cls.setup_siridb_output_connection()
 
         cls.tasks_last_runs = {
             'watch_series': None,
@@ -58,27 +68,36 @@ class ServerState:
         return True
 
     @classmethod
-    async def setup_siridb_connection(cls):
+    async def setup_siridb_data_connection(cls):
         data_config, output_config = Config.get_siridb_settings()
 
-        if cls.siridb_data_client is not None:
-            cls.stop()
+        logging.info('Setting up SiriDB data Connection')
+        async with cls.siridb_data_client_lock:
+            if cls.siridb_data_client is not None:
+                cls.siridb_data_client.close()
 
-        cls.siridb_data_client = SiriDBClient(
-            **data_config,
-            keepalive=True)
-        await cls.siridb_data_client.connect()
-        if not cls._siridb_config_equal(
-                data_config, output_config):
+            cls.siridb_data_client = SiriDBClient(
+                **data_config,
+                keepalive=True)
+            await cls.siridb_data_client.connect()
+
+        await cls.refresh_siridb_status()
+
+    @classmethod
+    async def setup_siridb_output_connection(cls):
+        data_config, output_config = Config.get_siridb_settings()
+
+        logging.info('Setting up SiriDB output Connection')
+        async with cls.siridb_output_client_lock:
             if cls.siridb_output_client is not None:
                 cls.siridb_output_client.close()
-            cls.siridb_output_client = SiriDBClient(
-                **output_config,
-                keepalive=True)
-            await cls.siridb_output_client.connect()
-        elif cls.siridb_output_client is not None:
-            cls.siridb_output_client.close()
-            cls.siridb_output_client = None
+                cls.siridb_output_client = None
+
+            if not cls._siridb_config_equal(data_config, output_config):
+                cls.siridb_output_client = SiriDBClient(
+                    **output_config,
+                    keepalive=True)
+                await cls.siridb_output_client.connect()
 
         await cls.refresh_siridb_status()
 
@@ -106,6 +125,8 @@ class ServerState:
     async def refresh_siridb_status(cls):
         status = {}
         status['data_conn'] = cls.get_siridb_data_conn_status()
+        if status['data_conn']:
+            cls.siridb_ts_unit = await query_time_unit(cls.siridb_data_client)
         status['analysis_conn'] = cls.get_siridb_output_conn_status()
 
         if status != cls.siridb_conn_status:

@@ -85,6 +85,11 @@ class WorkerClient(EnodoClient):
     def get_config(self):
         return self.worker_config
 
+    async def reconnected(self, ip_address, writer):
+        await super().reconnected(ip_address, writer)
+        self.busy = False
+        self.is_going_busy = False
+
     def to_dict(self):
         base_dict = super().to_dict()
         extra_dict = {

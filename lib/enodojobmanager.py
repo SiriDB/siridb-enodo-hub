@@ -432,6 +432,7 @@ class EnodoJobManager:
                 series.series_characteristics = \
                     job_response.get('characteristics')
                 series.state.health = job_response.get('health')
+                series.state.interval = job_response.get('interval')
                 await series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
                 await series.schedule_job(job.job_config.config_name)
@@ -481,7 +482,8 @@ class EnodoJobManager:
             job_data = EnodoJobRequestDataModel(
                 job_id=job.rid, job_config=job.job_config,
                 series_name=job.series_name,
-                series_config=series.series_config)
+                series_config=series.series_config,
+                series_state=series.state)
             data = qpack.packb(job_data.serialize())
             header = create_header(len(data), WORKER_JOB, 0)
             worker.writer.write(header + data)
