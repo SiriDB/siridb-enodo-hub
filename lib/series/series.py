@@ -19,7 +19,6 @@ class Series:
             state = {}
         self.state = SeriesState(**state)
         self.series_characteristics = series_characteristics
-
         self._datapoint_count_lock = asyncio.Lock()
 
     def get_errors(self):

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Changed
 - Removed siridb password from get settings base handler output
+- Refactored manager locks
+- Removed legacy code
 
 ## [0.1.0-beta3.2.3] - 2022-05-02
 
