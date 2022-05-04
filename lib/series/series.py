@@ -1,3 +1,4 @@
+import asyncio
 import time
 
 from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_NONE, \
@@ -6,7 +7,6 @@ from enodo.model.config.series import SeriesConfigModel, SeriesState
 
 
 class Series:
-    # detecting_anomalies_status forecast_status series_analysed_status
     __slots__ = ('rid', 'name', 'series_config', 'state',
                  '_datapoint_count_lock', 'series_characteristics')
 
@@ -20,18 +20,7 @@ class Series:
         self.state = SeriesState(**state)
         self.series_characteristics = series_characteristics
 
-        self._datapoint_count_lock = False
-
-    async def set_datapoints_counter_lock(self, is_locked):
-        """
-        Set lock so it can or can not be changed
-        :param is_locked:
-        :return:
-        """
-        self._datapoint_count_lock = is_locked
-
-    async def get_datapoints_counter_lock(self):
-        return self._datapoint_count_lock
+        self._datapoint_count_lock = asyncio.Lock()
 
     def get_errors(self):
         # To stop circular import
@@ -83,7 +72,7 @@ class Series:
         :param add_to_count:
         :return:
         """
-        if self._datapoint_count_lock is False:
+        async with self._datapoint_count_lock:
             self.state.datapoint_count += add_to_count
 
     async def schedule_job(self, job_config_name, initial=False):
