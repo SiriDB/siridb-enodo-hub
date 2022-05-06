@@ -20,18 +20,9 @@ EMPTY_CONFIG_FILE = {
         'enable_socket_io_api': 'false',
         'disable_safe_mode': 'false'
     },
-    'events': {
-        'max_in_queue_before_warning': '25'
-    },
     'analyser': {
-        'min_data_points': '100',
         'watcher_interval': '2',
-        'siridb_connection_check_interval': '30',
-        'interval_schedules_series': '3600',
-    }
-}
-
-EMPTY_SETTINGS_FILE = {
+    },
     'siridb': {
         'host': '',
         'port': '',
@@ -45,6 +36,15 @@ EMPTY_SETTINGS_FILE = {
         'user': '',
         'password': '',
         'database': '',
+    }
+}
+
+EMPTY_SETTINGS_FILE = {
+    'events': {
+        'max_in_queue_before_warning': '25'
+    },
+    'analyser': {
+        'min_data_points': '100'
     }
 }
 
@@ -82,9 +82,7 @@ class Config:
     _settings = None
     min_data_points = None
     watcher_interval = None
-    siridb_connection_check_interval = None
     db = None
-    interval_schedules_series = None
 
     # Siridb
     siridb_host = None
@@ -227,14 +225,8 @@ class Config:
 
     @classmethod
     def setup_config_variables(cls):
-        cls.min_data_points = cls.to_int(
-            cls._config.get_r('analyser', 'min_data_points'))
         cls.watcher_interval = cls.to_int(
             cls._config.get_r('analyser', 'watcher_interval'))
-        cls.siridb_connection_check_interval = cls.to_int(
-            cls._config.get_r('analyser', 'siridb_connection_check_interval'))
-        cls.interval_schedules_series = cls.to_int(
-            cls._config.get_r('analyser', 'interval_schedules_series'))
 
         # Enodo
         cls.basic_auth_username = cls._config.get_r(
@@ -276,37 +268,44 @@ class Config:
             cls.base_dir, 'data/outputs.json')
         cls.module_save_path = os.path.join(
             cls.base_dir, 'data/modules.json')
-        cls.max_in_queue_before_warning = cls.to_int(
-            cls._config.get_r('events', 'max_in_queue_before_warning'))
+
+        # SiriDB
+        cls.siridb_host = cls._config.get_r('siridb', 'host')
+        cls.siridb_port = cls.to_int(
+            cls._config.get_r('siridb', 'port'))
+        cls.siridb_user = cls._config.get_r('siridb', 'user')
+        cls.siridb_password = cls._config.get_r('siridb', 'password')
+        cls.siridb_database = cls._config.get_r('siridb', 'database')
+
+        # SiriDB Forecast
+        cls.siridb_output_host = cls._config.get_r(
+            'siridb_output',
+            'host')
+        cls.siridb_output_port = cls.to_int(
+            cls._config.get_r('siridb_output', 'port'))
+        cls.siridb_output_user = cls._config.get_r(
+            'siridb_output',
+            'user')
+        cls.siridb_output_password = cls._config.get_r(
+            'siridb_output',
+            'password')
+        cls.siridb_output_database = cls._config.get_r(
+            'siridb_output',
+            'database')
 
         if not os.path.exists(os.path.join(cls.base_dir, 'data')):
             os.makedirs(os.path.join(cls.base_dir, 'data'))
 
     @classmethod
     def setup_settings_variables(cls):
-        # SiriDB
-        cls.siridb_host = cls._settings.get_r('siridb', 'host')
-        cls.siridb_port = cls.to_int(
-            cls._settings.get_r('siridb', 'port'))
-        cls.siridb_user = cls._settings.get_r('siridb', 'user')
-        cls.siridb_password = cls._settings.get_r('siridb', 'password')
-        cls.siridb_database = cls._settings.get_r('siridb', 'database')
-
-        # SiriDB Forecast
-        cls.siridb_output_host = cls._settings.get_r(
-            'siridb_output',
-            'host')
-        cls.siridb_output_port = cls.to_int(
-            cls._settings.get_r('siridb_output', 'port'))
-        cls.siridb_output_user = cls._settings.get_r(
-            'siridb_output',
-            'user')
-        cls.siridb_output_password = cls._settings.get_r(
-            'siridb_output',
-            'password')
-        cls.siridb_output_database = cls._settings.get_r(
-            'siridb_output',
-            'database')
+        # TODO set default in one place/overview
+        cls.max_in_queue_before_warning = cls.to_int(cls._settings.get_r(
+            'events', 'max_in_queue_before_warning',
+            required=False, default=25))
+        cls.min_data_points = cls.to_int(
+            cls._settings.get_r(
+                'analyser', 'min_data_points', required=False,
+                default=100))
 
     @staticmethod
     def to_int(val):
@@ -339,9 +338,7 @@ class Config:
     @classmethod
     def get_settings(cls, include_secrets=True):
         if not include_secrets:
-            secret_paths = [
-                ["siridb", "password"],
-                ["siridb_output", "password"]]
+            secret_paths = []
             data = cls._settings._sections
         for secret in secret_paths:
             cls._remove_dict_key_recursive(data, secret)
@@ -351,19 +348,11 @@ class Config:
     @staticmethod
     def is_runtime_configurable(section, key):
         _is_runtime_configurable = {
-            "siridb": [
-                "host",
-                "port",
-                "user",
-                "password",
-                "database"
+            "events": [
+                "max_in_queue_before_warning"
             ],
-            "siridb_output": [
-                "host",
-                "port",
-                "user",
-                "password",
-                "database"
+            "analyser": [
+                "min_data_points"
             ]
         }
 

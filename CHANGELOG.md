@@ -5,12 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [unreleased] - yyyy-mm-dd
+## [0.1.0-beta3.2.4] - 2022-05-06
 
 ### Changed
 - Removed siridb password from get settings base handler output
 - Refactored manager locks
 - Removed legacy code
+- Moved siridb settings to config file, and `max_in_queue_before_warning` and `min_data_points` to the settings file
 
 ## [0.1.0-beta3.2.3] - 2022-05-02
 
