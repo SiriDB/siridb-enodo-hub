@@ -244,7 +244,7 @@ class ApiHandlers:
 
     @classmethod
     async def get_enodo_readiness(cls, request):
-        """Get status of this analyser instance
+        """Get ready status of this hub instance
 
         Args:
             request (Request): aiohttp request
@@ -259,7 +259,7 @@ class ApiHandlers:
 
     @classmethod
     async def get_enodo_liveness(cls, request):
-        """Get liveness status of this analyser instance
+        """Get liveness status of this hub instance
 
         Args:
             request (Request): aiohttp request

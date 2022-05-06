@@ -10,13 +10,16 @@ import socketio
 from aiohttp import web
 from aiojobs.aiohttp import setup
 from enodo.protocol.packagedata import *
+from enodo.protocol.package import LISTENER_NEW_SERIES_POINTS, \
+    WORKER_UPDATE_BUSY, WORKER_JOB_RESULT, WORKER_REFUSED, \
+    WORKER_JOB_CANCELLED
 from enodo.jobs import JOB_STATUS_NONE, JOB_STATUS_DONE
 
-from lib.analyser.model import EnodoModuleManager
-from lib.api.apihandlers import ApiHandlers, auth
+from lib.modulemanager import EnodoModuleManager
+from lib.webserver.apihandlers import ApiHandlers, auth
 from lib.config import Config
-from lib.events.enodoeventmanager import EnodoEventManager
-from lib.enodojobmanager import EnodoJobManager
+from lib.eventmanager import EnodoEventManager
+from lib.jobmanager import EnodoJobManager
 
 from lib.logging import prepare_logger
 from lib.series.seriesmanager import SeriesManager
@@ -24,9 +27,6 @@ from lib.serverstate import ServerState
 from lib.socket import ClientManager
 from lib.socket.handler import receive_new_series_points, \
     receive_worker_status_update, received_worker_refused
-from lib.socket.package import LISTENER_NEW_SERIES_POINTS, \
-    WORKER_UPDATE_BUSY, WORKER_JOB_RESULT, WORKER_REFUSED, \
-    WORKER_JOB_CANCELLED
 from lib.socket.socketserver import SocketServer
 from lib.socketio.socketiohandlers import SocketIoHandler
 from lib.socketio.socketiorouter import SocketIoRouter

@@ -4,17 +4,16 @@ import os
 import re
 
 import qpack
+from enodo.protocol.package import create_header, UPDATE_SERIES
 
 from lib.config import Config
-from lib.events import EnodoEvent
-from lib.events.enodoeventmanager import ENODO_EVENT_ANOMALY_DETECTED,\
-    EnodoEventManager
+from lib.eventmanager import ENODO_EVENT_ANOMALY_DETECTED,\
+    EnodoEventManager, EnodoEvent
 from lib.serverstate import ServerState
 from lib.siridb.siridb import query_series_datapoint_count,\
     drop_series, insert_points, query_series_data, does_series_exist,\
     query_group_expression_by_name
 from lib.socket import ClientManager
-from lib.socket.package import create_header, UPDATE_SERIES
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD,\
     SUBSCRIPTION_CHANGE_TYPE_DELETE
 from lib.util import load_disk_data, save_disk_data

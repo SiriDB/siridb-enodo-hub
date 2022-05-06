@@ -4,11 +4,13 @@ import logging
 from packaging import version
 
 import qpack
+from enodo.protocol.package import create_header, read_packet, HEARTBEAT, \
+    HANDSHAKE, HANDSHAKE_FAIL, UNKNOWN_CLIENT, CLIENT_SHUTDOWN, \
+    HANDSHAKE_OK, UPDATE_SERIES
 
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
 from . import ClientManager
-from .package import *
 
 ENODO_HUB_WORKER_MIN_VERSION = "0.1.0-beta3.0"
 

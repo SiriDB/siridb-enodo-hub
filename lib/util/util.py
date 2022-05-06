@@ -1,4 +1,5 @@
 import datetime
+import functools
 import json
 import logging
 import re
@@ -65,3 +66,16 @@ def save_disk_data(path, data):
     f = open(path, "w+")
     f.write(json.dumps(save_data, default=safe_json_dumps))
     f.close()
+
+
+def cls_lock():
+    def wrapper(func):
+        @functools.wraps(func)
+        async def wrapped(*args, **kwargs):
+            if len(args) > 0 and hasattr(args[0], "_lock"):
+                async with args[0]._lock:
+                    return await func(*args, **kwargs)
+            else:
+                raise Exception("Incorrect usage of cls_lock func")
+        return wrapped
+    return wrapper

@@ -1,5 +1,4 @@
 from aiohttp import web
-import logging
 
 from siridb.connector.lib.exceptions import QueryError, InsertError, \
     ServerError, PoolError, AuthenticationError, UserAuthError
@@ -8,14 +7,14 @@ from enodo.model.config.series import SeriesConfigModel
 
 from version import VERSION
 
-from lib.analyser.model import EnodoModuleManager
-from lib.events import EnodoEventManager
+from lib.modulemanager import EnodoModuleManager
+from lib.eventmanager import EnodoEventManager
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
 from lib.siridb.siridb import query_series_anomalies, query_series_forecasts, \
     query_series_static_rules_hits
 from lib.util import regex_valid
-from lib.enodojobmanager import EnodoJobManager, EnodoJob
+from lib.jobmanager import EnodoJobManager, EnodoJob
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
 from lib.config import Config
 from lib.socket.clientmanager import ClientManager
@@ -306,7 +305,7 @@ class BaseHandler:
 
     @classmethod
     async def resp_get_enodo_config(cls):
-        return {'data': Config.get_settings()}
+        return {'data': Config.get_settings(include_secrets=False)}
 
     @classmethod
     async def resp_set_config(cls, data):

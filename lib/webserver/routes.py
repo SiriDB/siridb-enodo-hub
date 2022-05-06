@@ -1,4 +1,4 @@
-from lib.api.apihandlers import ApiHandlers
+from lib.webserver.apihandlers import ApiHandlers
 
 
 def setup_routes(app, cors):
