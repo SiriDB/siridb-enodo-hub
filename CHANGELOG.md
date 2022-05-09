@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [unreleased] - yyyy-mm-dd
+
+## [0.1.0-beta3.2.5] - 2022-05-09
+
+### Added
+- Support for adding series with unknown modules
+
+### Changed
+- Known modules in memory only, not saved to disk
+- SiriDB config renamed to `siridb_data`
+
 ## [0.1.0-beta3.2.4] - 2022-05-06
 
 ### Changed

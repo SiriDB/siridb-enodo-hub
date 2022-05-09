@@ -23,7 +23,7 @@ EMPTY_CONFIG_FILE = {
     'analyser': {
         'watcher_interval': '2',
     },
-    'siridb': {
+    'siridb_data': {
         'host': '',
         'port': '',
         'user': '',
@@ -270,12 +270,12 @@ class Config:
             cls.base_dir, 'data/modules.json')
 
         # SiriDB
-        cls.siridb_host = cls._config.get_r('siridb', 'host')
+        cls.siridb_host = cls._config.get_r('siridb_data', 'host')
         cls.siridb_port = cls.to_int(
-            cls._config.get_r('siridb', 'port'))
-        cls.siridb_user = cls._config.get_r('siridb', 'user')
-        cls.siridb_password = cls._config.get_r('siridb', 'password')
-        cls.siridb_database = cls._config.get_r('siridb', 'database')
+            cls._config.get_r('siridb_data', 'port'))
+        cls.siridb_user = cls._config.get_r('siridb_data', 'user')
+        cls.siridb_password = cls._config.get_r('siridb_data', 'password')
+        cls.siridb_database = cls._config.get_r('siridb_data', 'database')
 
         # SiriDB Forecast
         cls.siridb_output_host = cls._config.get_r(

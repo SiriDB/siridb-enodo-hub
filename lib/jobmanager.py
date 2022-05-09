@@ -142,6 +142,9 @@ class EnodoJobManager:
     async def create_job(cls, job_config_name, series_name):
         series = await SeriesManager.get_series(series_name)
         await series.set_job_status(job_config_name, JOB_STATUS_OPEN)
+        series.state.set_job_check_status(
+            job_config_name,
+            "Job created")
         job_config = series.get_job(job_config_name)
         job_id = await cls._get_next_job_id()
         job = EnodoJob(job_id, series_name, job_config,
