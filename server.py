@@ -107,7 +107,6 @@ class Server:
         await EnodoEventManager.load_from_disk()
         await EnodoModuleManager.async_setup(
             SocketIoHandler.internal_updates_enodo_modules_subscribers)
-        await EnodoModuleManager.load_from_disk()
 
         scheduler = ServerState.scheduler
         self._watch_series_task = await scheduler.spawn(self.watch_series())
@@ -202,6 +201,13 @@ class Server:
         # Check if base analysis has already run
         if series.base_analysis_status() == JOB_STATUS_NONE:
             base_analysis_job = series.base_analysis_job
+            module = await EnodoModuleManager.get_module(
+                base_analysis_job.module)
+            if module is None:
+                series.state.set_job_check_status(
+                    base_analysis_job.config_name,
+                    "Unknown module")
+                return
             await EnodoJobManager.create_job(
                 base_analysis_job.config_name, series_name)
         # Only continue if base analysis has finished
@@ -249,8 +255,6 @@ class Server:
                 except Exception as e:
                     logging.error(
                         f"Something went wrong when trying to create new job")
-                    import traceback
-                    traceback.print_exc()
                     logging.debug(
                         f"Corresponding error: {e}, "
                         f'exception class: {e.__class__.__name__}')
@@ -264,7 +268,6 @@ class Server:
         await SeriesManager.save_to_disk()
         await EnodoJobManager.save_to_disk()
         await EnodoEventManager.save_to_disk()
-        await EnodoModuleManager.save_to_disk()
 
     async def save_to_disk(self):
         """Save configs to disk on a set interval

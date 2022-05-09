@@ -191,18 +191,17 @@ class BaseHandler:
             module_parameters = job_config.module_params
 
             module = await EnodoModuleManager.get_module(job_config.module)
-            if module is None:
-                return {'error': 'Unknown module'}, 400
-            if module_parameters is None and len(
-                    module.module_arguments.keys()) > 0:
-                return {'error': 'Missing module parameters'}, 400
-            for m_args in module.module_arguments:
-                if job_config.job_type in m_args.get("job_types", []) and \
-                        m_args.get("required") and \
-                        m_args.get('name') not in module_parameters.keys():
-                    return {'error': "Missing required module parameter '"
-                            f"{m_args.get('name')}' for job type "
-                            f"{job_config.job_type}"}, 400
+            if module is not None:
+                if module_parameters is None and len(
+                        module.module_arguments.keys()) > 0:
+                    return {'error': 'Missing module parameters'}, 400
+                for m_args in module.module_arguments:
+                    if job_config.job_type in m_args.get("job_types", []) and \
+                            m_args.get("required") and \
+                            m_args.get('name') not in module_parameters.keys():
+                        return {'error': "Missing required module parameter '"
+                                f"{m_args.get('name')}' for job type "
+                                f"{job_config.job_type}"}, 400
 
         if not await SeriesManager.add_series(data):
             return {'error': 'Something went wrong when adding the series. \
@@ -221,24 +220,21 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        required_fields = ['config']
-        if not all(required_field in data
-                   for required_field in required_fields):
-            return {'error': 'Something went wrong when updating the series. \
-                Missing required fields'}, 400
-        series_config = SeriesConfigModel(**data.get('config'))
+        try:
+            series_config = SeriesConfigModel(**data.get('config'))
+        except Exception as e:
+            return {'error': 'Invalid series config', 'message': str(e)}, 400
         for job_config in list(series_config.job_config.values()):
             module_parameters = job_config.module_params
 
             module = await EnodoModuleManager.get_module(job_config.module)
-            if module is None:
-                return {'error': 'Unknown module'}, 400
-            if module_parameters is None and len(
-                    module.module_arguments.keys()) > 0:
-                return {'error': 'Missing required fields'}, 400
-            for key in module.module_arguments:
-                if key not in module_parameters.keys():
-                    return {'error': f'Missing required field {key}'}, 400
+            if module is not None:
+                if module_parameters is None and len(
+                        module.module_arguments.keys()) > 0:
+                    return {'error': 'Missing required fields'}, 400
+                for key in module.module_arguments:
+                    if key not in module_parameters.keys():
+                        return {'error': f'Missing required field {key}'}, 400
 
         series = await SeriesManager.get_series(series_name)
         if series is None:

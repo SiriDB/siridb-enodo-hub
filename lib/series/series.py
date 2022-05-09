@@ -4,6 +4,7 @@ import time
 from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_NONE, \
     JOB_STATUS_DONE
 from enodo.model.config.series import SeriesConfigModel, SeriesState
+from lib.modulemanager import EnodoModuleManager
 
 
 class Series:
@@ -111,6 +112,12 @@ class Series:
         if job_status in [JOB_STATUS_NONE, JOB_STATUS_DONE]:
             job_config = self.series_config.get_config_for_job(
                 job_config_name)
+            module = await EnodoModuleManager.get_module(job_config.module)
+            if module is None:
+                self.state.set_job_check_status(
+                    job_config_name,
+                    "Unknown module")
+                return False
             if job_config.requires_job is not None:
                 required_job_status = self.state.get_job_status(
                     job_config.requires_job)
