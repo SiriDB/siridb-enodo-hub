@@ -8,4 +8,3 @@ python-socketio==5.6.0
 qpack==0.0.19
 siridb-connector==2.0.8
 packaging==21.3
-MarkupSafe==2.1.1
