@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta3.2.6] - 2022-05-16
+
+### Changed
+- Removed module manager, using clientmanager to fetch current know modules
+
+### Added
+- Implemented new version of lib; Check if a jobs config_name contains any spaces
+
 ## [0.1.0-beta3.2.5] - 2022-05-09
 
 ### Added

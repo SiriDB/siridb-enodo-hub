@@ -305,12 +305,14 @@ class SocketIoHandler:
     @classmethod
     @socketio_auth_required
     async def add_enodo_label(cls, sid, data, event):
-        return await BaseHandler.resp_add_enodo_label(data)
+        resp, status = await BaseHandler.resp_add_enodo_label(data)
+        return resp
 
     @classmethod
     @socketio_auth_required
     async def remove_enodo_label(cls, sid, data, event):
-        return await BaseHandler.resp_remove_enodo_label(data)
+        resp, status = await BaseHandler.resp_remove_enodo_label(data)
+        return resp
 
     @classmethod
     async def internal_updates_queue_subscribers(cls, change_type, job):

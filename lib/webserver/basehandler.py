@@ -4,10 +4,10 @@ from siridb.connector.lib.exceptions import QueryError, InsertError, \
     ServerError, PoolError, AuthenticationError, UserAuthError
 
 from enodo.model.config.series import SeriesConfigModel
+from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS
 
 from version import VERSION
 
-from lib.modulemanager import EnodoModuleManager
 from lib.eventmanager import EnodoEventManager
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
@@ -187,25 +187,18 @@ class BaseHandler:
             series_config = SeriesConfigModel(**data.get('config'))
         except Exception as e:
             return {'error': 'Invalid series config', 'message': str(e)}, 400
-        for job_config in series_config.job_config.values():
-            module_parameters = job_config.module_params
-
-            module = await EnodoModuleManager.get_module(job_config.module)
-            if module is not None:
-                if module_parameters is None and len(
-                        module.module_arguments.keys()) > 0:
-                    return {'error': 'Missing module parameters'}, 400
-                for m_args in module.module_arguments:
-                    if job_config.job_type in m_args.get("job_types", []) and \
-                            m_args.get("required") and \
-                            m_args.get('name') not in module_parameters.keys():
-                        return {'error': "Missing required module parameter '"
-                                f"{m_args.get('name')}' for job type "
-                                f"{job_config.job_type}"}, 400
-
-        if not await SeriesManager.add_series(data):
-            return {'error': 'Something went wrong when adding the series. \
-                Are you sure the series exists?'}, 400
+        bc = series_config.get_config_for_job_type(
+            JOB_TYPE_BASE_SERIES_ANALYSIS, first_only=True)
+        if bc is None:
+            return {'error': 'Something went wrong when adding the series. '
+                    'Missing base analysis job'}, 400
+        is_added = await SeriesManager.add_series(data)
+        if is_added is False:
+            return {'error': 'Something went wrong when adding the series. '
+                    'Series already added'}, 400
+        if is_added is None:
+            return {'error': 'Something went wrong when adding the series. '
+                    'Series does not exists'}, 400
 
         return {'data': list(await SeriesManager.get_series_to_dict())}, 201
 
@@ -224,18 +217,11 @@ class BaseHandler:
             series_config = SeriesConfigModel(**data.get('config'))
         except Exception as e:
             return {'error': 'Invalid series config', 'message': str(e)}, 400
-        for job_config in list(series_config.job_config.values()):
-            module_parameters = job_config.module_params
-
-            module = await EnodoModuleManager.get_module(job_config.module)
-            if module is not None:
-                if module_parameters is None and len(
-                        module.module_arguments.keys()) > 0:
-                    return {'error': 'Missing required fields'}, 400
-                for key in module.module_arguments:
-                    if key not in module_parameters.keys():
-                        return {'error': f'Missing required field {key}'}, 400
-
+        bc = series_config.get_config_for_job_type(
+            JOB_TYPE_BASE_SERIES_ANALYSIS, first_only=True)
+        if bc is None:
+            return {'error': 'Something went wrong when adding the series. '
+                    'Missing base analysis job'}, 400
         series = await SeriesManager.get_series(series_name)
         if series is None:
             return {'error': 'Something went wrong when updating the series. \
@@ -292,7 +278,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        data = {'modules': EnodoModuleManager.modules}
+        data = {'modules': list(ClientManager.modules.values())}
         return {'data': data}
 
     @classmethod
@@ -354,11 +340,11 @@ class BaseHandler:
         await SeriesManager.add_label(data.get('description'),
                                       data.get('name'),
                                       data.get('series_config'))
-        return {'data': True}
+        return {'data': True}, 201
 
     @classmethod
     async def resp_remove_enodo_label(cls, data):
         data = SeriesManager.remove_label(data.get('name'))
         if not data:
             return {'error': "Cannot remove label"}, 400
-        return {'data': data}
+        return {'data': data}, 200

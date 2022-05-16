@@ -1,8 +1,10 @@
 import asyncio
+from codecs import StreamWriter
 import datetime
 import logging
 import os
 import datetime
+from typing import Any, Callable
 
 import qpack
 from enodo.jobs import *
@@ -11,6 +13,8 @@ from enodo.protocol.packagedata import EnodoJobDataModel, \
     EnodoJobRequestDataModel
 from enodo.protocol.package import create_header, WORKER_JOB, \
     WORKER_JOB_CANCEL
+
+from lib.socket.clientmanager import WorkerClient
 
 from .eventmanager import EnodoEvent, EnodoEventManager, \
     ENODO_EVENT_JOB_QUEUE_TOO_LONG, ENODO_EVENT_STATIC_RULE_FAIL
@@ -42,7 +46,7 @@ class EnodoJob:
         self.worker_id = worker_id
 
     @classmethod
-    def to_dict(cls, job):
+    def to_dict(cls, job: 'EnodoJob') -> dict:
         resp = {}
         for slot in cls.__slots__:
             if isinstance(getattr(job, slot), datetime.datetime):
@@ -54,7 +58,7 @@ class EnodoJob:
         return resp
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict) -> 'EnodoJob':
         return EnodoJob(**data)
 
 
@@ -72,7 +76,7 @@ class EnodoJobManager:
     _update_queue_cb = None
 
     @classmethod
-    async def async_setup(cls, update_queue_cb):
+    async def async_setup(cls, update_queue_cb: Callable):
         cls._next_job_id = 0
 
         cls._update_queue_cb = update_queue_cb
@@ -87,34 +91,34 @@ class EnodoJobManager:
 
     @classmethod
     @cls_lock()
-    async def _get_next_job_id(cls):
+    async def _get_next_job_id(cls) -> int:
         if cls._next_job_id + 1 >= cls._max_job_id:
             cls._next_job_id = 0
         cls._next_job_id += 1
         return cls._next_job_id
 
     @classmethod
-    def get_active_jobs(cls):
+    def get_active_jobs(cls) -> list:
         return cls._active_jobs
 
     @classmethod
-    def get_failed_jobs(cls):
+    def get_failed_jobs(cls) -> list:
         return cls._failed_jobs
 
     @classmethod
-    def get_open_jobs_count(cls):
+    def get_open_jobs_count(cls) -> list:
         return len(cls._open_jobs)
 
     @classmethod
-    def get_active_jobs_count(cls):
+    def get_active_jobs_count(cls) -> int:
         return len(cls._active_jobs)
 
     @classmethod
-    def get_failed_jobs_count(cls):
+    def get_failed_jobs_count(cls) -> int:
         return len(cls._failed_jobs)
 
     @classmethod
-    def get_active_jobs_by_worker(cls, worker_id):
+    def get_active_jobs_by_worker(cls, worker_id: str) -> list:
         return [job for job in cls._active_jobs if job.worker_id == worker_id]
 
     @classmethod
@@ -139,7 +143,7 @@ class EnodoJobManager:
                                         JOB_STATUS_NONE)
 
     @classmethod
-    async def create_job(cls, job_config_name, series_name):
+    async def create_job(cls, job_config_name: str, series_name: str):
         series = await SeriesManager.get_series(series_name)
         await series.set_job_status(job_config_name, JOB_STATUS_OPEN)
         series.state.set_job_check_status(
@@ -152,7 +156,7 @@ class EnodoJobManager:
         await cls._add_job(job)
 
     @classmethod
-    async def _add_job(cls, job):
+    async def _add_job(cls, job: EnodoJob):
         if not isinstance(job, EnodoJob):
             raise Exception('Incorrect job instance')
 
@@ -162,14 +166,14 @@ class EnodoJobManager:
                 SUBSCRIPTION_CHANGE_TYPE_ADD, EnodoJob.to_dict(job))
 
     @classmethod
-    def has_series_failed_jobs(cls, series_name):
+    def has_series_failed_jobs(cls, series_name: str) -> bool:
         for job in cls._failed_jobs:
             if job.series_name == series_name:
                 return True
         return False
 
     @classmethod
-    def get_failed_jobs_for_series(cls, series_name):
+    def get_failed_jobs_for_series(cls, series_name: str) -> list:
         jobs = []
         for job in cls._failed_jobs:
             if job.series_name == series_name:
@@ -177,15 +181,13 @@ class EnodoJobManager:
         return jobs
 
     @classmethod
-    def remove_failed_jobs_for_series(cls, series_name):
-        jobs = cls.get_failed_jobs_for_series(series_name)
-
-        for job in jobs:
+    def remove_failed_jobs_for_series(cls, series_name: str):
+        for job in cls.get_failed_jobs_for_series(series_name):
             cls._failed_jobs.remove(job)
 
     @classmethod
     @cls_lock()
-    async def activate_job(cls, job_id, worker_id):
+    async def activate_job(cls, job_id: int, worker_id: str):
         j = None
         for job in cls._open_jobs:
             if job.rid == job_id:
@@ -195,7 +197,7 @@ class EnodoJobManager:
             await cls._activate_job(j, worker_id)
 
     @classmethod
-    async def _activate_job(cls, job, worker_id):
+    async def _activate_job(cls, job: EnodoJob, worker_id: str):
         if job is None or worker_id is None:
             return
 
@@ -210,7 +212,7 @@ class EnodoJobManager:
         cls._active_jobs_index[job.rid] = job
 
     @classmethod
-    async def get_activated_job(cls, job_id):
+    async def get_activated_job(cls, job_id: int) -> EnodoJob:
         for job in cls._active_jobs:
             if job.rid == job_id:
                 return job
@@ -219,7 +221,7 @@ class EnodoJobManager:
 
     @classmethod
     @cls_lock()
-    async def deactivate_job(cls, job_id):
+    async def deactivate_job(cls, job_id: int):
         j = None
         for job in cls._active_jobs:
             if job.rid == job_id:
@@ -229,14 +231,14 @@ class EnodoJobManager:
         cls._deactivate_job(j)
 
     @classmethod
-    def _deactivate_job(cls, job):
+    def _deactivate_job(cls, job: EnodoJob):
         if job in cls._active_jobs:
             cls._active_jobs.remove(job)
             del cls._active_jobs_index[job.rid]
 
     @classmethod
     @cls_lock()
-    async def cancel_job(cls, job):
+    async def cancel_job(cls, job: EnodoJob):
         if job in cls._active_jobs:
             cls._active_jobs.remove(job)
             del cls._active_jobs_index[job.rid]
@@ -244,11 +246,11 @@ class EnodoJobManager:
 
     @classmethod
     @cls_lock()
-    async def cancel_jobs_for_series(cls, series_name):
+    async def cancel_jobs_for_series(cls, series_name: str):
         await cls._cancel_jobs_for_series(series_name)
 
     @classmethod
-    async def _cancel_jobs_for_series(cls, series_name):
+    async def _cancel_jobs_for_series(cls, series_name: str):
         jobs = []
         for job in cls._open_jobs:
             if job.series_name == series_name:
@@ -274,7 +276,7 @@ class EnodoJobManager:
 
     @classmethod
     @cls_lock()
-    async def set_job_failed(cls, job_id, error):
+    async def set_job_failed(cls, job_id: int, error: str):
         j = None
         for job in cls._active_jobs:
             if job.rid == job_id:
@@ -283,7 +285,7 @@ class EnodoJobManager:
         await cls._set_job_failed(j, error)
 
     @classmethod
-    async def _set_job_failed(cls, job, error):
+    async def _set_job_failed(cls, job: EnodoJob, error: str):
         if job is not None:
             job.error = error
             await cls._cancel_jobs_for_series(job.series_name)
@@ -312,7 +314,7 @@ class EnodoJobManager:
 
     @classmethod
     @cls_lock()
-    async def _try_activate_job(cls, next_job):
+    async def _try_activate_job(cls, next_job: EnodoJob):
         try:
             series = await SeriesManager.get_series(
                 next_job.series_name)
@@ -324,6 +326,14 @@ class EnodoJobManager:
                 await series.get_module(
                     next_job.job_config.config_name))
             if worker is None:
+                return
+
+            if not worker.conform_params(
+                    next_job.job_config.module, next_job.job_config.
+                    job_type, next_job.job_config.module_params):
+                series.state.set_job_check_status(
+                    next_job.job_config.config_name,
+                    "Module params not conform")
                 return
 
             logging.info(
@@ -356,8 +366,9 @@ class EnodoJobManager:
             await asyncio.sleep(Config.watcher_interval)
 
     @classmethod
-    async def receive_job_result(cls, writer, packet_type,
-                                 packet_id, job_response, client_id):
+    async def receive_job_result(cls, writer: StreamWriter, packet_type,
+                                 packet_id: int, job_response: Any,
+                                 client_id: str):
         job_id = job_response.get('job_id')
 
         if job_response.get('error') is not None:
@@ -460,7 +471,8 @@ class EnodoJobManager:
             logging.error(f"Received unknown job type: {job_type}")
 
     @classmethod
-    async def _send_worker_job_request(cls, worker, job):
+    async def _send_worker_job_request(cls, worker: WorkerClient,
+                                       job: EnodoJob):
         try:
             series = await SeriesManager.get_series(job.series_name)
             job_data = EnodoJobRequestDataModel(
@@ -480,7 +492,7 @@ class EnodoJobManager:
                           f'exception class: {e.__class__.__name__}')
 
     @classmethod
-    async def _send_worker_cancel_job(cls, worker_id, job_id):
+    async def _send_worker_cancel_job(cls, worker_id: str, job_id: int):
         worker = await ClientManager.get_worker_by_id(worker_id)
         if worker is None:
             return
@@ -498,8 +510,10 @@ class EnodoJobManager:
                           f'exception class: {e.__class__.__name__}')
 
     @classmethod
-    async def receive_worker_cancelled_job(cls, writer, packet_type,
-                                           packet_id, data, client_id):
+    async def receive_worker_cancelled_job(cls, writer: StreamWriter,
+                                           packet_type: int,
+                                           packet_id: int, data: Any,
+                                           client_id: str):
         job_id = data.get('job_id')
         worker = await ClientManager.get_worker_by_id(client_id)
         if job_id in cls._active_jobs_index:
@@ -519,7 +533,7 @@ class EnodoJobManager:
                           f'exception class: {e.__class__.__name__}')
 
     @classmethod
-    async def get_open_queue(cls):
+    async def get_open_queue(cls) -> list:
         return [EnodoJob.to_dict(job) for job in cls._open_jobs]
 
     @classmethod

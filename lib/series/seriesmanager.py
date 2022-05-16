@@ -31,7 +31,7 @@ class SeriesManager:
         cls._labels_last_update = None
 
     @classmethod
-    async def series_changed(cls, change_type, series_name):
+    async def series_changed(cls, change_type: str, series_name: str):
         if cls._update_cb is not None:
             if change_type == "delete":
                 await cls._update_cb(change_type, series_name, series_name)
@@ -42,14 +42,15 @@ class SeriesManager:
                     series_name)
 
     @classmethod
-    async def add_series(cls, series):
-        if await cls._add_series(series):
+    async def add_series(cls, series: dict):
+        resp = await cls._add_series(series)
+        if resp:
             logging.info(f"Added new series: {series.get('name')}")
             return True
-        return False
+        return resp
 
     @classmethod
-    async def _add_series(cls, series):
+    async def _add_series(cls, series: dict):
         if series.get('name') in cls._series:
             return False
         if await does_series_exist(
@@ -65,7 +66,7 @@ class SeriesManager:
                     SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name'))
                 await cls.update_listeners(cls.get_listener_series_info())
                 return True
-        return False
+        return None
 
     @classmethod
     async def get_series(cls, series_name):
