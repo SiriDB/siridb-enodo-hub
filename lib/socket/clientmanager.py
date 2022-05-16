@@ -1,4 +1,4 @@
-from codecs import StreamWriter
+from asyncio import StreamWriter
 import datetime
 import logging
 from typing import Any

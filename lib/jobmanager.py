@@ -1,5 +1,5 @@
 import asyncio
-from codecs import StreamWriter
+from asyncio import StreamWriter
 import datetime
 import logging
 import os
