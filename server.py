@@ -15,7 +15,6 @@ from enodo.protocol.package import LISTENER_NEW_SERIES_POINTS, \
     WORKER_JOB_CANCELLED
 from enodo.jobs import JOB_STATUS_NONE, JOB_STATUS_DONE
 
-from lib.modulemanager import EnodoModuleManager
 from lib.webserver.apihandlers import ApiHandlers, auth
 from lib.config import Config
 from lib.eventmanager import EnodoEventManager
@@ -105,8 +104,6 @@ class Server:
         await EnodoJobManager.load_from_disk()
         await EnodoEventManager.async_setup()
         await EnodoEventManager.load_from_disk()
-        await EnodoModuleManager.async_setup(
-            SocketIoHandler.internal_updates_enodo_modules_subscribers)
 
         scheduler = ServerState.scheduler
         self._watch_series_task = await scheduler.spawn(self.watch_series())
@@ -201,7 +198,7 @@ class Server:
         # Check if base analysis has already run
         if series.base_analysis_status() == JOB_STATUS_NONE:
             base_analysis_job = series.base_analysis_job
-            module = await EnodoModuleManager.get_module(
+            module = ClientManager.get_module(
                 base_analysis_job.module)
             if module is None:
                 series.state.set_job_check_status(
@@ -373,12 +370,10 @@ class Server:
                                             # cookie=None,
                                             cors_allowed_origins='*')
             self.sio.attach(self.app)
-
-            logging.getLogger('aiohttp').setLevel(logging.ERROR)
             logging.getLogger('socketio').setLevel(logging.ERROR)
             logging.getLogger('engineio').setLevel(logging.ERROR)
-            logging.getLogger(
-                'siridb.connector').setLevel(logging.ERROR)
+        logging.getLogger('aiohttp').setLevel(logging.ERROR)
+        logging.getLogger('siridb.connector').setLevel(logging.ERROR)
 
         self.app.on_cleanup.append(
             self._stop_server_from_aiohttp_cleanup)

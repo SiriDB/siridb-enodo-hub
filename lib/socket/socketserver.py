@@ -134,8 +134,8 @@ class SocketServer:
             logging.info(
                 f'New listener with id: {client_id}')
         elif client_data.get('client_type') == 'worker':
-            supported_modules = client_data.get('modules')
-            if supported_modules is None or len(supported_modules) < 1:
+            supported_modules = client_data.get('module')
+            if supported_modules is None:
                 logging.warning(
                     f"New worker connected with id : {client_id}"
                     ", but has no installed modules")

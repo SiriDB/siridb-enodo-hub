@@ -56,13 +56,13 @@ class ServerState:
 
     @classmethod
     def _siridb_config_equal(cls, a, b):
-        if a.get('username') != b.get('username'):
+        if a.get('user') != b.get('user'):
             return False
         if a.get('password') != b.get('password'):
             return False
-        if a.get('dbname') != b.get('dbname'):
+        if a.get('database') != b.get('database'):
             return False
-        if a.get('hostlist')[0] != b.get('hostlist')[0]:
+        if a.get('host') != b.get('host'):
             return False
 
         return True
