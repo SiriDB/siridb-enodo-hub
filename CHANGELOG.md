@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta3.27] - 2022-05-17
+
+### Fixed
+- Added exception handling when loading series from disk, ignoring invalid data
+
 ## [0.1.0-beta3.2.6] - 2022-05-17
 
 ### Changed
