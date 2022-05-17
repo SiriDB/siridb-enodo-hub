@@ -239,7 +239,12 @@ class SeriesManager:
             series_data = data.get('series')
             if series_data is not None:
                 for s in series_data:
-                    await cls._add_series(s)
+                    try:
+                        await cls._add_series(s)
+                    except Exception as e:
+                        logging.warning(
+                            "Tried loading invalid data when "
+                            "loading series")
                     # cls._series[s.get('name')] = Series.from_dict(s)
                     # cls._series[s.get('name')]
             label_data = data.get('labels')
