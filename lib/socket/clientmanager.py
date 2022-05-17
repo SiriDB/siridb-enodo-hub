@@ -1,6 +1,7 @@
 from asyncio import StreamWriter
 import datetime
 import logging
+from operator import mod
 from typing import Any
 
 from enodo import WorkerConfigModel
@@ -54,19 +55,13 @@ class ListenerClient(EnodoClient):
 
 class WorkerClient(EnodoClient):
     def __init__(self, client_id: str, ip_address: str,
-                 writer: StreamWriter, supported_modules: list,
+                 writer: StreamWriter, module: dict,
                  version="unknown", last_seen=None, busy=False,
                  worker_config=None):
         super().__init__(client_id, ip_address, writer, version, last_seen)
         self.busy = busy
         self.is_going_busy = False
-        supported_modules = [
-            EnodoModule(**module_data)
-            for module_data in supported_modules]
-        self.supported_modules = {
-            module.name: module
-            for module in supported_modules}
-
+        self.module = EnodoModule(**module)
         if worker_config is None:
             worker_config = WorkerConfigModel(
                 WORKER_MODE_GLOBAL, dedicated_job_type=None,
@@ -75,16 +70,13 @@ class WorkerClient(EnodoClient):
 
     def support_module_for_job(
             self, job_type: str, module_name: str) -> bool:
-        module = self.supported_modules.get(module_name)
-        if module is not None and module.support_job_type(job_type):
-            return True
-        return False
+        return self.module.name == module_name and \
+            self.module.support_job_type(job_type)
 
     def conform_params(self, module_name: str, job_type: str,
                        params: dict) -> bool:
-        module = self.supported_modules.get(module_name)
-        if module is not None:
-            return module.conform_to_params(job_type, params)
+        if self.module.name == module_name:
+            return self.module.conform_to_params(job_type, params)
         return False
 
     def set_config(self, worker_config: WorkerConfigModel):
@@ -103,7 +95,7 @@ class WorkerClient(EnodoClient):
         base_dict = super().to_dict()
         extra_dict = {
             'busy': self.busy,
-            'jobs_and_modules': self.supported_modules,
+            'jobs_and_modules': self.module,
             'worker_config': self.worker_config
         }
         return {**base_dict, **extra_dict}
@@ -127,7 +119,8 @@ class ClientManager:
     def modules(cls) -> dict:
         m_index = {}
         for worker in cls.workers.values():
-            m_index = m_index | worker.supported_modules
+            d_val = {worker.module.name: worker.module}
+            m_index = m_index | d_val
         return m_index
 
     @classmethod
@@ -190,7 +183,7 @@ class ClientManager:
         client_id = client_data.get('client_id')
         if client_id not in cls.workers:
             client = WorkerClient(client_id, peername, writer,
-                                  client_data.get('modules'),
+                                  client_data.get('module'),
                                   client_data.get('version', None),
                                   busy=client_data.get('busy', None))
             await cls.add_client(client)
