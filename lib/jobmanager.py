@@ -479,7 +479,8 @@ class EnodoJobManager:
                 job_id=job.rid, job_config=job.job_config,
                 series_name=job.series_name,
                 series_config=series.series_config,
-                series_state=series.state)
+                series_state=series.state,
+                siridb_ts_units=ServerState.siridb_ts_unit)
             data = qpack.packb(job_data.serialize())
             header = create_header(len(data), WORKER_JOB, 0)
             worker.writer.write(header + data)
