@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
-## [0.1.0-beta3.2.7] - 2022-05-18
+## [0.1.0-beta3.2.8] - 2022-05-18
 
 ### Added
 - `time_precision` support, send to worker in job request.
