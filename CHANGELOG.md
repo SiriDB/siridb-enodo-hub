@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
-## [0.1.0-beta3.27] - 2022-05-17
+## [0.1.0-beta3.2.8] - 2022-05-18
+
+### Added
+- `time_precision` support, send to worker in job request.
+- Implemented new lib for `time_precision` support and `value_type` for `EnodoModuleArgument`
+
+## [0.1.0-beta3.2.7] - 2022-05-17
 
 ### Fixed
 - Added exception handling when loading series from disk, ignoring invalid data

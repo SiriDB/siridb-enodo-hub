@@ -18,7 +18,7 @@ class ServerState:
     siridb_output_client_lock = None
     tasks_last_runs = {}
     siridb_conn_status = {}
-    siridb_ts_unit = None
+    siridb_ts_unit = {}
     readiness = None
     scheduler = None
 
@@ -31,9 +31,6 @@ class ServerState:
         cls.siridb_data_client_lock = Lock()
         cls.siridb_output_client_lock = Lock()
 
-        await cls.setup_siridb_data_connection()
-        await cls.setup_siridb_output_connection()
-
         cls.tasks_last_runs = {
             'watch_series': None,
             'save_to_disk': None,
@@ -45,6 +42,14 @@ class ServerState:
             'data_conn': False,
             'analysis_conn': False
         }
+
+        cls.siridb_ts_unit = {
+            'data': 'ms',
+            'analysis': 'ms'
+        }
+
+        await cls.setup_siridb_data_connection()
+        await cls.setup_siridb_output_connection()
 
         cls.scheduler = await create_scheduler()
 
@@ -83,6 +88,10 @@ class ServerState:
 
         await cls.refresh_siridb_status()
 
+        if cls.siridb_conn_status['data_conn']:
+            cls.siridb_ts_unit['data'] = await query_time_unit(
+                cls.siridb_data_client)
+
     @classmethod
     async def setup_siridb_output_connection(cls):
         data_config, output_config = Config.get_siridb_settings()
@@ -100,6 +109,10 @@ class ServerState:
                 await cls.siridb_output_client.connect()
 
         await cls.refresh_siridb_status()
+
+        if cls.siridb_conn_status['output_conn']:
+            cls.siridb_ts_unit['output'] = await query_time_unit(
+                cls.get_siridb_output_conn())
 
     @classmethod
     def get_siridb_data_conn(cls):
@@ -125,9 +138,7 @@ class ServerState:
     async def refresh_siridb_status(cls):
         status = {}
         status['data_conn'] = cls.get_siridb_data_conn_status()
-        if status['data_conn']:
-            cls.siridb_ts_unit = await query_time_unit(cls.siridb_data_client)
-        status['analysis_conn'] = cls.get_siridb_output_conn_status()
+        status['output_conn'] = cls.get_siridb_output_conn_status()
 
         if status != cls.siridb_conn_status:
             cls.siridb_conn_status = status

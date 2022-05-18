@@ -301,18 +301,12 @@ class BaseHandler:
         """
         section = data.get('section')
         keys_and_values = data.get('entries')
-        changed = False
         for key in keys_and_values:
             if Config.is_runtime_configurable(section, key):
-                changed = changed or Config.update_settings(
+                Config.update_settings(
                     section, key, keys_and_values[key])
         Config.write_settings()
         Config.setup_settings_variables()
-
-        if changed and section == "siridb":
-            await ServerState.setup_siridb_data_connection()
-        elif changed and section == "siridb_output":
-            await ServerState.setup_siridb_output_connection()
 
         return {'data': True}
 
