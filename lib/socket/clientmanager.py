@@ -2,7 +2,7 @@ from asyncio import StreamWriter
 import logging
 import os
 import time
-from typing import Any
+from typing import Any, Optional, Union
 
 from enodo import WorkerConfigModel
 from enodo.model.config.worker import WORKER_MODE_GLOBAL, \
@@ -21,9 +21,13 @@ from lib.util.util import load_disk_data, save_disk_data
 
 class EnodoClient:
 
-    def __init__(self, client_id: str, ip_address: str,
-                 writer: StreamWriter, version="unknown",
-                 last_seen=None, online=True):
+    def __init__(self,
+                 client_id: str,
+                 ip_address: str,
+                 writer: StreamWriter,
+                 version: Optional[str] = "unknown",
+                 last_seen: Optional[int] = None,
+                 online=True):
         self.client_id = client_id
         self.ip_address = ip_address
         self.writer = writer
@@ -31,8 +35,7 @@ class EnodoClient:
         self.version = version
         self.online = online
         if last_seen is None:
-            self.last_seen = time.time()
-        self.last_seen = int(self.last_seen)
+            self.last_seen = int(time.time())
 
     async def reconnected(self, ip_address: str, writer: StreamWriter):
         self.online = True
@@ -50,17 +53,27 @@ class EnodoClient:
 
 
 class ListenerClient(EnodoClient):
-    def __init__(self, client_id: str, ip_address: str,
-                 writer: StreamWriter, version="unknown",
-                 last_seen=None):
+    def __init__(self,
+                 client_id: str,
+                 ip_address: str,
+                 writer: StreamWriter,
+                 version: Optional[str] = "unknown",
+                 last_seen: Optional[int] = None):
         super().__init__(client_id, ip_address, writer, version, last_seen)
 
 
 class WorkerClient(EnodoClient):
-    def __init__(self, client_id: str, ip_address: str,
-                 writer: StreamWriter, module: dict,
-                 lib_version="unknown", last_seen=None, busy=False,
-                 worker_config=None, online=False):
+    def __init__(self,
+                 client_id: str,
+                 ip_address: str,
+                 writer: StreamWriter,
+                 module: dict,
+                 lib_version: Optional[str] = "unknown",
+                 last_seen: Optional[int] = None,
+                 busy=False,
+                 worker_config: Optional[
+                     Union[dict, WorkerConfigModel]] = None,
+                 online=False):
         super().__init__(client_id, ip_address,
                          writer, lib_version, last_seen, online)
         self.busy = busy
@@ -193,6 +206,7 @@ class ClientManager:
                                client_data: Any):
         client_id = client_data.get('client_id')
         if client_id not in cls.workers:
+            logging.info(f'New worker with id: {client_id} connected')
             client = WorkerClient(client_id, peername, writer,
                                   client_data.get('module'),
                                   client_data.get('lib_version', None),
@@ -200,6 +214,7 @@ class ClientManager:
                                   online=True)
             await cls.add_client(client)
         else:
+            logging.info(f'Known worker with id: {client_id} connected')
             await cls.workers.get(client_id).reconnected(
                 peername,
                 writer,

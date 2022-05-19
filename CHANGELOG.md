@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta3.2.10] - 2022-05-19
+
+### Fixed
+- Accept empty anomalies result
+
+### Added
+- Typing
+
+### Changed
+- Using `time.time()` instead of `datetime.datetime.now()` for client timestamps
+
 ## [0.1.0-beta3.2.9] - 2022-05-19
 
 ### Added
