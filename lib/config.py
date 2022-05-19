@@ -106,6 +106,7 @@ class Config:
     socket_server_host = None
     socket_server_port = None
     series_save_path = None
+    clients_save_path = None
     event_outputs_save_path = None
     save_to_disk_interval = None
     enable_rest_api = None
@@ -261,6 +262,8 @@ class Config:
             cls._config.get_r('hub', 'disable_safe_mode'), False)
         cls.series_save_path = os.path.join(
             cls.base_dir, 'data/series.json')
+        cls.clients_save_path = os.path.join(
+            cls.base_dir, 'data/clients.json')
         cls.jobs_save_path = os.path.join(
             cls.base_dir, 'data/jobs.json')
         cls.event_outputs_save_path = os.path.join(

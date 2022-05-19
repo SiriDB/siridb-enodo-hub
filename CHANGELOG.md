@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta3.2.9] - 2022-05-19
+
+### Added
+- Logging hub version on startup
+- Save client data to disk
+- Update worker data on reconnect
+
 ## [0.1.0-beta3.2.8] - 2022-05-18
 
 ### Added

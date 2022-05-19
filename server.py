@@ -31,6 +31,7 @@ from lib.socketio.socketiohandlers import SocketIoHandler
 from lib.socketio.socketiorouter import SocketIoRouter
 from lib.util import print_custom_aiohttp_startup_message
 from lib.webserver.routes import setup_routes
+from version import VERSION
 
 
 class Server:
@@ -97,13 +98,14 @@ class Server:
         # clients, jobs, events and modules
         await SeriesManager.prepare(
             SocketIoHandler.internal_updates_series_subscribers)
-        await SeriesManager.read_from_disk()
+        await SeriesManager.load_from_disk()
         await ClientManager.setup(SeriesManager)
         await EnodoJobManager.async_setup(
             SocketIoHandler.internal_updates_queue_subscribers)
         await EnodoJobManager.load_from_disk()
         await EnodoEventManager.async_setup()
         await EnodoEventManager.load_from_disk()
+        await ClientManager.load_from_disk()
 
         scheduler = ServerState.scheduler
         self._watch_series_task = await scheduler.spawn(self.watch_series())
@@ -265,6 +267,7 @@ class Server:
         await SeriesManager.save_to_disk()
         await EnodoJobManager.save_to_disk()
         await EnodoEventManager.save_to_disk()
+        await ClientManager.save_to_disk()
 
     async def save_to_disk(self):
         """Save configs to disk on a set interval
@@ -345,7 +348,7 @@ class Server:
         """
         prepare_logger(self._log_level)
         Config.read_config(self._config_path)
-        logging.info('Starting...')
+        logging.info(f'Starting Hub V{VERSION}...')
         logging.info('Loaded Config...')
         logging.info('Running API\'s in secure mode...')
         self.app = web.Application(middlewares=[auth])

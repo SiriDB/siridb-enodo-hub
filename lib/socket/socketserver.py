@@ -41,6 +41,9 @@ class SocketServer:
 
         while connected and self._server_running:
             packet_type, packet_id, data = await read_packet(reader)
+            if data is False:
+                connected = False
+                continue
             if len(data):
                 data = qpack.unpackb(data, decode='utf-8')
 
@@ -141,7 +144,7 @@ class SocketServer:
                     ", but has no installed modules")
 
             if version.parse(
-                    client_data.get('version')) < version.parse(
+                    client_data.get('lib_version')) < version.parse(
                     ENODO_HUB_WORKER_MIN_VERSION):
                 logging.warning(
                     f"Worker with id : {client_id} tried to connect,"

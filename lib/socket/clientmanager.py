@@ -1,7 +1,7 @@
 from asyncio import StreamWriter
-import datetime
 import logging
-from operator import mod
+import os
+import time
 from typing import Any
 
 from enodo import WorkerConfigModel
@@ -12,9 +12,11 @@ from enodo.jobs import JOB_STATUS_OPEN
 from enodo import EnodoModule
 from enodo.protocol.package import UPDATE_SERIES, create_header
 import qpack
+from lib.config import Config
 
 from lib.eventmanager import EnodoEvent, EnodoEventManager, \
     ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE
+from lib.util.util import load_disk_data, save_disk_data
 
 
 class EnodoClient:
@@ -29,11 +31,12 @@ class EnodoClient:
         self.version = version
         self.online = online
         if last_seen is None:
-            self.last_seen = datetime.datetime.now()
+            self.last_seen = time.time()
+        self.last_seen = int(self.last_seen)
 
     async def reconnected(self, ip_address: str, writer: StreamWriter):
         self.online = True
-        self.last_seen = datetime.datetime.now()
+        self.last_seen = time.time()
         self.ip_address = ip_address
         self.writer = writer
 
@@ -56,9 +59,10 @@ class ListenerClient(EnodoClient):
 class WorkerClient(EnodoClient):
     def __init__(self, client_id: str, ip_address: str,
                  writer: StreamWriter, module: dict,
-                 version="unknown", last_seen=None, busy=False,
-                 worker_config=None):
-        super().__init__(client_id, ip_address, writer, version, last_seen)
+                 lib_version="unknown", last_seen=None, busy=False,
+                 worker_config=None, online=False):
+        super().__init__(client_id, ip_address,
+                         writer, lib_version, last_seen, online)
         self.busy = busy
         self.is_going_busy = False
         self.module = EnodoModule(**module)
@@ -66,6 +70,8 @@ class WorkerClient(EnodoClient):
             worker_config = WorkerConfigModel(
                 WORKER_MODE_GLOBAL, dedicated_job_type=None,
                 dedicated_series_name=None)
+        elif isinstance(worker_config, dict):
+            worker_config = WorkerConfigModel(**worker_config)
         self.worker_config = worker_config
 
     def support_module_for_job(
@@ -86,19 +92,24 @@ class WorkerClient(EnodoClient):
     def get_config(self) -> WorkerConfigModel:
         return self.worker_config
 
-    async def reconnected(self, ip_address: str, writer: StreamWriter):
+    async def reconnected(self, ip_address: str, writer: StreamWriter,
+                          module: dict):
         await super().reconnected(ip_address, writer)
         self.busy = False
         self.is_going_busy = False
+        self.module = EnodoModule(**module)
 
     def to_dict(self) -> dict:
-        base_dict = super().to_dict()
-        extra_dict = {
+        return {
+            'client_id': self.client_id,
+            'ip_address': self.ip_address,
+            'writer': None,
+            'module': self.module,
+            'lib_version': self.version,
+            'last_seen': self.last_seen,
             'busy': self.busy,
-            'jobs_and_modules': self.module,
             'worker_config': self.worker_config
         }
-        return {**base_dict, **extra_dict}
 
 
 class ClientManager:
@@ -184,11 +195,15 @@ class ClientManager:
         if client_id not in cls.workers:
             client = WorkerClient(client_id, peername, writer,
                                   client_data.get('module'),
-                                  client_data.get('version', None),
-                                  busy=client_data.get('busy', None))
+                                  client_data.get('lib_version', None),
+                                  busy=client_data.get('busy', None),
+                                  online=True)
             await cls.add_client(client)
         else:
-            await cls.workers.get(client_id).reconnected(peername, writer)
+            await cls.workers.get(client_id).reconnected(
+                peername,
+                writer,
+                client_data.get('module'))
 
     @classmethod
     async def add_client(cls, client: EnodoClient):
@@ -266,15 +281,14 @@ class ClientManager:
         for client in cls.listeners:
             listener = cls.listeners.get(client)
             if listener.online and \
-                (datetime.datetime.now() - listener.last_seen) \
-                    .total_seconds() > max_timeout:
+                    (time.time() - listener.last_seen) > max_timeout:
                 logging.info(f'Lost connection to listener: {client}')
                 listener.online = False
 
         for client in cls.workers:
             worker = cls.workers.get(client)
-            if worker.online and (datetime.datetime.now() - worker.last_seen) \
-                    .total_seconds() > max_timeout:
+            if worker.online and \
+                    (time.time() - worker.last_seen) > max_timeout:
                 logging.info(f'Lost connection to worker: {client}')
                 worker.online = False
 
@@ -323,3 +337,41 @@ class ClientManager:
                     job.job_config.config_name, JOB_STATUS_OPEN)
                 logging.info(
                     f'Setting for series job status pending to false...')
+
+    @classmethod
+    async def load_from_disk(cls):
+        if not os.path.exists(Config.clients_save_path):
+            pass
+        else:
+            data = load_disk_data(Config.clients_save_path)
+            workers = data.get('workers')
+            if workers is not None:
+                for w in workers:
+                    try:
+                        worker = WorkerClient(**w)
+                        await cls.add_client(worker)
+                    except Exception as e:
+                        logging.warning(
+                            "Tried loading invalid data when loading worker")
+                        logging.debug(
+                            f"Corresponding error: {e}, "
+                            f'exception class: {e.__class__.__name__}')
+
+    @classmethod
+    async def save_to_disk(cls):
+        try:
+            serialized_workers = []
+            for w in cls.workers.values():
+                serialized_workers.append(
+                    w.to_dict())
+
+            serialized_data = {
+                "workers": serialized_workers
+            }
+            save_disk_data(Config.clients_save_path, serialized_data)
+        except Exception as e:
+            logging.error(
+                f"Something went wrong when writing "
+                f"clientmanager data to disk")
+            logging.debug(f"Corresponding error: {e}, "
+                          f'exception class: {e.__class__.__name__}')
