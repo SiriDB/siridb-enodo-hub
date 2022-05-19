@@ -231,7 +231,7 @@ class SeriesManager:
             listener.writer.write(series_update + update)
 
     @classmethod
-    async def read_from_disk(cls):
+    async def load_from_disk(cls):
         if not os.path.exists(Config.series_save_path):
             pass
         else:
@@ -245,8 +245,9 @@ class SeriesManager:
                         logging.warning(
                             "Tried loading invalid data when "
                             "loading series")
-                    # cls._series[s.get('name')] = Series.from_dict(s)
-                    # cls._series[s.get('name')]
+                        logging.debug(
+                            f"Corresponding error: {e}, "
+                            f'exception class: {e.__class__.__name__}')
             label_data = data.get('labels')
             if label_data is not None:
                 for la in label_data:
