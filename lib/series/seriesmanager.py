@@ -191,9 +191,11 @@ class SeriesManager:
             await drop_series(
                 ServerState.get_siridb_output_conn(),
                 f'"enodo_{series_name}_anomalies_{job_config_name}"')
-            await insert_points(
-                ServerState.get_siridb_output_conn(),
-                f'enodo_{series_name}_anomalies_{job_config_name}', points)
+            if len(points) > 0:
+                await insert_points(
+                    ServerState.get_siridb_output_conn(),
+                    f'enodo_{series_name}_anomalies_{job_config_name}',
+                    points)
 
     @classmethod
     async def add_static_rule_hits_to_series(cls, series_name,

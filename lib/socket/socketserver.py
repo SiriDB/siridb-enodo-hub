@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+import time
 from packaging import version
 
 import qpack
@@ -97,13 +98,13 @@ class SocketServer:
         if l_client is not None:
             logging.debug(
                 f'Heartbeat from listener with id: {client_id}')
-            l_client.last_seen = datetime.datetime.now()
+            l_client.last_seen = int(time.time())
             response = create_header(0, HEARTBEAT, packet_id)
             writer.write(response)
         elif w_client is not None:
             logging.debug(
                 f'Heartbeat from worker with id: {client_id}')
-            w_client.last_seen = datetime.datetime.now()
+            w_client.last_seen = int(time.time())
             response = create_header(0, HEARTBEAT, packet_id)
             writer.write(response)
         else:
@@ -155,7 +156,6 @@ class SocketServer:
 
             await ClientManager.worker_connected(
                 writer.get_extra_info('peername'), writer, client_data)
-            logging.info(f'New worker with id: {client_id}')
             response = create_header(0, HANDSHAKE_OK, packet_id)
             writer.write(response)
             return client_id, True

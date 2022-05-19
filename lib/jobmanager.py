@@ -402,8 +402,7 @@ class EnodoJobManager:
         elif job_type == JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES:
             if isinstance(
                     job_response.get('data'),
-                    list) and len(
-                    job_response.get('data')) > 0:
+                    list):
                 try:
                     await SeriesManager.add_anomalies_to_series(
                         job_response.get('name'),
