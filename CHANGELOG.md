@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+### Added
+- Endpoint for fetching all analysis results for a series (for all job types)
+
 ## [0.1.0-beta3.2.12] - 2022-05-23
 
 ### Fixed

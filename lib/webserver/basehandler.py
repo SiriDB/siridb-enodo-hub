@@ -12,7 +12,7 @@ from lib.eventmanager import EnodoEventManager
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
 from lib.siridb.siridb import query_series_anomalies, query_series_forecasts, \
-    query_series_static_rules_hits
+    query_series_static_rules_hits, query_all_series_results
 from lib.util import regex_valid
 from lib.jobmanager import EnodoJobManager, EnodoJob
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
@@ -52,6 +52,22 @@ class BaseHandler:
             return {'data': ''}, 404
         series_data = series.to_dict()
         return {'data': series_data}, 200
+
+    @classmethod
+    async def resp_get_all_series_output(cls, series_name):
+        """Get all series results
+
+        Args:
+            series_name (string): name of series
+
+        Returns:
+            dict: dict with data
+        """
+        series = await SeriesManager.get_series(series_name)
+        if series is None:
+            return web.json_response(data={'data': ''}, status=404)
+        return {'data': await query_all_series_results(
+            ServerState.get_siridb_output_conn(), series_name)}
 
     @classmethod
     async def resp_get_series_forecasts(cls, series_name):

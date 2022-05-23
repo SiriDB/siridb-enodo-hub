@@ -99,6 +99,19 @@ async def query_group_expression_by_name(siridb_client, group_name):
     return groups[0][0]
 
 
+async def query_all_series_results(siridb_client, series_name, selector="*"):
+    result = None
+    try:
+        result = await siridb_client.query(
+            f'select {selector} from '
+            f'/enodo_{re.escape(series_name)}_.*?$/')
+    except (QueryError, InsertError, ServerError, PoolError,
+            AuthenticationError, UserAuthError) as e:
+        print("Connection problem with SiriDB server")
+        pass
+    return result
+
+
 async def query_series_forecasts(siridb_client, series_name, selector="*"):
     result = None
     try:

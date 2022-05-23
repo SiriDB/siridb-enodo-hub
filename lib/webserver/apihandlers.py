@@ -64,6 +64,23 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
+    async def get_all_series_output(cls, request):
+        """Returns forecast data of a specific series.
+
+        Args:
+            request (Request): aiohttp request
+
+        Returns:
+            _type_: _description_
+        """
+        series_name = unquote(request.match_info['series_name'])
+
+        return web.json_response(
+            data=await BaseHandler.resp_get_all_series_output(
+                series_name), dumps=safe_json_dumps)
+
+    @classmethod
+    @EnodoAuth.auth.required
     async def get_series_forecast(cls, request):
         """Returns forecast data of a specific series.
 

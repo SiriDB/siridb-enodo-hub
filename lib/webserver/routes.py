@@ -19,6 +19,10 @@ def setup_routes(app, cors):
         allow_head=False)
 
     app.router.add_get(
+        "/api/series/{series_name}/all",
+        ApiHandlers.get_all_series_output,
+        allow_head=False)
+    app.router.add_get(
         "/api/series/{series_name}/forecasts",
         ApiHandlers.get_series_forecast,
         allow_head=False)
