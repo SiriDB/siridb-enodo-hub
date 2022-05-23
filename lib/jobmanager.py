@@ -3,7 +3,6 @@ from asyncio import StreamWriter
 import datetime
 import logging
 import os
-import datetime
 import time
 from typing import Any, Callable, Optional, Union
 
@@ -56,10 +55,7 @@ class EnodoJob:
     def to_dict(cls, job: 'EnodoJob') -> dict:
         resp = {}
         for slot in cls.__slots__:
-            if isinstance(getattr(job, slot), datetime.datetime):
-                resp[slot] = int(getattr(job, slot).timestamp())
-            else:
-                resp[slot] = getattr(job, slot)
+            resp[slot] = getattr(job, slot)
         return resp
 
     @classmethod
@@ -303,8 +299,8 @@ class EnodoJobManager:
     @cls_lock()
     async def clean_jobs(cls):
         for job in cls._active_jobs:
-            now = datetime.datetime.now()
-            if (now - job.send_at).total_seconds() > cls._max_job_timeout:
+            now = time.time()
+            if (now - job.send_at) > cls._max_job_timeout:
                 await cls._set_job_failed(job, "Job timed-out")
                 await cls._send_worker_cancel_job(job.worker_id, job.rid)
 
