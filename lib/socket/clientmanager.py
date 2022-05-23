@@ -258,8 +258,9 @@ class ClientManager:
                               module_name: str) -> WorkerClient:
         # Check if there is a worker free that's dedicated for the series
         if cls._dedicated_for_series.get(series_name) is not None:
-            for worker_id in cls._dedicated_for_series[series_name]:
-                worker = cls.workers.get(worker_id)
+            for worker in cls._dedicated_for_series[series_name].values():
+                if not worker.online:
+                    continue
                 if not worker.busy and not worker.is_going_busy:
                     if worker.support_module_for_job(
                             job_type, module_name):
@@ -267,15 +268,17 @@ class ClientManager:
 
         # Check if there is a worker free that's dedicated for the job_type
         if cls._dedicated_for_job_type.get(job_type) is not None:
-            for worker_id in cls._dedicated_for_series[job_type]:
-                worker = cls.workers.get(worker_id)
+            for worker in cls._dedicated_for_series[job_type].values():
+                if not worker.online:
+                    continue
                 if not worker.busy and not worker.is_going_busy:
                     if worker.support_module_for_job(
                             job_type, module_name):
                         return worker
 
-        for worker_id in cls.workers:
-            worker = cls.workers.get(worker_id)
+        for worker in cls.workers.values():
+            if not worker.online:
+                continue
             if worker.worker_config.mode == WORKER_MODE_GLOBAL and \
                     not worker.busy and not worker.is_going_busy:
                 if worker.support_module_for_job(job_type, module_name):
@@ -369,6 +372,7 @@ class ClientManager:
                 for w in workers:
                     try:
                         worker = WorkerClient(**w)
+                        worker.online = False
                         await cls.add_client(worker)
                     except Exception as e:
                         logging.warning(
