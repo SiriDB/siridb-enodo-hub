@@ -82,7 +82,7 @@ class SeriesManager:
     @classmethod
     def get_listener_series_info(cls):
         series = [{"name": series_name,
-                   "realtime": series.series_config.realtime}
+                   "realtime": series.config.realtime}
                   for series_name, series in cls._series.items()]
         labels = [
             {"name": label.get('selector'),

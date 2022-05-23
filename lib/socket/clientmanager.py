@@ -21,21 +21,26 @@ from lib.util.util import load_disk_data, save_disk_data
 
 class EnodoClient:
 
-    def __init__(self,
-                 client_id: str,
-                 ip_address: str,
-                 writer: StreamWriter,
-                 version: Optional[str] = "unknown",
-                 last_seen: Optional[int] = None,
-                 online=True):
+    def __init__(
+            self, client_id: str, ip_address: str, writer: StreamWriter,
+            version: Optional[str] = "unknown",
+            last_seen: Optional[Union[str, Union[float, int]]] = None,
+            online=True):
         self.client_id = client_id
         self.ip_address = ip_address
         self.writer = writer
-        self.last_seen = last_seen
         self.version = version
         self.online = online
-        if last_seen is None:
-            self.last_seen = int(time.time())
+        self._last_seen = int(time.time()) if last_seen is None \
+            else int(last_seen)
+
+    @property
+    def last_seen(self) -> int:
+        return self._last_seen
+
+    @last_seen.setter
+    def last_seen(self, val: Union[str, Union[float, int]]):
+        self._last_seen = int(val)
 
     async def reconnected(self, ip_address: str, writer: StreamWriter):
         self.online = True

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+### Changed
+- Using `time.time()` instead of `datetime.datetime.now()` in rest of project
+
 ## [0.1.0-beta3.2.10] - 2022-05-19
 
 ### Fixed
