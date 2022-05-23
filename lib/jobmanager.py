@@ -299,7 +299,7 @@ class EnodoJobManager:
     @cls_lock()
     async def clean_jobs(cls):
         for job in cls._active_jobs:
-            now = time.time()
+            now = int(time.time())
             if (now - job.send_at) > cls._max_job_timeout:
                 await cls._set_job_failed(job, "Job timed-out")
                 await cls._send_worker_cancel_job(job.worker_id, job.rid)
