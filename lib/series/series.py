@@ -24,7 +24,7 @@ class Series:
         self.rid = name
         self.name = name
         self.config = SeriesConfigModel(**config)
-        self.state = {} if state is None else SeriesState(**state)
+        self.state = SeriesState() if state is None else SeriesState(**state)
         self.series_characteristics = series_characteristics
         self._datapoint_count_lock = asyncio.Lock()
 

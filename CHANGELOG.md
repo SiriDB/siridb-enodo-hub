@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta3.2.12] - 2022-05-23
+
+### Fixed
+- Adding series with an empty SeriesState instead of an dict
+- Checking online status of client on loading clientlist from disk
+
 ## [0.1.0-beta3.2.11] - 2022-05-23
 
 ### Fixed
