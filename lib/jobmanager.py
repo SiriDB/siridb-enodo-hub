@@ -3,8 +3,8 @@ from asyncio import StreamWriter
 import datetime
 import logging
 import os
-import datetime
-from typing import Any, Callable
+import time
+from typing import Any, Callable, Optional, Union
 
 import qpack
 from enodo.jobs import *
@@ -32,8 +32,14 @@ class EnodoJob:
     __slots__ = ('rid', 'series_name', 'job_config',
                  'job_data', 'send_at', 'error', 'worker_id')
 
-    def __init__(self, rid, series_name, job_config, job_data=None,
-                 send_at=None, error=None, worker_id=None):
+    def __init__(self,
+                 rid: Union[int, str],
+                 series_name: str,
+                 job_config: SeriesJobConfigModel,
+                 job_data: Optional[dict] = None,
+                 send_at: Optional[int] = None,
+                 error: Optional[str] = None,
+                 worker_id: Optional[str] = None):
         if not isinstance(
                 job_data, EnodoJobDataModel) and job_data is not None:
             raise Exception('Unknown job data value')
@@ -49,12 +55,7 @@ class EnodoJob:
     def to_dict(cls, job: 'EnodoJob') -> dict:
         resp = {}
         for slot in cls.__slots__:
-            if isinstance(getattr(job, slot), datetime.datetime):
-                resp[slot] = int(getattr(job, slot).timestamp())
-            elif isinstance(getattr(job, slot), SeriesJobConfigModel):
-                resp[slot] = getattr(job, slot)
-            else:
-                resp[slot] = getattr(job, slot)
+            resp[slot] = getattr(job, slot)
         return resp
 
     @classmethod
@@ -206,7 +207,7 @@ class EnodoJobManager:
             if cls._update_queue_cb is not None:
                 await cls._update_queue_cb(
                     SUBSCRIPTION_CHANGE_TYPE_DELETE, job.rid)
-        job.send_at = datetime.datetime.now()
+        job.send_at = time.time()
         job.worker_id = worker_id
         cls._active_jobs.append(job)
         cls._active_jobs_index[job.rid] = job
@@ -298,8 +299,8 @@ class EnodoJobManager:
     @cls_lock()
     async def clean_jobs(cls):
         for job in cls._active_jobs:
-            now = datetime.datetime.now()
-            if (now - job.send_at).total_seconds() > cls._max_job_timeout:
+            now = int(time.time())
+            if (now - job.send_at) > cls._max_job_timeout:
                 await cls._set_job_failed(job, "Job timed-out")
                 await cls._send_worker_cancel_job(job.worker_id, job.rid)
 
@@ -477,7 +478,7 @@ class EnodoJobManager:
             job_data = EnodoJobRequestDataModel(
                 job_id=job.rid, job_config=job.job_config,
                 series_name=job.series_name,
-                series_config=series.series_config,
+                series_config=series.config,
                 series_state=series.state,
                 siridb_ts_units=ServerState.siridb_ts_unit)
             data = qpack.packb(job_data.serialize())

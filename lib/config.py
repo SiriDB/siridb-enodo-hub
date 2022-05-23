@@ -82,7 +82,6 @@ class Config:
     _settings = None
     min_data_points = None
     watcher_interval = None
-    db = None
 
     # Siridb
     siridb_host = None

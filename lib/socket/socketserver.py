@@ -1,5 +1,4 @@
 import asyncio
-import datetime
 import logging
 import time
 from packaging import version
@@ -98,13 +97,13 @@ class SocketServer:
         if l_client is not None:
             logging.debug(
                 f'Heartbeat from listener with id: {client_id}')
-            l_client.last_seen = int(time.time())
+            l_client.last_seen = time.time()
             response = create_header(0, HEARTBEAT, packet_id)
             writer.write(response)
         elif w_client is not None:
             logging.debug(
                 f'Heartbeat from worker with id: {client_id}')
-            w_client.last_seen = int(time.time())
+            w_client.last_seen = time.time()
             response = create_header(0, HEARTBEAT, packet_id)
             writer.write(response)
         else:

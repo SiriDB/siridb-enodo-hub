@@ -215,7 +215,7 @@ class Server:
 
         # loop through scheduled jobs:
         job_schedules = series.state.get_all_job_schedules()
-        for job_config_name in series.series_config.job_config:
+        for job_config_name in series.config.job_config:
             if job_config_name in job_schedules and \
                     await series.is_job_due(job_config_name):
                 await EnodoJobManager.create_job(job_config_name, series_name)
@@ -242,9 +242,9 @@ class Server:
                 # Check if requirement of min amount of datapoints is met
                 if series.get_datapoints_count() is None:
                     continue
-                if series.series_config.min_data_points is not None:
+                if series.config.min_data_points is not None:
                     if series.get_datapoints_count() < \
-                            series.series_config.min_data_points:
+                            series.config.min_data_points:
                         continue
                 elif series.get_datapoints_count() < Config.min_data_points:
                     continue
