@@ -14,6 +14,7 @@ from enodo.protocol.package import LISTENER_NEW_SERIES_POINTS, \
     WORKER_UPDATE_BUSY, WORKER_JOB_RESULT, WORKER_REFUSED, \
     WORKER_JOB_CANCELLED
 from enodo.jobs import JOB_STATUS_NONE, JOB_STATUS_DONE
+from lib.state.diskstorage import DiskStorage
 
 from lib.webserver.apihandlers import ApiHandlers, auth
 from lib.config import Config
@@ -48,7 +49,6 @@ class Server:
         self._log_level = log_level
 
         self._watch_series_task = None
-        self._save_to_disk_task = None
         self._check_jobs_task = None
         self._connection_management_task = None
 
@@ -68,7 +68,8 @@ class Server:
                 lambda: asyncio.ensure_future(self.stop_server()))
 
         # Setup server state object
-        await ServerState.async_setup(sio=self.sio)
+        await ServerState.async_setup(sio=self.sio,
+                                      storage=DiskStorage(Config.base_dir))
 
         # Setup internal security token for authenticating
         # backend socket connections
@@ -109,7 +110,6 @@ class Server:
 
         scheduler = ServerState.scheduler
         self._watch_series_task = await scheduler.spawn(self.watch_series())
-        self._save_to_disk_task = await scheduler.spawn(self.save_to_disk())
         self._check_jobs_task = await scheduler.spawn(
             EnodoJobManager.check_for_jobs())
         self._connection_management_task = await scheduler.spawn(
@@ -234,7 +234,7 @@ class Server:
 
             series_names = SeriesManager.get_all_series()
             for series_name in series_names:
-                series = await SeriesManager.get_series(series_name)
+                series = SeriesManager.get_series(series_name)
                 # Check if series is valid and not ignored
                 if series is None or series.is_ignored():
                     continue
@@ -259,25 +259,6 @@ class Server:
                         f'exception class: {e.__class__.__name__}')
 
             await asyncio.sleep(Config.watcher_interval)
-
-    @staticmethod
-    async def _save_to_disk():
-        """Call all save to disk methods from various manager classes
-        """
-        await SeriesManager.save_to_disk()
-        await EnodoJobManager.save_to_disk()
-        await EnodoEventManager.save_to_disk()
-        await ClientManager.save_to_disk()
-
-    async def save_to_disk(self):
-        """Save configs to disk on a set interval
-        """
-        while ServerState.running:
-            await asyncio.sleep(Config.save_to_disk_interval)
-            ServerState.tasks_last_runs['save_to_disk'] = \
-                datetime.datetime.now()
-            logging.debug('Saving seriesmanager state to disk')
-            await self._save_to_disk()
 
     async def stop_server(self):
         """Stop all parts of the server for a clean shutdown
@@ -311,8 +292,6 @@ class Server:
         await self.wait_for_queue()
         logging.info('...Doing clean up')
         await self.clean_up()
-        logging.info('...Saving data to disk')
-        await self._save_to_disk()
 
         ServerState.stop()
 

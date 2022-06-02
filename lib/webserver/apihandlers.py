@@ -42,7 +42,7 @@ class ApiHandlers:
         # TODO implement filter
 
         return web.json_response(
-            data=await BaseHandler.resp_get_monitored_series(regex_filter),
+            data=BaseHandler.resp_get_monitored_series(regex_filter),
             dumps=safe_json_dumps)
 
     @classmethod
@@ -91,10 +91,11 @@ class ApiHandlers:
             _type_: _description_
         """
         series_name = unquote(request.match_info['series_name'])
+        only_future = True if "future" in request.rel_url.query else False
 
         return web.json_response(
             data=await BaseHandler.resp_get_series_forecasts(
-                series_name), dumps=safe_json_dumps)
+                series_name, only_future), dumps=safe_json_dumps)
 
     @classmethod
     @EnodoAuth.auth.required

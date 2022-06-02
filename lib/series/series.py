@@ -8,9 +8,10 @@ from enodo.model.config.series import SeriesConfigModel, SeriesState, \
     SeriesJobConfigModel
 
 from lib.socket.clientmanager import ClientManager
+from lib.state.resource import StoredResource
 
 
-class Series:
+class Series(StoredResource):
     __slots__ = ('rid', 'name', 'config', 'state',
                  '_datapoint_count_lock', 'series_characteristics')
 
@@ -27,6 +28,7 @@ class Series:
         self.state = SeriesState() if state is None else SeriesState(**state)
         self.series_characteristics = series_characteristics
         self._datapoint_count_lock = asyncio.Lock()
+        self.created()
 
     def get_errors(self) -> list:
         # To stop circular import
@@ -48,7 +50,8 @@ class Series:
     async def get_job_status(self, job_config_name: str) -> int:
         return self.state.get_job_status(job_config_name)
 
-    async def set_job_status(self, config_name: str, status: int):
+    @StoredResource.changed
+    def set_job_status(self, config_name: str, status: int):
         self.state.set_job_status(config_name, status)
 
     @property
@@ -72,6 +75,7 @@ class Series:
     def get_datapoints_count(self) -> int:
         return self.state.datapoint_count
 
+    @StoredResource.async_changed
     async def add_to_datapoints_count(self, add_to_count: int):
         """
         Add value to existing value of data points counter
@@ -81,6 +85,7 @@ class Series:
         async with self._datapoint_count_lock:
             self.state.datapoint_count += add_to_count
 
+    @StoredResource.async_changed
     async def schedule_job(self, job_config_name: str, initial=False):
         job_config = self.config.get_config_for_job(job_config_name)
         if job_config is None:
@@ -147,12 +152,20 @@ class Series:
             job_config_name, "Not yet scheduled")
         return False
 
+    @StoredResource.changed
     def update(self, data: dict) -> bool:
         config = data.get('config')
         if config is not None:
             self.config = SeriesConfigModel(**config)
-
         return True
+
+    @property
+    def resource_type(self):
+        return "series"
+
+    @property
+    def to_store_data(self):
+        return self.to_dict(static_only=True)
 
     def to_dict(self, static_only=False) -> dict:
         if static_only:

@@ -12,6 +12,7 @@ from lib.config import Config
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, \
     SUBSCRIPTION_CHANGE_TYPE_UPDATE, SUBSCRIPTION_CHANGE_TYPE_DELETE
 from lib.serverstate import ServerState
+from lib.state.resource import StoredResource
 from lib.util import save_disk_data, load_disk_data, cls_lock
 
 ENODO_EVENT_ANOMALY_DETECTED = "event_anomaly_detected"
@@ -67,12 +68,12 @@ class EnodoEvent:
         }
 
 
-class EnodoEventOutput:
+class EnodoEventOutput(StoredResource):
     """
     EnodoEventOutput Class. Class to describe base output method of events
     """
 
-    def __init__(self, rid,
+    def __init__(self, rid=None,
                  severity=ENODO_EVENT_SEVERITY_ERROR,
                  for_event_types=ENODO_EVENT_TYPES,
                  vendor_name=None,
@@ -87,13 +88,20 @@ class EnodoEventOutput:
         :param custom_name: custom name
         """
         self.rid = rid
+        if self.rid is None:
+            self.rid = str(uuid.uuid4()).replace("-", "")
         self.severity = severity
         self.for_event_types = for_event_types
         self.vendor_name = vendor_name
         self.custom_name = custom_name
+        self.created()
 
     async def send_event(self, event):
         pass
+
+    @property
+    def resource_type(self):
+        return "outputs"
 
     @classmethod
     async def create(cls, output_type, data):
@@ -104,6 +112,7 @@ class EnodoEventOutput:
             return EnodoEventOutputWebhook(**data)
         return EnodoEventOutput(**data)
 
+    @StoredResource.changed
     def update(self, data):
         self.custom_name = data.get('custom_name') if data.get(
             'custom_name') is not None else self.custom_name
@@ -132,13 +141,14 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
     on the event instance
     """
 
-    def __init__(self, rid, url, headers=None, payload=None, **kwargs):
+    def __init__(
+            self, url, rid=None, headers=None, payload=None, **kwargs):
         """
         Call webhook url with data of EnodoEvent
         :param id: id of output
         :param url: url to call
         """
-        super().__init__(rid, **kwargs)
+        super().__init__(rid=rid, **kwargs)
         self.url = url
         self.payload = payload
         self.headers = headers
@@ -205,29 +215,15 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
 class EnodoEventManager:
     outputs = None
     # Next id is always current. will be incremented when setting new id
-    _next_output_id = None
     _lock = None
-    _max_output_id = None
 
     @classmethod
     async def async_setup(cls):
         cls.outputs = []
-        cls._next_output_id = 0
-        cls._max_output_id = 1000
         cls._lock = asyncio.Lock()
 
     @classmethod
-    @cls_lock()
-    async def _get_next_output_id(cls):
-        if cls._next_output_id + 1 >= cls._max_output_id:
-            cls._next_output_id = 0
-        cls._next_output_id += 1
-        return cls._next_output_id
-
-    @classmethod
     async def create_event_output(cls, output_type, data):
-        data["rid"] = await cls._get_next_output_id()
-        # TODO: Catch exception
         output = await EnodoEventOutput.create(output_type, data)
         cls.outputs.append(output)
         await internal_updates_event_output_subscribers(
@@ -275,42 +271,11 @@ class EnodoEventManager:
 
     @classmethod
     async def load_from_disk(cls):
-        try:
-            if not os.path.exists(Config.event_outputs_save_path):
-                raise Exception()
-            data = load_disk_data(Config.event_outputs_save_path)
-        except Exception as _:
-            data = {}
-
-        if data == "" or data is None:
-            data = {}
-
-        output_data = data
-        if 'next_output_id' in output_data:
-            cls._next_output_id = output_data.get('next_output_id')
-        if 'outputs' in output_data:
-            for s in output_data.get('outputs'):
-                cls.outputs.append(
-                    await EnodoEventOutput.create(
-                        s.get('output_type'), s.get('data')))
-
-    @classmethod
-    async def save_to_disk(cls):
-        try:
-            serialized_outputs = []
-            for output in cls.outputs:
-                serialized_outputs.append(output.to_dict())
-
-            output_data = {
-                'next_output_id': cls._next_output_id,
-                'outputs': serialized_outputs
-            }
-            save_disk_data(Config.event_outputs_save_path, output_data)
-        except Exception as e:
-            logging.error(
-                f"Something went wrong when writing eventmanager data to disk")
-            logging.debug(f"Corresponding error: {e}, "
-                          f'exception class: {e.__class__.__name__}')
+        outputs = ServerState.storage.load_by_type("outputs")
+        for s in outputs:
+            cls.outputs.append(
+                await EnodoEventOutput.create(
+                    s.get('output_type'), s.get('data')))
 
 
 async def internal_updates_event_output_subscribers(change_type, data):

@@ -5,6 +5,7 @@ import logging
 import os
 import time
 from typing import Any, Callable, Optional, Union
+import uuid
 
 import qpack
 from enodo.jobs import *
@@ -15,6 +16,7 @@ from enodo.protocol.package import create_header, WORKER_JOB, \
     WORKER_JOB_CANCEL
 
 from lib.socket.clientmanager import WorkerClient
+from lib.state.resource import StoredResource
 
 from .eventmanager import EnodoEvent, EnodoEventManager, \
     ENODO_EVENT_JOB_QUEUE_TOO_LONG, ENODO_EVENT_STATIC_RULE_FAIL
@@ -28,7 +30,7 @@ from .socketio import SUBSCRIPTION_CHANGE_TYPE_DELETE, \
     SUBSCRIPTION_CHANGE_TYPE_ADD
 
 
-class EnodoJob:
+class EnodoJob(StoredResource):
     __slots__ = ('rid', 'series_name', 'job_config',
                  'job_data', 'send_at', 'error', 'worker_id')
 
@@ -50,6 +52,19 @@ class EnodoJob:
         self.send_at = send_at
         self.error = error
         self.worker_id = worker_id
+        self.created()
+
+    @property
+    def should_be_stored(self):
+        return self.error is None
+
+    @property
+    def to_store_data(self):
+        return EnodoJob.to_dict(self)
+
+    @property
+    def resource_type(self):
+        return "failed_jobs"
 
     @classmethod
     def to_dict(cls, job: 'EnodoJob') -> dict:
@@ -68,9 +83,7 @@ class EnodoJobManager:
     _active_jobs = []
     _active_jobs_index = {}
     _failed_jobs = []
-    _max_job_id = 1000
     _max_job_timeout = 60 * 5
-    _next_job_id = None
     _lock = None
     _max_in_queue_before_warning = None
 
@@ -78,8 +91,6 @@ class EnodoJobManager:
 
     @classmethod
     async def async_setup(cls, update_queue_cb: Callable):
-        cls._next_job_id = 0
-
         cls._update_queue_cb = update_queue_cb
         cls._max_in_queue_before_warning = Config.max_in_queue_before_warning
         cls._lock = asyncio.Lock()
@@ -91,12 +102,8 @@ class EnodoJobManager:
             cls._active_jobs_index[job.rid] = job
 
     @classmethod
-    @cls_lock()
-    async def _get_next_job_id(cls) -> int:
-        if cls._next_job_id + 1 >= cls._max_job_id:
-            cls._next_job_id = 0
-        cls._next_job_id += 1
-        return cls._next_job_id
+    def _get_next_job_id(cls) -> int:
+        return str(uuid.uuid4()).replace("-", "")
 
     @classmethod
     def get_active_jobs(cls) -> list:
@@ -131,27 +138,27 @@ class EnodoJobManager:
             async with cls._lock:
                 cls._deactivate_job(job)
             await cls._send_worker_cancel_job(job.worker_id, job.rid)
-            series = await SeriesManager.get_series(job.series_name)
-            await series.set_job_status(job.job_config.config_name,
-                                        JOB_STATUS_NONE)
+            series = SeriesManager.get_series(job.series_name)
+            series.set_job_status(job.job_config.config_name,
+                                  JOB_STATUS_NONE)
         jobs = []
         for job in cls._open_jobs:
             jobs.append(job)
         for job in jobs:
             cls._open_jobs.remove(job)
-            series = await SeriesManager.get_series(job.series_name)
-            await series.set_job_status(job.job_config.config_name,
-                                        JOB_STATUS_NONE)
+            series = SeriesManager.get_series(job.series_name)
+            series.set_job_status(job.job_config.config_name,
+                                  JOB_STATUS_NONE)
 
     @classmethod
     async def create_job(cls, job_config_name: str, series_name: str):
-        series = await SeriesManager.get_series(series_name)
-        await series.set_job_status(job_config_name, JOB_STATUS_OPEN)
+        series = SeriesManager.get_series(series_name)
+        series.set_job_status(job_config_name, JOB_STATUS_OPEN)
         series.state.set_job_check_status(
             job_config_name,
             "Job created")
         job_config = series.get_job(job_config_name)
-        job_id = await cls._get_next_job_id()
+        job_id = cls._get_next_job_id()
         job = EnodoJob(job_id, series_name, job_config,
                        job_data=None)  # TODO: Catch exception
         await cls._add_job(job)
@@ -289,6 +296,10 @@ class EnodoJobManager:
     async def _set_job_failed(cls, job: EnodoJob, error: str):
         if job is not None:
             job.error = error
+            series = SeriesManager.get_series(job.series_name)
+            if series is not None:
+                series.set_job_status(
+                    job.job_config.config_name, JOB_STATUS_FAILED)
             await cls._cancel_jobs_for_series(job.series_name)
             if job in cls._active_jobs:
                 cls._active_jobs.remove(job)
@@ -317,7 +328,7 @@ class EnodoJobManager:
     @cls_lock()
     async def _try_activate_job(cls, next_job: EnodoJob):
         try:
-            series = await SeriesManager.get_series(
+            series = SeriesManager.get_series(
                 next_job.series_name)
             if series is None:
                 return
@@ -382,14 +393,14 @@ class EnodoJobManager:
         job_type = job_response.get('job_type')
         job = await cls.get_activated_job(job_id)
         await cls.deactivate_job(job_id)
-        series = await SeriesManager.get_series(job_response.get('name'))
+        series = SeriesManager.get_series(job_response.get('name'))
         if job_type == JOB_TYPE_FORECAST_SERIES:
             try:
                 await SeriesManager.add_forecast_to_series(
                     job_response.get('name'),
                     job.job_config.config_name,
                     job_response.get('data'))
-                await series.set_job_status(
+                series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
                 await series.schedule_job(job.job_config.config_name)
                 await SeriesManager.series_changed(
@@ -409,7 +420,7 @@ class EnodoJobManager:
                         job_response.get('name'),
                         job.job_config.config_name,
                         job_response.get('data'))
-                    await series.set_job_status(
+                    series.set_job_status(
                         job.job_config.config_name, JOB_STATUS_DONE)
                     await series.schedule_job(job.job_config.config_name)
                     await SeriesManager.series_changed(
@@ -428,7 +439,7 @@ class EnodoJobManager:
                     job_response.get('characteristics')
                 series.state.health = job_response.get('health')
                 series.state.interval = job_response.get('interval')
-                await series.set_job_status(
+                series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
                 await series.schedule_job(job.job_config.config_name)
                 await SeriesManager.series_changed(
@@ -441,7 +452,7 @@ class EnodoJobManager:
                     f'exception class: {e.__class__.__name__}')
         elif job_type == JOB_TYPE_STATIC_RULES:
             try:
-                await series.set_job_status(
+                series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
                 await series.schedule_job(job.job_config.config_name)
                 await SeriesManager.add_static_rule_hits_to_series(
@@ -474,7 +485,7 @@ class EnodoJobManager:
     async def _send_worker_job_request(cls, worker: WorkerClient,
                                        job: EnodoJob):
         try:
-            series = await SeriesManager.get_series(job.series_name)
+            series = SeriesManager.get_series(job.series_name)
             job_data = EnodoJobRequestDataModel(
                 job_id=job.rid, job_config=job.job_config,
                 series_name=job.series_name,
@@ -539,41 +550,13 @@ class EnodoJobManager:
 
     @classmethod
     @cls_lock()
-    async def save_to_disk(cls):
-        try:
-            job_data = {
-                'next_job_id': cls._next_job_id,
-                'failed_jobs': [
-                    EnodoJob.to_dict(job) for job in cls._failed_jobs],
-            }
-            save_disk_data(Config.jobs_save_path, job_data)
-        except Exception as e:
-            logging.error(
-                f"Something went wrong when saving jobmanager data to disk")
-            logging.debug(f"Corresponding error: {e}, "
-                          f'exception class: {e.__class__.__name__}')
-
-    @classmethod
-    @cls_lock()
     async def load_from_disk(cls):
-        loaded_failed_jobs = 0
-        try:
-            if not os.path.exists(Config.jobs_save_path):
-                raise Exception()
-            data = load_disk_data(Config.jobs_save_path)
-        except Exception as e:
-            data = {}
-
-        if isinstance(data, dict):
-            if 'next_job_id' in data:
-                cls._next_job_id = int(data.get('next_job_id'))
-            if 'failed_jobs' in data:
-                loaded_failed_jobs += len(data.get('failed_jobs'))
-                cls._failed_jobs = [
-                    EnodoJob.from_dict(job_data)
-                    for job_data in data.get('failed_jobs')]
+        failed_jobs = ServerState.storage.load_by_type("failed_jobs")
+        cls._failed_jobs = [
+            EnodoJob.from_dict(job_data)
+            for job_data in failed_jobs]
 
         await cls._build_index()
 
         logging.info(
-            f'Loaded {loaded_failed_jobs} failed jobs from disk')
+            f'Loaded {len(failed_jobs)} failed jobs from disk')

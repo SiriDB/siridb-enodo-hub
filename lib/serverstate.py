@@ -21,19 +21,20 @@ class ServerState:
     siridb_ts_unit = {}
     readiness = None
     scheduler = None
+    storage = None
 
     @classmethod
-    async def async_setup(cls, sio):
+    async def async_setup(cls, sio, storage):
         cls.running = True
         cls.work_queue = True
         cls.readiness = False
         cls.sio = sio
         cls.siridb_data_client_lock = Lock()
         cls.siridb_output_client_lock = Lock()
+        cls.storage = storage
 
         cls.tasks_last_runs = {
             'watch_series': None,
-            'save_to_disk': None,
             'check_jobs': None,
             'manage_connections': None
         }

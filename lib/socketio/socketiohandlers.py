@@ -57,7 +57,7 @@ class SocketIoHandler:
     @classmethod
     async def _get_all_series(cls, sid, regex_filter, event):
         regex_filter = regex_filter if regex_filter else None
-        resp = await BaseHandler.resp_get_monitored_series(regex_filter)
+        resp = BaseHandler.resp_get_monitored_series(regex_filter)
         return safe_json_dumps(resp)
 
     @classmethod
@@ -72,8 +72,9 @@ class SocketIoHandler:
     @socketio_auth_required
     async def get_series_forecasts(cls, sid, data, event):
         series_name = data.get('series_name')
+        only_future = data.get('only_future')
         resp = await BaseHandler.resp_get_series_forecasts(
-            series_name)
+            series_name, only_future)
         return safe_json_dumps(resp)
 
     @classmethod

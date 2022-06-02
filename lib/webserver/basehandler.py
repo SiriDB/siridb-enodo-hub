@@ -23,7 +23,7 @@ from lib.socket.clientmanager import ClientManager
 class BaseHandler:
 
     @classmethod
-    async def resp_get_monitored_series(cls, regex_filter=None):
+    def resp_get_monitored_series(cls, regex_filter=None):
         """Get monitored series
 
         Args:
@@ -35,7 +35,7 @@ class BaseHandler:
         if regex_filter is not None and not regex_valid(regex_filter):
             return {'data': []}
         return {'data': list(
-            await SeriesManager.get_series_to_dict(regex_filter))}
+            SeriesManager.get_series_to_dict(regex_filter))}
 
     @classmethod
     async def resp_get_single_monitored_series(cls, series_name):
@@ -47,7 +47,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = await SeriesManager.get_series(series_name)
+        series = SeriesManager.get_series(series_name)
         if series is None:
             return {'data': ''}, 404
         series_data = series.to_dict()
@@ -63,14 +63,14 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = await SeriesManager.get_series(series_name)
+        series = SeriesManager.get_series(series_name)
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_all_series_results(
             ServerState.get_siridb_output_conn(), series_name)}
 
     @classmethod
-    async def resp_get_series_forecasts(cls, series_name):
+    async def resp_get_series_forecasts(cls, series_name, only_future):
         """Get series forecast results
 
         Args:
@@ -79,11 +79,12 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = await SeriesManager.get_series(series_name)
+        series = SeriesManager.get_series(series_name)
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_forecasts(
-            ServerState.get_siridb_output_conn(), series_name)}
+            ServerState.get_siridb_output_conn(), series_name,
+            only_future=only_future)}
 
     @classmethod
     async def resp_get_series_anomalies(cls, series_name):
@@ -95,7 +96,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = await SeriesManager.get_series(series_name)
+        series = SeriesManager.get_series(series_name)
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_anomalies(
@@ -111,7 +112,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = await SeriesManager.get_series(series_name)
+        series = SeriesManager.get_series(series_name)
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_static_rules_hits(
@@ -216,7 +217,7 @@ class BaseHandler:
             return {'error': 'Something went wrong when adding the series. '
                     'Series does not exists'}, 400
 
-        return {'data': list(await SeriesManager.get_series_to_dict())}, 201
+        return {'data': list(SeriesManager.get_series_to_dict())}, 201
 
     @classmethod
     async def resp_update_series(cls, series_name, data):
@@ -238,7 +239,7 @@ class BaseHandler:
         if bc is None:
             return {'error': 'Something went wrong when adding the series. '
                     'Missing base analysis job'}, 400
-        series = await SeriesManager.get_series(series_name)
+        series = SeriesManager.get_series(series_name)
         if series is None:
             return {'error': 'Something went wrong when updating the series. \
                 Are you sure the series exists?'}, 400
@@ -247,7 +248,7 @@ class BaseHandler:
         await SeriesManager.series_changed(
             SUBSCRIPTION_CHANGE_TYPE_UPDATE, series_name)
 
-        return {'data': list(await SeriesManager.get_series_to_dict())}, 201
+        return {'data': list(SeriesManager.get_series_to_dict())}, 201
 
     @classmethod
     async def resp_remove_series(cls, series_name):

@@ -8,7 +8,7 @@ from lib.socket import ClientManager
 async def receive_new_series_points(writer, packet_type,
                                     packet_id, data, client_id):
     for series_name in data.keys():
-        series = await SeriesManager.get_series(series_name)
+        series = SeriesManager.get_series(series_name)
         if series is not None:
             await SeriesManager.add_to_datapoint_counter(
                 series_name, data.get(series_name))

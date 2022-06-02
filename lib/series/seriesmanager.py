@@ -38,7 +38,7 @@ class SeriesManager:
             else:
                 await cls._update_cb(
                     change_type,
-                    (await cls.get_series(series_name)).to_dict(),
+                    cls.get_series(series_name).to_dict(),
                     series_name)
 
     @classmethod
@@ -69,7 +69,7 @@ class SeriesManager:
         return None
 
     @classmethod
-    async def get_series(cls, series_name):
+    def get_series(cls, series_name):
         series = None
         if series_name in cls._series:
             series = cls._series.get(series_name)
@@ -133,7 +133,7 @@ class SeriesManager:
                     if cls._series[rid].is_ignored is True])
 
     @classmethod
-    async def get_series_to_dict(cls, regex_filter=None):
+    def get_series_to_dict(cls, regex_filter=None):
         if regex_filter is not None:
             pattern = re.compile(regex_filter)
             return [
@@ -234,44 +234,19 @@ class SeriesManager:
 
     @classmethod
     async def load_from_disk(cls):
-        if not os.path.exists(Config.series_save_path):
-            pass
-        else:
-            data = load_disk_data(Config.series_save_path)
-            series_data = data.get('series')
-            if series_data is not None:
-                for s in series_data:
-                    try:
-                        await cls._add_series(s)
-                    except Exception as e:
-                        logging.warning(
-                            "Tried loading invalid data when "
-                            "loading series")
-                        logging.debug(
-                            f"Corresponding error: {e}, "
-                            f'exception class: {e.__class__.__name__}')
-            label_data = data.get('labels')
-            if label_data is not None:
-                for la in label_data:
-                    cls._labels[la.get('grouptag')] = la
-
-    @classmethod
-    async def save_to_disk(cls):
-        try:
-            serialized_series = []
-            for series in cls._series.values():
-                serialized_series.append(
-                    series.to_dict(static_only=True))
-            serialized_labels = list(cls._labels.values())
-
-            serialized_data = {
-                "series": serialized_series,
-                "labels": serialized_labels
-            }
-            save_disk_data(Config.series_save_path, serialized_data)
-        except Exception as e:
-            logging.error(
-                f"Something went wrong when writing "
-                f"seriesmanager data to disk")
-            logging.debug(f"Corresponding error: {e}, "
-                          f'exception class: {e.__class__.__name__}')
+        series_data = ServerState.storage.load_by_type("series")
+        for s in series_data:
+            try:
+                await cls._add_series(s)
+            except Exception as e:
+                logging.warning(
+                    "Tried loading invalid data when "
+                    "loading series")
+                logging.debug(
+                    f"Corresponding error: {e}, "
+                    f'exception class: {e.__class__.__name__}')
+        # TODO: Labels
+        # label_data = data.get('labels')
+        # if label_data is not None:
+        #     for la in label_data:
+        #         cls._labels[la.get('grouptag')] = la

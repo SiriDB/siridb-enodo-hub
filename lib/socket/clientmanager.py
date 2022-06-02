@@ -16,10 +16,11 @@ from lib.config import Config
 
 from lib.eventmanager import EnodoEvent, EnodoEventManager, \
     ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE
-from lib.util.util import load_disk_data, save_disk_data
+from lib.serverstate import ServerState
+from lib.state.resource import StoredResource
 
 
-class EnodoClient:
+class EnodoClient(StoredResource):
 
     def __init__(
             self, client_id: str, ip_address: str, writer: StreamWriter,
@@ -66,6 +67,10 @@ class ListenerClient(EnodoClient):
                  last_seen: Optional[int] = None):
         super().__init__(client_id, ip_address, writer, version, last_seen)
 
+    @property
+    def should_be_stored(self):
+        return False
+
 
 class WorkerClient(EnodoClient):
     def __init__(self,
@@ -81,6 +86,7 @@ class WorkerClient(EnodoClient):
                  online=False):
         super().__init__(client_id, ip_address,
                          writer, lib_version, last_seen, online)
+        self.rid = client_id
         self.busy = busy
         self.is_going_busy = False
         self.module = EnodoModule(**module)
@@ -91,6 +97,7 @@ class WorkerClient(EnodoClient):
         elif isinstance(worker_config, dict):
             worker_config = WorkerConfigModel(**worker_config)
         self.worker_config = worker_config
+        self.created()
 
     def support_module_for_job(
             self, job_type: str, module_name: str) -> bool:
@@ -103,6 +110,7 @@ class WorkerClient(EnodoClient):
             return self.module.conform_to_params(job_type, params)
         return False
 
+    @StoredResource.changed
     def set_config(self, worker_config: WorkerConfigModel):
         if isinstance(worker_config, WorkerConfigModel):
             self.worker_config = worker_config
@@ -110,6 +118,11 @@ class WorkerClient(EnodoClient):
     def get_config(self) -> WorkerConfigModel:
         return self.worker_config
 
+    @property
+    def resource_type(self):
+        return "workers"
+
+    @StoredResource.async_changed
     async def reconnected(self, ip_address: str, writer: StreamWriter,
                           module: dict):
         await super().reconnected(ip_address, writer)
@@ -355,47 +368,23 @@ class ClientManager:
         if len(pending_jobs) > 0:
             for job in pending_jobs:
                 await EnodoJobManager.cancel_job(job)
-                series = await cls.series_manager.get_series(job.series_name)
-                await series.set_job_status(
+                series = cls.series_manager.get_series(job.series_name)
+                series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_OPEN)
                 logging.info(
                     f'Setting for series job status pending to false...')
 
     @classmethod
     async def load_from_disk(cls):
-        if not os.path.exists(Config.clients_save_path):
-            pass
-        else:
-            data = load_disk_data(Config.clients_save_path)
-            workers = data.get('workers')
-            if workers is not None:
-                for w in workers:
-                    try:
-                        worker = WorkerClient(**w)
-                        worker.online = False
-                        await cls.add_client(worker)
-                    except Exception as e:
-                        logging.warning(
-                            "Tried loading invalid data when loading worker")
-                        logging.debug(
-                            f"Corresponding error: {e}, "
-                            f'exception class: {e.__class__.__name__}')
-
-    @classmethod
-    async def save_to_disk(cls):
-        try:
-            serialized_workers = []
-            for w in cls.workers.values():
-                serialized_workers.append(
-                    w.to_dict())
-
-            serialized_data = {
-                "workers": serialized_workers
-            }
-            save_disk_data(Config.clients_save_path, serialized_data)
-        except Exception as e:
-            logging.error(
-                f"Something went wrong when writing "
-                f"clientmanager data to disk")
-            logging.debug(f"Corresponding error: {e}, "
-                          f'exception class: {e.__class__.__name__}')
+        workers = ServerState.storage.load_by_type("workers")
+        for w in workers:
+            try:
+                worker = WorkerClient(**w)
+                worker.online = False
+                await cls.add_client(worker)
+            except Exception as e:
+                logging.warning(
+                    "Tried loading invalid data when loading worker")
+                logging.debug(
+                    f"Corresponding error: {e}, "
+                    f'exception class: {e.__class__.__name__}')
