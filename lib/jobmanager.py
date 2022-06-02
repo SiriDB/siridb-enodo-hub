@@ -1,31 +1,31 @@
 import asyncio
-from asyncio import StreamWriter
 import datetime
 import logging
 import os
 import time
+from asyncio import StreamWriter
 from typing import Any, Callable, Optional, Union
 
 import qpack
 from enodo.jobs import *
 from enodo.model.config.series import SeriesJobConfigModel
-from enodo.protocol.packagedata import EnodoJobDataModel, \
-    EnodoJobRequestDataModel
-from enodo.protocol.package import create_header, WORKER_JOB, \
-    WORKER_JOB_CANCEL
+from enodo.protocol.package import WORKER_JOB, WORKER_JOB_CANCEL, create_header
+from enodo.protocol.packagedata import (EnodoJobDataModel,
+                                        EnodoJobRequestDataModel)
 
 from lib.socket.clientmanager import WorkerClient
+from lib.util import cls_lock, load_disk_data, save_disk_data
 
-from .eventmanager import EnodoEvent, EnodoEventManager, \
-    ENODO_EVENT_JOB_QUEUE_TOO_LONG, ENODO_EVENT_STATIC_RULE_FAIL
 from .config import Config
+from .eventmanager import (ENODO_EVENT_JOB_QUEUE_TOO_LONG,
+                           ENODO_EVENT_STATIC_RULE_FAIL, EnodoEvent,
+                           EnodoEventManager)
 from .series.seriesmanager import SeriesManager
 from .serverstate import ServerState
 from .socket import ClientManager
-from .socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
-from lib.util import load_disk_data, save_disk_data, cls_lock
-from .socketio import SUBSCRIPTION_CHANGE_TYPE_DELETE, \
-    SUBSCRIPTION_CHANGE_TYPE_ADD
+from .socketio import (SUBSCRIPTION_CHANGE_TYPE_ADD,
+                       SUBSCRIPTION_CHANGE_TYPE_DELETE,
+                       SUBSCRIPTION_CHANGE_TYPE_UPDATE)
 
 
 class EnodoJob:
@@ -72,17 +72,17 @@ class EnodoJobManager:
     _max_job_timeout = 60 * 5
     _next_job_id = None
     _lock = None
-    _max_in_queue_before_warning = None
+    _next_job_id = 0
+    _lock = asyncio.Lock()
 
+    _max_in_queue_before_warning = None
     _update_queue_cb = None
 
     @classmethod
-    async def async_setup(cls, update_queue_cb: Callable):
-        cls._next_job_id = 0
-
+    def setup(cls, update_queue_cb: Callable):
         cls._update_queue_cb = update_queue_cb
         cls._max_in_queue_before_warning = Config.max_in_queue_before_warning
-        cls._lock = asyncio.Lock()
+        
 
     @classmethod
     async def _build_index(cls):
@@ -131,7 +131,7 @@ class EnodoJobManager:
             async with cls._lock:
                 cls._deactivate_job(job)
             await cls._send_worker_cancel_job(job.worker_id, job.rid)
-            series = await SeriesManager.get_series(job.series_name)
+            series = SeriesManager.get_series(job.series_name)
             await series.set_job_status(job.job_config.config_name,
                                         JOB_STATUS_NONE)
         jobs = []
@@ -139,13 +139,13 @@ class EnodoJobManager:
             jobs.append(job)
         for job in jobs:
             cls._open_jobs.remove(job)
-            series = await SeriesManager.get_series(job.series_name)
+            series = SeriesManager.get_series(job.series_name)
             await series.set_job_status(job.job_config.config_name,
                                         JOB_STATUS_NONE)
 
     @classmethod
     async def create_job(cls, job_config_name: str, series_name: str):
-        series = await SeriesManager.get_series(series_name)
+        series = SeriesManager.get_series(series_name)
         await series.set_job_status(job_config_name, JOB_STATUS_OPEN)
         series.state.set_job_check_status(
             job_config_name,
@@ -317,7 +317,7 @@ class EnodoJobManager:
     @cls_lock()
     async def _try_activate_job(cls, next_job: EnodoJob):
         try:
-            series = await SeriesManager.get_series(
+            series = SeriesManager.get_series(
                 next_job.series_name)
             if series is None:
                 return
@@ -382,7 +382,7 @@ class EnodoJobManager:
         job_type = job_response.get('job_type')
         job = await cls.get_activated_job(job_id)
         await cls.deactivate_job(job_id)
-        series = await SeriesManager.get_series(job_response.get('name'))
+        series = SeriesManager.get_series(job_response.get('name'))
         if job_type == JOB_TYPE_FORECAST_SERIES:
             try:
                 await SeriesManager.add_forecast_to_series(
@@ -474,7 +474,7 @@ class EnodoJobManager:
     async def _send_worker_job_request(cls, worker: WorkerClient,
                                        job: EnodoJob):
         try:
-            series = await SeriesManager.get_series(job.series_name)
+            series = SeriesManager.get_series(job.series_name)
             job_data = EnodoJobRequestDataModel(
                 job_id=job.rid, job_config=job.job_config,
                 series_name=job.series_name,
@@ -534,7 +534,7 @@ class EnodoJobManager:
                           f'exception class: {e.__class__.__name__}')
 
     @classmethod
-    async def get_open_queue(cls) -> list:
+    def get_open_queue(cls) -> list:
         return [EnodoJob.to_dict(job) for job in cls._open_jobs]
 
     @classmethod

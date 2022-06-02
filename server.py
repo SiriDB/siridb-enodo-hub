@@ -87,20 +87,20 @@ class Server:
              receive_worker_cancelled_job})
 
         # Setup REST API handlers
-        await ApiHandlers.prepare()
+        ApiHandlers.prepare()
 
         # Setup websocket handlers and routes
         if self.sio is not None:
-            await SocketIoHandler.prepare(self.sio)
+            SocketIoHandler.prepare(self.sio)
             SocketIoRouter(self.sio)
 
         # Setup internal managers for handling and managing series,
         # clients, jobs, events and modules
-        await SeriesManager.prepare(
+        SeriesManager.prepare(
             SocketIoHandler.internal_updates_series_subscribers)
         await SeriesManager.load_from_disk()
         await ClientManager.setup(SeriesManager)
-        await EnodoJobManager.async_setup(
+        EnodoJobManager.setup(
             SocketIoHandler.internal_updates_queue_subscribers)
         await EnodoJobManager.load_from_disk()
         await EnodoEventManager.async_setup()
@@ -234,7 +234,7 @@ class Server:
 
             series_names = SeriesManager.get_all_series()
             for series_name in series_names:
-                series = await SeriesManager.get_series(series_name)
+                series = SeriesManager.get_series(series_name)
                 # Check if series is valid and not ignored
                 if series is None or series.is_ignored():
                     continue

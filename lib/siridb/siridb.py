@@ -1,7 +1,8 @@
 import re
 
-from siridb.connector.lib.exceptions import QueryError, InsertError, \
-    ServerError, PoolError, AuthenticationError, UserAuthError
+from siridb.connector.lib.exceptions import (AuthenticationError, InsertError,
+                                             PoolError, QueryError,
+                                             ServerError, UserAuthError)
 
 
 # @classmethod
@@ -13,25 +14,10 @@ async def query_series_datapoint_count(siridb_client, series_name):
     except (QueryError, InsertError, ServerError, PoolError,
             AuthenticationError, UserAuthError) as e:
         print(e)
-        print("Connection problem with SiriDB server")
         pass
     else:
         count = result.get(series_name, [])[0][1]
     return count
-
-
-async def does_series_exist(siridb_client, series_name):
-    exists = False
-    try:
-        result = await siridb_client.query(
-            f'select count() from "{series_name}"')
-        if result.get(series_name) is not None:
-            exists = True
-    except (QueryError, InsertError, ServerError, PoolError,
-            AuthenticationError, UserAuthError) as e:
-        print("Connection problem with SiriDB server")
-        pass
-    return exists
 
 
 async def query_time_unit(siridb_client):

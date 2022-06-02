@@ -1,10 +1,9 @@
-from json import JSONDecodeError
 import urllib.parse
+from json import JSONDecodeError
 from urllib.parse import unquote
+
 from aiohttp import web
-
 from aiohttp_basicauth import BasicAuthMiddleware
-
 from lib.config import Config
 from lib.serverstate import ServerState
 from lib.socket import ClientManager
@@ -18,13 +17,13 @@ auth = BasicAuthMiddleware(username=None, password=None, force=False)
 class ApiHandlers:
 
     @classmethod
-    async def prepare(cls):
+    def prepare(cls):
         EnodoAuth.auth.username = Config.basic_auth_username
         EnodoAuth.auth.password = Config.basic_auth_password
 
     @classmethod
     @EnodoAuth.auth.required
-    async def get_monitored_series(cls, request):
+    def get_monitored_series(cls, request):
         """Returns a list of monitored series
 
         Args:
@@ -42,12 +41,12 @@ class ApiHandlers:
         # TODO implement filter
 
         return web.json_response(
-            data=await BaseHandler.resp_get_monitored_series(regex_filter),
+            data=BaseHandler.resp_get_monitored_series(regex_filter),
             dumps=safe_json_dumps)
 
     @classmethod
     @EnodoAuth.auth.required
-    async def get_single_monitored_series(cls, request):
+    def get_single_monitored_series(cls, request):
         """Returns all details
 
         Args:
@@ -57,7 +56,7 @@ class ApiHandlers:
             _type_: _description_
         """
         series_name = unquote(request.match_info['series_name'])
-        data, status = await BaseHandler.resp_get_single_monitored_series(
+        data, status = BaseHandler.resp_get_single_monitored_series(
             series_name)
         return web.json_response(
             data, dumps=safe_json_dumps, status=status)
@@ -180,7 +179,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp, status = await BaseHandler.resp_get_event_outputs()
+        resp, status = BaseHandler.resp_get_event_outputs()
         return web.json_response(data=resp, status=status)
 
     @classmethod
@@ -206,7 +205,7 @@ class ApiHandlers:
             output_type = data.get('output_type')
             output_data = data.get('data')
 
-            resp, status = await BaseHandler.resp_add_event_output(
+            resp, status = BaseHandler.resp_add_event_output(
                 output_type, output_data)
         return web.json_response(data=resp, status=status)
 
@@ -223,7 +222,7 @@ class ApiHandlers:
         """
         output_id = int(request.match_info['output_id'])
 
-        resp, status = await BaseHandler.resp_remove_event_output(output_id)
+        resp, status = BaseHandler.resp_remove_event_output(output_id)
         return web.json_response(data=resp, status=status)
 
     @classmethod
@@ -239,7 +238,7 @@ class ApiHandlers:
         """
 
         return web.json_response(
-            data=await BaseHandler.resp_get_possible_analyser_modules(),
+            data=BaseHandler.resp_get_possible_analyser_modules(),
             status=200)
 
     @classmethod
@@ -253,7 +252,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp = await BaseHandler.resp_get_enodo_hub_status()
+        resp = BaseHandler.resp_get_enodo_hub_status()
         return web.json_response(data=resp, status=200)
 
     @classmethod
@@ -309,7 +308,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp = await BaseHandler.resp_get_enodo_config()
+        resp = BaseHandler.resp_get_enodo_config()
         return web.json_response(data=resp, status=200)
 
     @classmethod
@@ -327,7 +326,7 @@ class ApiHandlers:
             key/value pairs settings
         """
         data = await request.json()
-        resp = await BaseHandler.resp_set_config(data)
+        resp = BaseHandler.resp_set_config(data)
         return web.json_response(data=resp, status=200)
 
     @classmethod
@@ -363,7 +362,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp = await BaseHandler.resp_get_enodo_stats()
+        resp = BaseHandler.resp_get_enodo_stats()
         return web.json_response(data={
             'data': resp}, status=200)
 
@@ -378,7 +377,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp = await BaseHandler.resp_get_enodo_labels()
+        resp = BaseHandler.resp_get_enodo_labels()
         return web.json_response(data={
             'data': resp}, status=200)
 
@@ -424,6 +423,6 @@ class ApiHandlers:
         except JSONDecodeError as e:
             resp, status = {'error': 'Invalid JSON'}, 400
         else:
-            resp, status = await BaseHandler.resp_remove_enodo_label(data)
+            resp, status = BaseHandler.resp_remove_enodo_label(data)
         return web.json_response(data={
             'data': resp}, status=status)

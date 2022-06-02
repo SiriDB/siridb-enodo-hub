@@ -1,29 +1,28 @@
+import asyncio
+
 from aiohttp import web
-
-from siridb.connector.lib.exceptions import QueryError, InsertError, \
-    ServerError, PoolError, AuthenticationError, UserAuthError
-
-from enodo.model.config.series import SeriesConfigModel
 from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS
-
-from version import VERSION
-
+from enodo.model.config.series import SeriesConfigModel
+from lib.config import Config
 from lib.eventmanager import EnodoEventManager
+from lib.jobmanager import EnodoJob, EnodoJobManager
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
-from lib.siridb.siridb import query_series_anomalies, query_series_forecasts, \
-    query_series_static_rules_hits
-from lib.util import regex_valid
-from lib.jobmanager import EnodoJobManager, EnodoJob
-from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
-from lib.config import Config
+from lib.siridb.siridb import (query_series_anomalies, query_series_forecasts,
+                               query_series_static_rules_hits)
 from lib.socket.clientmanager import ClientManager
+from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
+from lib.util import regex_valid
+from siridb.connector.lib.exceptions import (AuthenticationError, InsertError,
+                                             PoolError, QueryError,
+                                             ServerError, UserAuthError)
+from version import VERSION
 
 
 class BaseHandler:
 
     @classmethod
-    async def resp_get_monitored_series(cls, regex_filter=None):
+    def resp_get_monitored_series(cls, regex_filter=None):
         """Get monitored series
 
         Args:
@@ -35,10 +34,10 @@ class BaseHandler:
         if regex_filter is not None and not regex_valid(regex_filter):
             return {'data': []}
         return {'data': list(
-            await SeriesManager.get_series_to_dict(regex_filter))}
+            SeriesManager.get_series_to_dict(regex_filter))}
 
     @classmethod
-    async def resp_get_single_monitored_series(cls, series_name):
+    def resp_get_single_monitored_series(cls, series_name):
         """Get monitored series details
 
         Args:
@@ -47,7 +46,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = await SeriesManager.get_series(series_name)
+        series = SeriesManager.get_series(series_name)
         if series is None:
             return {'data': ''}, 404
         series_data = series.to_dict()
@@ -63,7 +62,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = await SeriesManager.get_series(series_name)
+        series = SeriesManager.get_series(series_name)
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_forecasts(
@@ -79,7 +78,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = await SeriesManager.get_series(series_name)
+        series = SeriesManager.get_series(series_name)
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_anomalies(
@@ -95,7 +94,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = await SeriesManager.get_series(series_name)
+        series = SeriesManager.get_series(series_name)
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_static_rules_hits(
@@ -123,7 +122,7 @@ class BaseHandler:
         return {'data': output}, 200
 
     @classmethod
-    async def resp_get_event_outputs(cls):
+    def resp_get_event_outputs(cls):
         """get all event output steams
 
         Returns:
@@ -143,11 +142,11 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        output = await EnodoEventManager.create_event_output(output_type, data)
+        output = EnodoEventManager.create_event_output(output_type, data)
         return {'data': output.to_dict()}, 201
 
     @classmethod
-    async def resp_update_event_output(cls, output_id, data):
+    def resp_update_event_output(cls, output_id, data):
         """Update event output stream
 
         Args:
@@ -157,11 +156,11 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        output = await EnodoEventManager.update_event_output(output_id, data)
+        output = EnodoEventManager.update_event_output(output_id, data)
         return {'data': output.to_dict()}, 201
 
     @classmethod
-    async def resp_remove_event_output(cls, output_id):
+    def resp_remove_event_output(cls, output_id):
         """remove output stream
 
         Args:
@@ -170,7 +169,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        await EnodoEventManager.remove_event_output(output_id)
+        EnodoEventManager.remove_event_output(output_id)
         return {'data': None}, 200
 
     @classmethod
@@ -200,7 +199,7 @@ class BaseHandler:
             return {'error': 'Something went wrong when adding the series. '
                     'Series does not exists'}, 400
 
-        return {'data': list(await SeriesManager.get_series_to_dict())}, 201
+        return {'data': list(SeriesManager.get_series_to_dict())}, 201
 
     @classmethod
     async def resp_update_series(cls, series_name, data):
@@ -222,16 +221,19 @@ class BaseHandler:
         if bc is None:
             return {'error': 'Something went wrong when adding the series. '
                     'Missing base analysis job'}, 400
-        series = await SeriesManager.get_series(series_name)
+        series = SeriesManager.get_series(series_name)
         if series is None:
             return {'error': 'Something went wrong when updating the series. \
                 Are you sure the series exists?'}, 400
         series.update(data)
 
-        await SeriesManager.series_changed(
-            SUBSCRIPTION_CHANGE_TYPE_UPDATE, series_name)
+        asyncio.ensure_future(
+            SeriesManager.series_changed(
+                SUBSCRIPTION_CHANGE_TYPE_UPDATE, series_name
+            )
+        )
 
-        return {'data': list(await SeriesManager.get_series_to_dict())}, 201
+        return {'data': list(SeriesManager.get_series_to_dict())}, 201
 
     @classmethod
     async def resp_remove_series(cls, series_name):
@@ -250,29 +252,29 @@ class BaseHandler:
         return 404
 
     @classmethod
-    async def resp_get_jobs_queue(cls):
-        return {'data': await EnodoJobManager.get_open_queue()}
+    def resp_get_jobs_queue(cls):
+        return {'data': EnodoJobManager.get_open_queue()}
 
     @classmethod
-    async def resp_get_open_jobs(cls):
-        return {'data': await EnodoJobManager.get_open_queue()}
+    def resp_get_open_jobs(cls):
+        return {'data': EnodoJobManager.get_open_queue()}
 
     @classmethod
-    async def resp_get_active_jobs(cls):
+    def resp_get_active_jobs(cls):
         return {'data': EnodoJobManager.get_active_jobs()}
 
     @classmethod
-    async def resp_get_failed_jobs(cls):
+    def resp_get_failed_jobs(cls):
         return {'data': [
             EnodoJob.to_dict(j) for j in EnodoJobManager.get_failed_jobs()]}
 
     @classmethod
-    async def resp_resolve_failed_job(cls, series_name):
+    def resp_resolve_failed_job(cls, series_name):
         return {
             'data': EnodoJobManager.remove_failed_jobs_for_series(series_name)}
 
     @classmethod
-    async def resp_get_possible_analyser_modules(cls):
+    def resp_get_possible_analyser_modules(cls):
         """Get all modules that are available
 
         Returns:
@@ -282,15 +284,15 @@ class BaseHandler:
         return {'data': data}
 
     @classmethod
-    async def resp_get_enodo_hub_status(cls):
+    def resp_get_enodo_hub_status(cls):
         return {'data': {'version': VERSION}}
 
     @classmethod
-    async def resp_get_enodo_config(cls):
+    def resp_get_enodo_config(cls):
         return {'data': Config.get_settings(include_secrets=False)}
 
     @classmethod
-    async def resp_set_config(cls, data):
+    def resp_set_config(cls, data):
         """Update config
 
         Args:
@@ -311,7 +313,7 @@ class BaseHandler:
         return {'data': True}
 
     @classmethod
-    async def resp_get_enodo_stats(cls):
+    def resp_get_enodo_stats(cls):
         return {'data': {
             "no_series": SeriesManager.get_series_count(),
             "no_ignored_series": SeriesManager.get_ignored_series_count(),
@@ -325,7 +327,7 @@ class BaseHandler:
         }}
 
     @classmethod
-    async def resp_get_enodo_labels(cls):
+    def resp_get_enodo_labels(cls):
         data = SeriesManager.get_labels_data()
         return {'data': data}
 
@@ -337,7 +339,7 @@ class BaseHandler:
         return {'data': True}, 201
 
     @classmethod
-    async def resp_remove_enodo_label(cls, data):
+    def resp_remove_enodo_label(cls, data):
         data = SeriesManager.remove_label(data.get('name'))
         if not data:
             return {'error': "Cannot remove label"}, 400

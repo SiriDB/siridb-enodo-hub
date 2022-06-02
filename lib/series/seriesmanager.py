@@ -1,21 +1,21 @@
-from lib.series.series import Series
+import asyncio
 import logging
 import os
 import re
 
 import qpack
-from enodo.protocol.package import create_header, UPDATE_SERIES
-
+from enodo.protocol.package import UPDATE_SERIES, create_header
 from lib.config import Config
-from lib.eventmanager import ENODO_EVENT_ANOMALY_DETECTED,\
-    EnodoEventManager, EnodoEvent
+from lib.eventmanager import (ENODO_EVENT_ANOMALY_DETECTED, EnodoEvent,
+                              EnodoEventManager)
+from lib.series.series import Series
 from lib.serverstate import ServerState
-from lib.siridb.siridb import query_series_datapoint_count,\
-    drop_series, insert_points, query_series_data, does_series_exist,\
-    query_group_expression_by_name
+from lib.siridb.siridb import (drop_series, insert_points,
+                               query_group_expression_by_name,
+                               query_series_data, query_series_datapoint_count)
 from lib.socket import ClientManager
-from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD,\
-    SUBSCRIPTION_CHANGE_TYPE_DELETE
+from lib.socketio import (SUBSCRIPTION_CHANGE_TYPE_ADD,
+                          SUBSCRIPTION_CHANGE_TYPE_DELETE)
 from lib.util import load_disk_data, save_disk_data
 
 
@@ -26,7 +26,7 @@ class SeriesManager:
     _update_cb = None
 
     @classmethod
-    async def prepare(cls, update_cb=None):
+    def prepare(cls, update_cb=None):
         cls._update_cb = update_cb
         cls._labels_last_update = None
 
@@ -38,7 +38,7 @@ class SeriesManager:
             else:
                 await cls._update_cb(
                     change_type,
-                    (await cls.get_series(series_name)).to_dict(),
+                    (cls.get_series(series_name)).to_dict(),
                     series_name)
 
     @classmethod
@@ -53,23 +53,23 @@ class SeriesManager:
     async def _add_series(cls, series: dict):
         if series.get('name') in cls._series:
             return False
-        if await does_series_exist(
-                ServerState.get_siridb_data_conn(), series.get('name')):
-            collected_datapoints = await query_series_datapoint_count(
+        collected_datapoints = await query_series_datapoint_count(
                 ServerState.get_siridb_data_conn(), series.get('name'))
-            if collected_datapoints is not None:
-                cls._series[series.get(
-                    'name')] = Series.from_dict(series)
-                cls._series[series.get(
-                    'name')].state.datapoint_count = collected_datapoints
-                await cls.series_changed(
-                    SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name'))
-                await cls.update_listeners(cls.get_listener_series_info())
-                return True
+        # If collected_datapoints is None, the series does not exist.
+        if collected_datapoints is not None:
+            cls._series[series.get(
+                'name')] = Series.from_dict(series)
+            cls._series[series.get(
+                'name')].state.datapoint_count = collected_datapoints
+            asyncio.ensure_future(cls.series_changed(
+                SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name')))
+            asyncio.ensure_future(
+                cls.update_listeners(cls.get_listener_series_info()))
+            return True
         return None
 
     @classmethod
-    async def get_series(cls, series_name):
+    def get_series(cls, series_name):
         series = None
         if series_name in cls._series:
             series = cls._series.get(series_name)
@@ -133,7 +133,7 @@ class SeriesManager:
                     if cls._series[rid].is_ignored is True])
 
     @classmethod
-    async def get_series_to_dict(cls, regex_filter=None):
+    def get_series_to_dict(cls, regex_filter=None):
         if regex_filter is not None:
             pattern = re.compile(regex_filter)
             return [
@@ -144,9 +144,11 @@ class SeriesManager:
     @classmethod
     async def remove_series(cls, series_name):
         if series_name in cls._series:
-            await cls.series_changed(
-                SUBSCRIPTION_CHANGE_TYPE_DELETE, series_name)
             await cls.cleanup_series(series_name)
+            asyncio.ensure_future(
+                cls.series_changed(
+                    SUBSCRIPTION_CHANGE_TYPE_DELETE, series_name)
+            )
             del cls._series[series_name]
             return True
         return False
