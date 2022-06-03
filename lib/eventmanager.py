@@ -1,19 +1,17 @@
 import asyncio
 import logging
 import time
-import os
 import uuid
 import json
 import aiohttp
 
 from jinja2 import Environment
 
-from lib.config import Config
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, \
     SUBSCRIPTION_CHANGE_TYPE_UPDATE, SUBSCRIPTION_CHANGE_TYPE_DELETE
 from lib.serverstate import ServerState
 from lib.state.resource import StoredResource
-from lib.util import save_disk_data, load_disk_data, cls_lock
+from lib.util import cls_lock
 
 ENODO_EVENT_ANOMALY_DETECTED = "event_anomaly_detected"
 ENODO_EVENT_JOB_QUEUE_TOO_LONG = "job_queue_too_long"
@@ -250,6 +248,7 @@ class EnodoEventManager:
     @cls_lock()
     async def _remove_event_output(cls, output):
         cls.outputs.remove(output)
+        output.delete()
         await internal_updates_event_output_subscribers(
             SUBSCRIPTION_CHANGE_TYPE_DELETE, output.rid)
 

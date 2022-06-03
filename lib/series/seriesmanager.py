@@ -1,6 +1,5 @@
 from lib.series.series import Series
 import logging
-import os
 import re
 
 import qpack
@@ -145,6 +144,7 @@ class SeriesManager:
             await cls.series_changed(
                 SUBSCRIPTION_CHANGE_TYPE_DELETE, series_name)
             await cls.cleanup_series(series_name)
+            cls._series[series_name].delete()
             del cls._series[series_name]
             return True
         return False

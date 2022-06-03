@@ -146,6 +146,7 @@ class EnodoJobManager:
             jobs.append(job)
         for job in jobs:
             cls._open_jobs.remove(job)
+            job.delete()
             series = SeriesManager.get_series(job.series_name)
             series.set_job_status(job.job_config.config_name,
                                   JOB_STATUS_NONE)
@@ -192,6 +193,7 @@ class EnodoJobManager:
     def remove_failed_jobs_for_series(cls, series_name: str):
         for job in cls.get_failed_jobs_for_series(series_name):
             cls._failed_jobs.remove(job)
+            job.delete()
 
     @classmethod
     @cls_lock()
@@ -242,6 +244,7 @@ class EnodoJobManager:
     def _deactivate_job(cls, job: EnodoJob):
         if job in cls._active_jobs:
             cls._active_jobs.remove(job)
+            job.delete()
             del cls._active_jobs_index[job.rid]
 
     @classmethod
@@ -266,6 +269,7 @@ class EnodoJobManager:
 
         for job in jobs:
             cls._open_jobs.remove(job)
+            job.delete()
             if cls._update_queue_cb is not None:
                 await cls._update_queue_cb(
                     SUBSCRIPTION_CHANGE_TYPE_DELETE, job.rid)
@@ -278,6 +282,7 @@ class EnodoJobManager:
 
         for job in jobs:
             cls._active_jobs.remove(job)
+            job.delete()
             if cls._update_queue_cb is not None:
                 await cls._update_queue_cb(
                     SUBSCRIPTION_CHANGE_TYPE_DELETE, job.rid)
