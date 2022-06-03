@@ -1,10 +1,10 @@
 import asyncio
+import json
 import logging
 import time
 import uuid
-import json
-import aiohttp
 
+import aiohttp
 from jinja2 import Environment
 
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, \
@@ -12,6 +12,12 @@ from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, \
 from lib.serverstate import ServerState
 from lib.state.resource import StoredResource
 from lib.util import cls_lock
+from lib.config import Config
+from lib.serverstate import ServerState
+from lib.socketio import (SUBSCRIPTION_CHANGE_TYPE_ADD,
+                          SUBSCRIPTION_CHANGE_TYPE_DELETE,
+                          SUBSCRIPTION_CHANGE_TYPE_UPDATE)
+from lib.util import cls_lock, load_disk_data, save_disk_data
 
 ENODO_EVENT_ANOMALY_DETECTED = "event_anomaly_detected"
 ENODO_EVENT_JOB_QUEUE_TOO_LONG = "job_queue_too_long"
@@ -221,43 +227,53 @@ class EnodoEventManager:
         cls._lock = asyncio.Lock()
 
     @classmethod
-    async def create_event_output(cls, output_type, data):
+    @cls_lock()
+    def _get_next_output_id(cls):
+        if cls._next_output_id + 1 >= cls._max_output_id:
+            cls._next_output_id = 0
+        cls._next_output_id += 1
+        return cls._next_output_id
+
+    @classmethod
+    def create_event_output(cls, output_type, data):
+        data["rid"] = cls._get_next_output_id()
+        # TODO: Catch exception
         output = EnodoEventOutput.create(output_type, data)
         cls.outputs.append(output)
-        await internal_updates_event_output_subscribers(
-            SUBSCRIPTION_CHANGE_TYPE_ADD, output.to_dict())
+        asyncio.ensure_future(internal_updates_event_output_subscribers(
+            SUBSCRIPTION_CHANGE_TYPE_ADD, output.to_dict()))
         return output
 
     @classmethod
-    async def update_event_output(cls, output_id, data):
+    def update_event_output(cls, output_id, data):
         for output in cls.outputs:
             if output.rid == output_id:
-                await cls._update_event_output(output, data)
+                cls._update_event_output(output, data)
                 return output
         return False
 
     @classmethod
-    async def remove_event_output(cls, output_id):
+    def remove_event_output(cls, output_id):
         for output in cls.outputs:
             if output.rid == output_id:
-                await cls._remove_event_output(output)
+                cls._remove_event_output(output)
                 return True
         return False
 
     @classmethod
     @cls_lock()
-    async def _remove_event_output(cls, output):
+    def _remove_event_output(cls, output):
         cls.outputs.remove(output)
         output.delete()
-        await internal_updates_event_output_subscribers(
-            SUBSCRIPTION_CHANGE_TYPE_DELETE, output.rid)
+        asyncio.ensure_future(internal_updates_event_output_subscribers(
+            SUBSCRIPTION_CHANGE_TYPE_DELETE, output.rid))
 
     @classmethod
     @cls_lock()
-    async def _update_event_output(cls, output, data):
+    def _update_event_output(cls, output, data):
         output.update(data)
-        await internal_updates_event_output_subscribers(
-            SUBSCRIPTION_CHANGE_TYPE_UPDATE, output.to_dict())
+        asyncio.ensure_future(internal_updates_event_output_subscribers(
+            SUBSCRIPTION_CHANGE_TYPE_UPDATE, output.to_dict()))
 
     @classmethod
     async def handle_event(cls, event, series=None):

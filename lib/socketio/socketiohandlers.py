@@ -1,10 +1,10 @@
 import functools
 
+from lib.serverstate import ServerState
 from lib.socketio.subscriptionmanager import SubscriptionManager
 from lib.util import safe_json_dumps
 from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
-from lib.serverstate import ServerState
 
 
 def socketio_auth_required(handler):
@@ -23,7 +23,7 @@ class SocketIoHandler:
     _sio = None
 
     @classmethod
-    async def prepare(cls, sio):
+    def prepare(cls, sio):
         cls._sio = sio
 
     @classmethod
@@ -46,16 +46,16 @@ class SocketIoHandler:
 
     @classmethod
     async def disconnect(cls, sid):
-        await SubscriptionManager.remove_subscriber(sid)
+        SubscriptionManager.remove_subscriber(sid)
         # TODO verbose logging
 
     @classmethod
     @socketio_auth_required
     async def get_all_series(cls, sid, regex_filter, event):
-        return await cls._get_all_series(sid, regex_filter, event)
+        return cls._get_all_series(regex_filter)
 
     @classmethod
-    async def _get_all_series(cls, sid, regex_filter, event):
+    def _get_all_series(cls, regex_filter):
         regex_filter = regex_filter if regex_filter else None
         resp = BaseHandler.resp_get_monitored_series(regex_filter)
         return safe_json_dumps(resp)
@@ -178,7 +178,7 @@ class SocketIoHandler:
     async def add_event_output(cls, sid, data, event=None):
         output_type = data.get('output_type')
         output_data = data.get('data')
-        return await BaseHandler.resp_add_event_output(
+        return BaseHandler.resp_add_event_output(
             output_type, output_data)
 
     @classmethod
@@ -186,14 +186,14 @@ class SocketIoHandler:
     async def update_event_output(cls, sid, data, event=None):
         output_id = data.get('id')
         output_data = data.get('data')
-        return await BaseHandler.resp_update_event_output(
+        return BaseHandler.resp_update_event_output(
             output_id, output_data)
 
     @classmethod
     @socketio_auth_required
     async def remove_event_output(cls, sid, data, event=None):
         output_id = data.get('output_id')
-        return await BaseHandler.resp_remove_event_output(output_id)
+        return BaseHandler.resp_remove_event_output(output_id)
 
     @classmethod
     @socketio_auth_required
@@ -213,7 +213,7 @@ class SocketIoHandler:
     async def subscribe_series(cls, sid, data, event=None):
         if cls._sio is not None:
             cls._sio.enter_room(sid, 'series_updates')
-            return await cls._get_all_series(None, None, None)
+            return cls._get_all_series(None)
 
     @classmethod
     @socketio_auth_required
@@ -230,8 +230,8 @@ class SocketIoHandler:
             regex = None
 
         if cls._sio is not None and regex is not None:
-            await SubscriptionManager.add_subscriber(sid, regex)
-            return await cls._get_all_series(None, regex, None)
+            SubscriptionManager.add_subscriber(sid, regex)
+            return cls._get_all_series(regex)
         else:
             return {'error': 'incorrect regex'}
 
@@ -312,7 +312,7 @@ class SocketIoHandler:
     @classmethod
     @socketio_auth_required
     async def remove_enodo_label(cls, sid, data, event):
-        resp, status = await BaseHandler.resp_remove_enodo_label(data)
+        resp, status = BaseHandler.resp_remove_enodo_label(data)
         return resp
 
     @classmethod
@@ -335,7 +335,7 @@ class SocketIoHandler:
             }, room='series_updates')
 
         filtered_subs = \
-            await SubscriptionManager.get_subscriptions_for_series_name(name)
+            SubscriptionManager.get_subscriptions_for_series_name(name)
         for sub in filtered_subs:
             await cls._sio.emit('update', {
                 'resource': 'series',

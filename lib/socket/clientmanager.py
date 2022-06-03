@@ -1,23 +1,19 @@
-from asyncio import StreamWriter
 import logging
-import os
 import time
+from asyncio import StreamWriter
 from typing import Any, Optional, Union
 
-from enodo import WorkerConfigModel
-from enodo.model.config.worker import WORKER_MODE_GLOBAL, \
-    WORKER_MODE_DEDICATED_JOB_TYPE, \
-    WORKER_MODE_DEDICATED_SERIES
-from enodo.jobs import JOB_STATUS_OPEN
-from enodo import EnodoModule
-from enodo.protocol.package import UPDATE_SERIES, create_header
 import qpack
-from lib.config import Config
-
-from lib.eventmanager import EnodoEvent, EnodoEventManager, \
-    ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE
+from enodo import EnodoModule, WorkerConfigModel
+from enodo.model.config.worker import (WORKER_MODE_DEDICATED_JOB_TYPE,
+                                       WORKER_MODE_DEDICATED_SERIES,
+                                       WORKER_MODE_GLOBAL)
+from enodo.protocol.package import UPDATE_SERIES, create_header
+from enodo.jobs import JOB_STATUS_OPEN
 from lib.serverstate import ServerState
 from lib.state.resource import StoredResource
+from lib.eventmanager import (ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE,
+                              EnodoEvent, EnodoEventManager)
 
 
 class EnodoClient(StoredResource):
@@ -371,10 +367,12 @@ class ClientManager:
                 series = cls.series_manager.get_series(job.series_name)
                 series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_OPEN)
+                await series.set_job_status(
+                    job.job_config.config_name, JOB_STATUS_OPEN)
                 logging.info(
                     f'Setting for series job status pending to false...')
 
-    @classmethod
+    @ classmethod
     async def load_from_disk(cls):
         workers = ServerState.storage.load_by_type("workers")
         for w in workers:

@@ -1,33 +1,33 @@
 import asyncio
-from asyncio import StreamWriter
 import datetime
 import logging
 import os
 import time
+from asyncio import StreamWriter
 from typing import Any, Callable, Optional, Union
 import uuid
 
 import qpack
 from enodo.jobs import *
 from enodo.model.config.series import SeriesJobConfigModel
-from enodo.protocol.packagedata import EnodoJobDataModel, \
-    EnodoJobRequestDataModel
-from enodo.protocol.package import create_header, WORKER_JOB, \
-    WORKER_JOB_CANCEL
+from enodo.protocol.package import WORKER_JOB, WORKER_JOB_CANCEL, create_header
+from enodo.protocol.packagedata import (EnodoJobDataModel,
+                                        EnodoJobRequestDataModel)
 
 from lib.socket.clientmanager import WorkerClient
 from lib.state.resource import StoredResource
+from lib.util import cls_lock
 
-from .eventmanager import EnodoEvent, EnodoEventManager, \
-    ENODO_EVENT_JOB_QUEUE_TOO_LONG, ENODO_EVENT_STATIC_RULE_FAIL
 from .config import Config
+from .eventmanager import (ENODO_EVENT_JOB_QUEUE_TOO_LONG,
+                           ENODO_EVENT_STATIC_RULE_FAIL, EnodoEvent,
+                           EnodoEventManager)
 from .series.seriesmanager import SeriesManager
 from .serverstate import ServerState
 from .socket import ClientManager
-from .socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
-from lib.util import load_disk_data, save_disk_data, cls_lock
-from .socketio import SUBSCRIPTION_CHANGE_TYPE_DELETE, \
-    SUBSCRIPTION_CHANGE_TYPE_ADD
+from .socketio import (SUBSCRIPTION_CHANGE_TYPE_ADD,
+                       SUBSCRIPTION_CHANGE_TYPE_DELETE,
+                       SUBSCRIPTION_CHANGE_TYPE_UPDATE)
 
 
 class EnodoJob(StoredResource):
@@ -85,15 +85,16 @@ class EnodoJobManager:
     _failed_jobs = []
     _max_job_timeout = 60 * 5
     _lock = None
-    _max_in_queue_before_warning = None
+    _next_job_id = 0
+    _lock = asyncio.Lock()
 
+    _max_in_queue_before_warning = None
     _update_queue_cb = None
 
     @classmethod
-    async def async_setup(cls, update_queue_cb: Callable):
+    def setup(cls, update_queue_cb: Callable):
         cls._update_queue_cb = update_queue_cb
         cls._max_in_queue_before_warning = Config.max_in_queue_before_warning
-        cls._lock = asyncio.Lock()
 
     @classmethod
     def _build_index(cls):

@@ -1,23 +1,24 @@
+import asyncio
+
 from aiohttp import web
-
-from siridb.connector.lib.exceptions import QueryError, InsertError, \
-    ServerError, PoolError, AuthenticationError, UserAuthError
-
-from enodo.model.config.series import SeriesConfigModel
 from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS
+from enodo.model.config.series import SeriesConfigModel
 
-from version import VERSION
-
+from lib.config import Config
 from lib.eventmanager import EnodoEventManager
+from lib.jobmanager import EnodoJob, EnodoJobManager
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
-from lib.siridb.siridb import query_series_anomalies, query_series_forecasts, \
-    query_series_static_rules_hits, query_all_series_results
-from lib.util import regex_valid
-from lib.jobmanager import EnodoJobManager, EnodoJob
-from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
-from lib.config import Config
+from lib.siridb.siridb import (
+    query_series_anomalies, query_series_forecasts,
+    query_series_static_rules_hits, query_all_series_results)
 from lib.socket.clientmanager import ClientManager
+from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
+from lib.util import regex_valid
+from siridb.connector.lib.exceptions import (
+    AuthenticationError, InsertError, PoolError, QueryError,
+    ServerError, UserAuthError)
+from version import VERSION
 
 
 class BaseHandler:
@@ -150,7 +151,7 @@ class BaseHandler:
             output.to_dict() for output in EnodoEventManager.outputs]}, 200
 
     @classmethod
-    async def resp_add_event_output(cls, output_type, data):
+    def resp_add_event_output(cls, output_type, data):
         """create event output stream
 
         Args:
@@ -160,11 +161,12 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        output = await EnodoEventManager.create_event_output(output_type, data)
+        output = EnodoEventManager.create_event_output(
+            output_type, data)
         return {'data': output.to_dict()}, 201
 
     @classmethod
-    async def resp_update_event_output(cls, output_id, data):
+    def resp_update_event_output(cls, output_id, data):
         """Update event output stream
 
         Args:
@@ -174,11 +176,11 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        output = await EnodoEventManager.update_event_output(output_id, data)
+        output = EnodoEventManager.update_event_output(output_id, data)
         return {'data': output.to_dict()}, 201
 
     @classmethod
-    async def resp_remove_event_output(cls, output_id):
+    def resp_remove_event_output(cls, output_id):
         """remove output stream
 
         Args:
@@ -187,7 +189,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        await EnodoEventManager.remove_event_output(output_id)
+        EnodoEventManager.remove_event_output(output_id)
         return {'data': None}, 200
 
     @classmethod
@@ -245,8 +247,11 @@ class BaseHandler:
                 Are you sure the series exists?'}, 400
         series.update(data)
 
-        await SeriesManager.series_changed(
-            SUBSCRIPTION_CHANGE_TYPE_UPDATE, series_name)
+        asyncio.ensure_future(
+            SeriesManager.series_changed(
+                SUBSCRIPTION_CHANGE_TYPE_UPDATE, series_name
+            )
+        )
 
         return {'data': list(SeriesManager.get_series_to_dict())}, 201
 
@@ -354,7 +359,7 @@ class BaseHandler:
         return {'data': True}, 201
 
     @classmethod
-    async def resp_remove_enodo_label(cls, data):
+    def resp_remove_enodo_label(cls, data):
         data = SeriesManager.remove_label(data.get('name'))
         if not data:
             return {'error': "Cannot remove label"}, 400

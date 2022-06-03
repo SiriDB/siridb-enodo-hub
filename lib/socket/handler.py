@@ -1,6 +1,4 @@
 from enodo.protocol.package import RESPONSE_OK, create_header
-
-
 from lib.series.seriesmanager import SeriesManager
 from lib.socket import ClientManager
 
@@ -26,6 +24,5 @@ async def receive_worker_status_update(writer, packet_type,
             worker.is_going_busy = False
 
 
-async def received_worker_refused(writer, packet_type,
-                                  packet_id, data, client_id):
+def received_worker_refused(writer, packet_type, packet_id, data, client_id):
     print("Worker refused, is probably busy")
