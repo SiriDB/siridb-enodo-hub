@@ -23,7 +23,7 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
-    def get_monitored_series(cls, request):
+    async def get_monitored_series(cls, request):
         """Returns a list of monitored series
 
         Args:
@@ -46,7 +46,7 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
-    def get_single_monitored_series(cls, request):
+    async def get_single_monitored_series(cls, request):
         """Returns all details
 
         Args:
