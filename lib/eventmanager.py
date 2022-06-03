@@ -219,15 +219,15 @@ class EnodoEventManager:
 
     @classmethod
     @cls_lock()
-    def _get_next_output_id(cls):
+    async def _get_next_output_id(cls):
         if cls._next_output_id + 1 >= cls._max_output_id:
             cls._next_output_id = 0
         cls._next_output_id += 1
         return cls._next_output_id
 
     @classmethod
-    def create_event_output(cls, output_type, data):
-        data["rid"] = cls._get_next_output_id()
+    async def create_event_output(cls, output_type, data):
+        data["rid"] = await cls._get_next_output_id()
         # TODO: Catch exception
         output = EnodoEventOutput.create(output_type, data)
         cls.outputs.append(output)
@@ -236,31 +236,31 @@ class EnodoEventManager:
         return output
 
     @classmethod
-    def update_event_output(cls, output_id, data):
+    async def update_event_output(cls, output_id, data):
         for output in cls.outputs:
             if output.rid == output_id:
-                cls._update_event_output(output, data)
+                await cls._update_event_output(output, data)
                 return output
         return False
 
     @classmethod
-    def remove_event_output(cls, output_id):
+    async def remove_event_output(cls, output_id):
         for output in cls.outputs:
             if output.rid == output_id:
-                cls._remove_event_output(output)
+                await cls._remove_event_output(output)
                 return True
         return False
 
     @classmethod
     @cls_lock()
-    def _remove_event_output(cls, output):
+    async def _remove_event_output(cls, output):
         cls.outputs.remove(output)
         asyncio.ensure_future(internal_updates_event_output_subscribers(
             SUBSCRIPTION_CHANGE_TYPE_DELETE, output.rid))
 
     @classmethod
     @cls_lock()
-    def _update_event_output(cls, output, data):
+    async def _update_event_output(cls, output, data):
         output.update(data)
         asyncio.ensure_future(internal_updates_event_output_subscribers(
             SUBSCRIPTION_CHANGE_TYPE_UPDATE, output.to_dict()))
