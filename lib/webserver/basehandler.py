@@ -132,7 +132,7 @@ class BaseHandler:
             output.to_dict() for output in EnodoEventManager.outputs]}, 200
 
     @classmethod
-    async def resp_add_event_output(cls, output_type, data):
+    def resp_add_event_output(cls, output_type, data):
         """create event output stream
 
         Args:
