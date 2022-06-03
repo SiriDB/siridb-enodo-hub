@@ -82,7 +82,6 @@ class EnodoJobManager:
     def setup(cls, update_queue_cb: Callable):
         cls._update_queue_cb = update_queue_cb
         cls._max_in_queue_before_warning = Config.max_in_queue_before_warning
-        
 
     @classmethod
     async def _build_index(cls):
