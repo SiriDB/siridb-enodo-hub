@@ -96,7 +96,7 @@ class EnodoJobManager:
         cls._lock = asyncio.Lock()
 
     @classmethod
-    async def _build_index(cls):
+    def _build_index(cls):
         cls._active_jobs_index = {}
         for job in cls._active_jobs:
             cls._active_jobs_index[job.rid] = job
@@ -220,7 +220,7 @@ class EnodoJobManager:
         cls._active_jobs_index[job.rid] = job
 
     @classmethod
-    async def get_activated_job(cls, job_id: int) -> EnodoJob:
+    def get_activated_job(cls, job_id: int) -> EnodoJob:
         for job in cls._active_jobs:
             if job.rid == job_id:
                 return job
@@ -335,7 +335,7 @@ class EnodoJobManager:
 
             worker = await ClientManager.get_free_worker(
                 next_job.series_name, next_job.job_config.job_type,
-                await series.get_module(
+                series.get_module(
                     next_job.job_config.config_name))
             if worker is None:
                 return
@@ -391,7 +391,7 @@ class EnodoJobManager:
             return
 
         job_type = job_response.get('job_type')
-        job = await cls.get_activated_job(job_id)
+        job = cls.get_activated_job(job_id)
         await cls.deactivate_job(job_id)
         series = SeriesManager.get_series(job_response.get('name'))
         if job_type == JOB_TYPE_FORECAST_SERIES:
@@ -402,7 +402,7 @@ class EnodoJobManager:
                     job_response.get('data'))
                 series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
-                await series.schedule_job(job.job_config.config_name)
+                series.schedule_job(job.job_config.config_name)
                 await SeriesManager.series_changed(
                     SUBSCRIPTION_CHANGE_TYPE_UPDATE, job_response.get('name'))
             except Exception as e:
@@ -422,7 +422,7 @@ class EnodoJobManager:
                         job_response.get('data'))
                     series.set_job_status(
                         job.job_config.config_name, JOB_STATUS_DONE)
-                    await series.schedule_job(job.job_config.config_name)
+                    series.schedule_job(job.job_config.config_name)
                     await SeriesManager.series_changed(
                         SUBSCRIPTION_CHANGE_TYPE_UPDATE,
                         job_response.get('name'))
@@ -441,7 +441,7 @@ class EnodoJobManager:
                 series.state.interval = job_response.get('interval')
                 series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
-                await series.schedule_job(job.job_config.config_name)
+                series.schedule_job(job.job_config.config_name)
                 await SeriesManager.series_changed(
                     SUBSCRIPTION_CHANGE_TYPE_UPDATE, job_response.get('name'))
             except Exception as e:
@@ -454,7 +454,7 @@ class EnodoJobManager:
             try:
                 series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
-                await series.schedule_job(job.job_config.config_name)
+                series.schedule_job(job.job_config.config_name)
                 await SeriesManager.add_static_rule_hits_to_series(
                     job_response.get('name'),
                     job.job_config.config_name,
@@ -545,7 +545,7 @@ class EnodoJobManager:
                           f'exception class: {e.__class__.__name__}')
 
     @classmethod
-    async def get_open_queue(cls) -> list:
+    def get_open_queue(cls) -> list:
         return [EnodoJob.to_dict(job) for job in cls._open_jobs]
 
     @classmethod
@@ -556,7 +556,7 @@ class EnodoJobManager:
             EnodoJob.from_dict(job_data)
             for job_data in failed_jobs]
 
-        await cls._build_index()
+        cls._build_index()
 
         logging.info(
             f'Loaded {len(failed_jobs)} failed jobs from disk')

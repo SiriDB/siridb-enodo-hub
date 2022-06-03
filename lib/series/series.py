@@ -44,10 +44,10 @@ class Series(StoredResource):
         from ..jobmanager import EnodoJobManager
         return EnodoJobManager.has_series_failed_jobs(self.name)
 
-    async def get_module(self, job_name: str) -> SeriesJobConfigModel:
+    def get_module(self, job_name: str) -> SeriesJobConfigModel:
         return self.config.get_config_for_job(job_name).module
 
-    async def get_job_status(self, job_config_name: str) -> int:
+    def get_job_status(self, job_config_name: str) -> int:
         return self.state.get_job_status(job_config_name)
 
     @StoredResource.changed
@@ -85,8 +85,8 @@ class Series(StoredResource):
         async with self._datapoint_count_lock:
             self.state.datapoint_count += add_to_count
 
-    @StoredResource.async_changed
-    async def schedule_job(self, job_config_name: str, initial=False):
+    @StoredResource.changed
+    def schedule_job(self, job_config_name: str, initial=False):
         job_config = self.config.get_config_for_job(job_config_name)
         if job_config is None:
             return False
@@ -115,7 +115,7 @@ class Series(StoredResource):
             job_schedule['value'] = next_value
             self.state.set_job_schedule(job_config_name, job_schedule)
 
-    async def is_job_due(self, job_config_name: str) -> bool:
+    def is_job_due(self, job_config_name: str) -> bool:
         job_status = self.state.get_job_status(job_config_name)
         job_schedule = self.state.get_job_schedule(job_config_name)
 

@@ -13,7 +13,7 @@ class DiskStorage(StorageBase):
         data = resource.to_store_data
         rid = resource.rid
         resource_type = resource.resource_type
-        logging.debug(f"Saving data of {rid}")
+        logging.debug(f"Saving data of {rid} of type {resource_type}")
         file_path = os.path.join(
             self._base_path, resource_type, f"{rid}.json")
         if not os.path.exists(

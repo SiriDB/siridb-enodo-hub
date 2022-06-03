@@ -14,6 +14,10 @@ class StorageBase:
         pass
 
     @abstractmethod
+    def delete(self, resource: StoredResource):
+        pass
+
+    @abstractmethod
     def load_by_type(self, resource_type: str) -> list:
         pass
 

@@ -104,7 +104,7 @@ class EnodoEventOutput(StoredResource):
         return "outputs"
 
     @classmethod
-    async def create(cls, output_type, data):
+    def create(cls, output_type, data):
         if output_type not in ENODO_EVENT_OUTPUT_TYPES:
             raise Exception  # TODO nice exception
 
@@ -224,7 +224,7 @@ class EnodoEventManager:
 
     @classmethod
     async def create_event_output(cls, output_type, data):
-        output = await EnodoEventOutput.create(output_type, data)
+        output = EnodoEventOutput.create(output_type, data)
         cls.outputs.append(output)
         await internal_updates_event_output_subscribers(
             SUBSCRIPTION_CHANGE_TYPE_ADD, output.to_dict())

@@ -217,12 +217,12 @@ class Server:
         job_schedules = series.state.get_all_job_schedules()
         for job_config_name in series.config.job_config:
             if job_config_name in job_schedules and \
-                    await series.is_job_due(job_config_name):
+                    series.is_job_due(job_config_name):
                 await EnodoJobManager.create_job(job_config_name, series_name)
                 continue
             if job_config_name not in job_schedules:
                 # Job has not been schedules yet, let's add it
-                await series.schedule_job(job_config_name, initial=True)
+                series.schedule_job(job_config_name, initial=True)
 
     async def watch_series(self):
         """Background task to check each series if

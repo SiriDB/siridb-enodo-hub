@@ -6,7 +6,6 @@ import re
 import qpack
 from enodo.protocol.package import create_header, UPDATE_SERIES
 
-from lib.config import Config
 from lib.eventmanager import ENODO_EVENT_ANOMALY_DETECTED,\
     EnodoEventManager, EnodoEvent
 from lib.serverstate import ServerState
@@ -16,7 +15,6 @@ from lib.siridb.siridb import query_series_datapoint_count,\
 from lib.socket import ClientManager
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD,\
     SUBSCRIPTION_CHANGE_TYPE_DELETE
-from lib.util import load_disk_data, save_disk_data
 
 
 class SeriesManager:

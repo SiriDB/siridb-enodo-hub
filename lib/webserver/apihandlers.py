@@ -57,7 +57,7 @@ class ApiHandlers:
             _type_: _description_
         """
         series_name = unquote(request.match_info['series_name'])
-        data, status = await BaseHandler.resp_get_single_monitored_series(
+        data, status = BaseHandler.resp_get_single_monitored_series(
             series_name)
         return web.json_response(
             data, dumps=safe_json_dumps, status=status)
@@ -198,7 +198,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp, status = await BaseHandler.resp_get_event_outputs()
+        resp, status = BaseHandler.resp_get_event_outputs()
         return web.json_response(data=resp, status=status)
 
     @classmethod
@@ -257,7 +257,7 @@ class ApiHandlers:
         """
 
         return web.json_response(
-            data=await BaseHandler.resp_get_possible_analyser_modules(),
+            data=BaseHandler.resp_get_possible_analyser_modules(),
             status=200)
 
     @classmethod
@@ -271,7 +271,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp = await BaseHandler.resp_get_enodo_hub_status()
+        resp = BaseHandler.resp_get_enodo_hub_status()
         return web.json_response(data=resp, status=200)
 
     @classmethod
@@ -327,7 +327,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp = await BaseHandler.resp_get_enodo_config()
+        resp = BaseHandler.resp_get_enodo_config()
         return web.json_response(data=resp, status=200)
 
     @classmethod
@@ -345,7 +345,7 @@ class ApiHandlers:
             key/value pairs settings
         """
         data = await request.json()
-        resp = await BaseHandler.resp_set_config(data)
+        resp = BaseHandler.resp_set_config(data)
         return web.json_response(data=resp, status=200)
 
     @classmethod
@@ -381,7 +381,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp = await BaseHandler.resp_get_enodo_stats()
+        resp = BaseHandler.resp_get_enodo_stats()
         return web.json_response(data={
             'data': resp}, status=200)
 
@@ -396,7 +396,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp = await BaseHandler.resp_get_enodo_labels()
+        resp = BaseHandler.resp_get_enodo_labels()
         return web.json_response(data={
             'data': resp}, status=200)
 

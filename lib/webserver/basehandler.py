@@ -38,7 +38,7 @@ class BaseHandler:
             SeriesManager.get_series_to_dict(regex_filter))}
 
     @classmethod
-    async def resp_get_single_monitored_series(cls, series_name):
+    def resp_get_single_monitored_series(cls, series_name):
         """Get monitored series details
 
         Args:
@@ -140,7 +140,7 @@ class BaseHandler:
         return {'data': output}, 200
 
     @classmethod
-    async def resp_get_event_outputs(cls):
+    def resp_get_event_outputs(cls):
         """get all event output steams
 
         Returns:
@@ -267,29 +267,29 @@ class BaseHandler:
         return 404
 
     @classmethod
-    async def resp_get_jobs_queue(cls):
-        return {'data': await EnodoJobManager.get_open_queue()}
+    def resp_get_jobs_queue(cls):
+        return {'data': EnodoJobManager.get_open_queue()}
 
     @classmethod
-    async def resp_get_open_jobs(cls):
-        return {'data': await EnodoJobManager.get_open_queue()}
+    def resp_get_open_jobs(cls):
+        return {'data': EnodoJobManager.get_open_queue()}
 
     @classmethod
-    async def resp_get_active_jobs(cls):
+    def resp_get_active_jobs(cls):
         return {'data': EnodoJobManager.get_active_jobs()}
 
     @classmethod
-    async def resp_get_failed_jobs(cls):
+    def resp_get_failed_jobs(cls):
         return {'data': [
             EnodoJob.to_dict(j) for j in EnodoJobManager.get_failed_jobs()]}
 
     @classmethod
-    async def resp_resolve_failed_job(cls, series_name):
+    def resp_resolve_failed_job(cls, series_name):
         return {
             'data': EnodoJobManager.remove_failed_jobs_for_series(series_name)}
 
     @classmethod
-    async def resp_get_possible_analyser_modules(cls):
+    def resp_get_possible_analyser_modules(cls):
         """Get all modules that are available
 
         Returns:
@@ -299,15 +299,15 @@ class BaseHandler:
         return {'data': data}
 
     @classmethod
-    async def resp_get_enodo_hub_status(cls):
+    def resp_get_enodo_hub_status(cls):
         return {'data': {'version': VERSION}}
 
     @classmethod
-    async def resp_get_enodo_config(cls):
+    def resp_get_enodo_config(cls):
         return {'data': Config.get_settings(include_secrets=False)}
 
     @classmethod
-    async def resp_set_config(cls, data):
+    def resp_set_config(cls, data):
         """Update config
 
         Args:
@@ -328,7 +328,7 @@ class BaseHandler:
         return {'data': True}
 
     @classmethod
-    async def resp_get_enodo_stats(cls):
+    def resp_get_enodo_stats(cls):
         return {'data': {
             "no_series": SeriesManager.get_series_count(),
             "no_ignored_series": SeriesManager.get_ignored_series_count(),
@@ -342,7 +342,7 @@ class BaseHandler:
         }}
 
     @classmethod
-    async def resp_get_enodo_labels(cls):
+    def resp_get_enodo_labels(cls):
         data = SeriesManager.get_labels_data()
         return {'data': data}
 

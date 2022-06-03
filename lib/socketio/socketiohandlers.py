@@ -64,7 +64,7 @@ class SocketIoHandler:
     @socketio_auth_required
     async def get_series_details(cls, sid, data, event):
         series_name = data.get('series_name')
-        resp, status = await BaseHandler.resp_get_single_monitored_series(
+        resp, status = BaseHandler.resp_get_single_monitored_series(
             series_name)
         return safe_json_dumps(resp)
 
@@ -145,33 +145,33 @@ class SocketIoHandler:
     @classmethod
     @socketio_auth_required
     async def get_enodo_modules(cls, sid, data, event=None):
-        return await BaseHandler.resp_get_possible_analyser_modules()
+        return BaseHandler.resp_get_possible_analyser_modules()
 
     @classmethod
     @socketio_auth_required
     async def get_open_jobs(cls, sid, data, event=None):
-        return await BaseHandler.resp_get_open_jobs()
+        return BaseHandler.resp_get_open_jobs()
 
     @classmethod
     @socketio_auth_required
     async def get_active_jobs(cls, sid, data, event=None):
-        return await BaseHandler.resp_get_active_jobs()
+        return BaseHandler.resp_get_active_jobs()
 
     @classmethod
     @socketio_auth_required
     async def get_failed_jobs(cls, sid, data, event=None):
-        return await BaseHandler.resp_get_failed_jobs()
+        return BaseHandler.resp_get_failed_jobs()
 
     @classmethod
     @socketio_auth_required
     async def resolve_failed_job(cls, sid, data, event=None):
-        return await BaseHandler.resp_resolve_failed_job(
+        return BaseHandler.resp_resolve_failed_job(
             data.get('series_name'))
 
     @classmethod
     @socketio_auth_required
     async def get_event_outputs(cls, sid, data, event=None):
-        return await BaseHandler.resp_get_event_outputs()
+        return BaseHandler.resp_get_event_outputs()
 
     @classmethod
     @socketio_auth_required
@@ -200,7 +200,7 @@ class SocketIoHandler:
     async def subscribe_queue(cls, sid, data, event=None):
         if cls._sio is not None:
             cls._sio.enter_room(sid, 'job_updates')
-        return safe_json_dumps(await BaseHandler.resp_get_jobs_queue())
+        return safe_json_dumps(BaseHandler.resp_get_jobs_queue())
 
     @classmethod
     @socketio_auth_required
@@ -246,14 +246,14 @@ class SocketIoHandler:
     async def subscribe_enodo_modules(cls, sid, data, event):
         if cls._sio is not None:
             cls._sio.enter_room(sid, 'enodo_module_updates')
-            return await BaseHandler.resp_get_possible_analyser_modules()
+            return BaseHandler.resp_get_possible_analyser_modules()
 
     @classmethod
     @socketio_auth_required
     async def subscribe_event_output(cls, sid, data, event):
         if cls._sio is not None:
             cls._sio.enter_room(sid, 'event_output_updates')
-            return await BaseHandler.resp_get_event_outputs()
+            return BaseHandler.resp_get_event_outputs()
 
     @classmethod
     @socketio_auth_required
@@ -264,25 +264,25 @@ class SocketIoHandler:
     @classmethod
     @socketio_auth_required
     async def get_enodo_hub_status(cls, sid, data, event):
-        resp = await BaseHandler.resp_get_enodo_hub_status()
+        resp = BaseHandler.resp_get_enodo_hub_status()
         return resp
 
     @classmethod
     @socketio_auth_required
     async def get_enodo_settings(cls, sid, data, event):
-        resp = await BaseHandler.resp_get_enodo_config()
+        resp = BaseHandler.resp_get_enodo_config()
         return resp
 
     @classmethod
     @socketio_auth_required
     async def update_enodo_hub_settings(cls, sid, data, event):
-        resp = await BaseHandler.resp_set_config(data)
+        resp = BaseHandler.resp_set_config(data)
         return resp
 
     @classmethod
     @socketio_auth_required
     async def get_enodo_stats(cls, sid, data, event):
-        resp = await BaseHandler.resp_get_enodo_stats()
+        resp = BaseHandler.resp_get_enodo_stats()
         return resp
 
     @classmethod
@@ -301,7 +301,7 @@ class SocketIoHandler:
     @classmethod
     @socketio_auth_required
     async def get_enodo_labels(cls, sid, data, event):
-        return await BaseHandler.resp_get_enodo_labels()
+        return BaseHandler.resp_get_enodo_labels()
 
     @classmethod
     @socketio_auth_required
