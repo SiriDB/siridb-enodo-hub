@@ -223,7 +223,7 @@ class ApiHandlers:
             output_type = data.get('output_type')
             output_data = data.get('data')
 
-            resp, status = BaseHandler.resp_add_event_output(
+            resp, status = await BaseHandler.resp_add_event_output(
                 output_type, output_data)
         return web.json_response(data=resp, status=status)
 
@@ -240,7 +240,7 @@ class ApiHandlers:
         """
         output_id = int(request.match_info['output_id'])
 
-        resp, status = BaseHandler.resp_remove_event_output(output_id)
+        resp, status = await BaseHandler.resp_remove_event_output(output_id)
         return web.json_response(data=resp, status=status)
 
     @classmethod

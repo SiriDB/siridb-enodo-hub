@@ -151,7 +151,7 @@ class BaseHandler:
             output.to_dict() for output in EnodoEventManager.outputs]}, 200
 
     @classmethod
-    def resp_add_event_output(cls, output_type, data):
+    async def resp_add_event_output(cls, output_type, data):
         """create event output stream
 
         Args:
@@ -161,12 +161,12 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        output = EnodoEventManager.create_event_output(
+        output = await EnodoEventManager.create_event_output(
             output_type, data)
         return {'data': output.to_dict()}, 201
 
     @classmethod
-    def resp_update_event_output(cls, output_id, data):
+    async def resp_update_event_output(cls, output_id, data):
         """Update event output stream
 
         Args:
@@ -176,11 +176,11 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        output = EnodoEventManager.update_event_output(output_id, data)
+        output = await EnodoEventManager.update_event_output(output_id, data)
         return {'data': output.to_dict()}, 201
 
     @classmethod
-    def resp_remove_event_output(cls, output_id):
+    async def resp_remove_event_output(cls, output_id):
         """remove output stream
 
         Args:
@@ -189,7 +189,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        EnodoEventManager.remove_event_output(output_id)
+        await EnodoEventManager.remove_event_output(output_id)
         return {'data': None}, 200
 
     @classmethod

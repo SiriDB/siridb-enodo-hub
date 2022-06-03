@@ -16,7 +16,9 @@ async def query_series_datapoint_count(siridb_client, series_name):
         print(e)
         pass
     else:
-        count = result.get(series_name, [])[0][1]
+        counts = result.get(series_name, [])
+        if counts:
+            count = counts[0][1]
     return count
 
 
