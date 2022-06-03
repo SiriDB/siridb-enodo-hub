@@ -8,6 +8,7 @@ from lib.state import StoredResource, StorageBase
 class DiskStorage(StorageBase):
     def __init__(self, base_path: str):
         self._base_path = os.path.join(base_path, "data")
+        self._cache = {}
 
     def delete(self, resource: StoredResource):
         rid = resource.rid
