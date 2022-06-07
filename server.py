@@ -123,6 +123,7 @@ class Server:
     async def clean_up(self):
         """Cleans up before shutdown
         """
+        await ServerState.storage.close()
         await ServerState.scheduler.close()
         await self.backend_socket.stop()
 

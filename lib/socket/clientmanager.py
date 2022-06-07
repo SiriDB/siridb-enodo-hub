@@ -374,7 +374,7 @@ class ClientManager:
 
     @ classmethod
     async def load_from_disk(cls):
-        workers = ServerState.storage.load_by_type("workers")
+        workers = await ServerState.storage.load_by_type("workers")
         for w in workers:
             try:
                 worker = WorkerClient(**w)

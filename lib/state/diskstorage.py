@@ -6,9 +6,11 @@ from lib.state import StoredResource, StorageBase
 
 
 class DiskStorage(StorageBase):
+
     def __init__(self, base_path: str):
         self._base_path = os.path.join(base_path, "data")
         self._cache = {}
+        self.load_as_needed = False
 
     def delete(self, resource: StoredResource):
         rid = resource.rid
@@ -35,7 +37,7 @@ class DiskStorage(StorageBase):
         with open(file_path, 'w') as file:
             file.write(json.dumps(data))
 
-    def load_by_type(self, resource_type: str) -> list:
+    async def load_by_type(self, resource_type: str) -> list:
         resp = []
         type_path = os.path.join(self._base_path, resource_type)
         if not os.path.isdir(type_path):
@@ -54,7 +56,7 @@ class DiskStorage(StorageBase):
                         resp.append(data)
         return resp
 
-    def load_by_type_and_rid(
+    async def load_by_type_and_rid(
             self, resource_type: str, rid: Any) -> dict:
         file_path = os.path.join(self._base_path,
                                  resource_type, f"{rid}.json")
@@ -69,3 +71,6 @@ class DiskStorage(StorageBase):
                 else:
                     return data
         return False
+
+    async def close(self):
+        pass

@@ -238,7 +238,7 @@ class SeriesManager:
 
     @classmethod
     async def load_from_disk(cls):
-        series_data = ServerState.storage.load_by_type("series")
+        series_data = await ServerState.storage.load_by_type("series")
         for s in series_data:
             try:
                 await cls._add_series(s)

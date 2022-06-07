@@ -286,7 +286,7 @@ class EnodoEventManager:
 
     @classmethod
     async def load_from_disk(cls):
-        outputs = ServerState.storage.load_by_type("outputs")
+        outputs = await ServerState.storage.load_by_type("outputs")
         for s in outputs:
             cls.outputs.append(
                 await EnodoEventOutput.create(

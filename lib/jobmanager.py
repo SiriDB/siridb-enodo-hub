@@ -557,7 +557,7 @@ class EnodoJobManager:
     @classmethod
     @cls_lock()
     async def load_from_disk(cls):
-        failed_jobs = ServerState.storage.load_by_type("failed_jobs")
+        failed_jobs = await ServerState.storage.load_by_type("failed_jobs")
         cls._failed_jobs = [
             EnodoJob.from_dict(job_data)
             for job_data in failed_jobs]
