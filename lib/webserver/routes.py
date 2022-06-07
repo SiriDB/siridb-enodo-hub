@@ -33,6 +33,9 @@ def setup_routes(app, cors):
 
     app.router.add_delete(
         "/api/series/{series_name}", ApiHandlers.remove_series)
+    app.router.add_delete(
+        "/api/series/{series_name}/job/{job_config_name}",
+        ApiHandlers.remove_series_job_config)
     app.router.add_get(
         "/api/enodo/model", ApiHandlers.get_possible_analyser_models,
         allow_head=False)

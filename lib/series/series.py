@@ -129,10 +129,10 @@ class Series:
             if job_schedule["value"] is None:
                 return True
             if job_schedule["type"] == "TS" and \
-                job_schedule["value"] <= int(time.time()):
+                    job_schedule["value"] <= int(time.time()):
                 return True
             if job_schedule["type"] == "N" and \
-                job_schedule["value"] <= self.state.datapoint_count:
+                    job_schedule["value"] <= self.state.datapoint_count:
                 return True
         return False
 

@@ -243,6 +243,29 @@ class BaseHandler:
         return 404
 
     @classmethod
+    def resp_remove_job_config(cls, series_name, job_config_name):
+        """Remove job config from series config
+
+        Args:
+            series_name (string): name of sereis
+            job_config_name (string): name of job config
+
+        Returns:
+            dict: dict with data if succeeded and error when necessary
+        """
+
+        series = await SeriesManager.get_series(series_name)
+        if series is None:
+            return {"error": "Series does not exist"}, 400
+
+        try:
+            series.series_config.remove_config_for_job(job_config_name)
+        except Exception as e:
+            return {"error": str(e)}, 400
+        else:
+            return {"data": {"successful": True}}, 200
+
+    @classmethod
     async def resp_get_jobs_queue(cls):
         return {'data': await EnodoJobManager.get_open_queue()}
 

@@ -145,6 +145,25 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
+    async def remove_series_job_config(cls, request):
+        """Remove a job config from a series
+
+        Args:
+            request (Request): aiohttp request
+
+        Returns:
+            _type_: _description_
+        """
+        series_name = urllib.parse.unquote(
+            request.match_info['series_name'])
+        job_config_name = urllib.parse.unquote(
+            request.match_info['job_config_name'])
+        return web.json_response(
+            data={}, status=await BaseHandler.resp_remove_job_config(
+                series_name, job_config_name))
+
+    @classmethod
+    @EnodoAuth.auth.required
     async def get_enodo_event_outputs(cls, request):
         """Get all event outputs
 
