@@ -29,10 +29,10 @@ class SocketIoRouter:
             event='/api/series/forecasts',
             handler=SocketIoHandler.get_series_forecasts)
         self._sio_on(
-            event='/api/series/details',
+            event='/api/series/anomalies',
             handler=SocketIoHandler.get_series_anomalies)
         self._sio_on(
-            event='/api/series/details',
+            event='/api/series/static_rules',
             handler=SocketIoHandler.get_series_static_rules_hits)
         self._sio_on(
             event='/api/series/delete',
@@ -53,8 +53,8 @@ class SocketIoRouter:
             event='/api/event/output/delete',
             handler=SocketIoHandler.remove_event_output)
         self._sio_on(
-            event='/api/enodo/models',
-            handler=SocketIoHandler.get_enodo_models)
+            event='/api/enodo/modules',
+            handler=SocketIoHandler.get_enodo_modules)
         self._sio_on(
             event='/api/enodo/status',
             handler=SocketIoHandler.get_enodo_hub_status)
@@ -88,6 +88,9 @@ class SocketIoRouter:
         self._sio_on(
             event='/api/enodo/labels/delete',
             handler=SocketIoHandler.remove_enodo_label)
+        self._sio_on(
+            event='/api/siridb/query',
+            handler=SocketIoHandler.run_siridb_query)
 
         self._setup_listen_events()
 
@@ -102,8 +105,8 @@ class SocketIoRouter:
             event='/subscribe/filtered/series',
             handler=SocketIoHandler.subscribe_filtered_series)
         self._sio_on(
-            event='/subscribe/enodo/model',
-            handler=SocketIoHandler.subscribe_enodo_models)
+            event='/subscribe/enodo/module',
+            handler=SocketIoHandler.subscribe_enodo_modules)
         self._sio_on(
             event='/subscribe/event/output',
             handler=SocketIoHandler.subscribe_event_output)

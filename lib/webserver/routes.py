@@ -1,4 +1,4 @@
-from lib.api.apihandlers import ApiHandlers
+from lib.webserver.apihandlers import ApiHandlers
 
 
 def setup_routes(app, cors):
@@ -37,7 +37,7 @@ def setup_routes(app, cors):
         "/api/series/{series_name}/job/{job_config_name}",
         ApiHandlers.remove_series_job_config)
     app.router.add_get(
-        "/api/enodo/model", ApiHandlers.get_possible_analyser_models,
+        "/api/enodo/module", ApiHandlers.get_possible_analyser_modules,
         allow_head=False)
     app.router.add_get(
         "/api/enodo/event/output", ApiHandlers.get_enodo_event_outputs)
@@ -72,9 +72,17 @@ def setup_routes(app, cors):
         "/api/enodo/clients", ApiHandlers.get_connected_clients,
         allow_head=False)
 
+    # SiriDB proxy
+    app.router.add_get(
+        "/api/siridb/query", ApiHandlers.run_siridb_query,
+        allow_head=False)
+
     # Add non api routes
     app.router.add_get(
         "/status/ready", ApiHandlers.get_enodo_readiness,
+        allow_head=False)
+    app.router.add_get(
+        "/status/live", ApiHandlers.get_enodo_liveness,
         allow_head=False)
 
     # Configure CORS on all routes.

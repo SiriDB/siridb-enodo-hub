@@ -5,13 +5,97 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased] - yyyy-mm-dd
+## [unreleased] - yyyy-mm-dd
 
-## [0.1.0-beta3.2.0] - yyyy-mm-dd
+## [0.1.0-beta3.2.12] - 2022-05-23
+
+### Fixed
+- Adding series with an empty SeriesState instead of an dict
+- Checking online status of client on loading clientlist from disk
+
+## [0.1.0-beta3.2.11] - 2022-05-23
+
+### Fixed
+- Ignore `requires_job` when config is not found (invalid job name)
+
+### Changed
+- Using `time.time()` instead of `datetime.datetime.now()` in rest of project
+
+## [0.1.0-beta3.2.10] - 2022-05-19
+
+### Fixed
+- Accept empty anomalies result
+
+### Added
+- Typing
+
+### Changed
+- Using `time.time()` instead of `datetime.datetime.now()` for client timestamps
+
+## [0.1.0-beta3.2.9] - 2022-05-19
+
+### Added
+- Logging hub version on startup
+- Save client data to disk
+- Update worker data on reconnect
+
+## [0.1.0-beta3.2.8] - 2022-05-18
+
+### Added
+- `time_precision` support, send to worker in job request.
+- Implemented new lib for `time_precision` support and `value_type` for `EnodoModuleArgument`
+
+## [0.1.0-beta3.2.7] - 2022-05-17
+
+### Fixed
+- Added exception handling when loading series from disk, ignoring invalid data
+
+## [0.1.0-beta3.2.6] - 2022-05-17
+
+### Changed
+- Removed module manager, using clientmanager to fetch current known modules
+- Implemented new lib version, to check if module version has been specified with the module name `<module_name>@<module_version>`
+- Receive only 1 module data
+
+### Added
+- Implemented new version of lib; Check if a jobs config_name contains any spaces
+
+## [0.1.0-beta3.2.5] - 2022-05-09
+
+### Added
+- Support for adding series with unknown modules
+
+### Changed
+- Known modules in memory only, not saved to disk
+- SiriDB config renamed to `siridb_data`
+
+## [0.1.0-beta3.2.4] - 2022-05-06
+
+### Changed
+- Removed siridb password from get settings base handler output
+- Refactored manager locks
+- Removed legacy code
+- Moved siridb settings to config file, and `max_in_queue_before_warning` and `min_data_points` to the settings file
+
+## [0.1.0-beta3.2.3] - 2022-05-02
+
+### Added
+- Implemented use_max_points property in job configs
+  
+### Fixed
+- Bug with worker is_going_busy status on reconnect
+- Fixed return http status on not found when fetching series details
+- Fixed issue with siridb connect when changing settings
+
+## [0.1.0-beta3.2.2] - 2022-04-29
 
 ### Added
 - Seperate endpoints for fetching analysis result data
 - Cleanup on series removal (siridb analytics results)
+- Endpoint as proxy for querying SiriDB data db
+- Friendly shutdown to clear queue
+- Force shutdown support
+- Online status of clients exposed to API
 
 ### Changed
 - Changed series config and job config. Job config is now a list of jobs. Not categorised by job type. Forecast, anomaly detection jobs can be in the list multiple times. 
@@ -20,9 +104,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - A job can require an other job the be run beforehand by using the `requires_job` property
 - Config section `enodo` renamed to `hub` because of env prefix `ENODO_`
 - Job response handling updated
+- Refactored model to be renamed to module
 
 ### Fixed
 - PEP8 guidelines
+- Fixed socketio serialisation of config classes on emit
+- SiriDB output db selection/config
 
 ## [0.1.0-beta3.0.0] - 2021-08-13
 

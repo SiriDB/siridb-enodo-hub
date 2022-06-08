@@ -1,17 +1,20 @@
 from aiohttp import web
-from enodo import EnodoModel
+
+from siridb.connector.lib.exceptions import QueryError, InsertError, \
+    ServerError, PoolError, AuthenticationError, UserAuthError
+
 from enodo.model.config.series import SeriesConfigModel
+from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS
 
 from version import VERSION
 
-from lib.analyser.model import EnodoModelManager
-from lib.events import EnodoEventManager
+from lib.eventmanager import EnodoEventManager
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
 from lib.siridb.siridb import query_series_anomalies, query_series_forecasts, \
     query_series_static_rules_hits
 from lib.util import regex_valid
-from lib.enodojobmanager import EnodoJobManager, EnodoJob
+from lib.jobmanager import EnodoJobManager, EnodoJob
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
 from lib.config import Config
 from lib.socket.clientmanager import ClientManager
@@ -46,9 +49,9 @@ class BaseHandler:
         """
         series = await SeriesManager.get_series(series_name)
         if series is None:
-            return web.json_response(data={'data': ''}, status=404)
+            return {'data': ''}, 404
         series_data = series.to_dict()
-        return {'data': series_data}
+        return {'data': series_data}, 200
 
     @classmethod
     async def resp_get_series_forecasts(cls, series_name):
@@ -64,7 +67,7 @@ class BaseHandler:
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_forecasts(
-            ServerState.get_siridb_data_conn(), series_name)}
+            ServerState.get_siridb_output_conn(), series_name)}
 
     @classmethod
     async def resp_get_series_anomalies(cls, series_name):
@@ -80,7 +83,7 @@ class BaseHandler:
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_anomalies(
-            ServerState.get_siridb_data_conn(), series_name)}
+            ServerState.get_siridb_output_conn(), series_name)}
 
     @classmethod
     async def resp_get_series_static_rules_hits(cls, series_name):
@@ -96,7 +99,28 @@ class BaseHandler:
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_static_rules_hits(
-            ServerState.get_siridb_data_conn(), series_name)}
+            ServerState.get_siridb_output_conn(), series_name)}
+
+    @classmethod
+    async def resp_run_siridb_query(cls, query):
+        """Run siridb query
+
+        Args:
+            query (string): siridb query, free format
+
+        Returns:
+            dict with siridb response
+        """
+        output = None
+        try:
+            result = await ServerState.get_siridb_data_conn().query(
+                query)
+        except (QueryError, InsertError, ServerError, PoolError,
+                AuthenticationError, UserAuthError) as _:
+            return {'data': output}, 400
+        else:
+            output = result
+        return {'data': output}, 200
 
     @classmethod
     async def resp_get_event_outputs(cls):
@@ -160,28 +184,21 @@ class BaseHandler:
             dict: dict with data
         """
         try:
-            series_config = SeriesConfigModel.from_dict(
-                data.get('config'))
+            series_config = SeriesConfigModel(**data.get('config'))
         except Exception as e:
             return {'error': 'Invalid series config', 'message': str(e)}, 400
-        for job_config in list(series_config.job_config.values()):
-            model_parameters = job_config.model_params
-
-            model = await EnodoModelManager.get_model(job_config.model)
-            if model is None:
-                return {'error': 'Unknown model'}, 400
-            if model_parameters is None and len(
-                    model.model_arguments.keys()) > 0:
-                return {'error': 'Missing model parameters'}, 400
-            for m_args in model.model_arguments:
-                if m_args.get("required") and \
-                        m_args.get('name') not in model_parameters.keys():
-                    return {'error': f'Missing required model parameter \
-                        {m_args.get("name")}'}, 400
-
-        if not await SeriesManager.add_series(data):
-            return {'error': 'Something went wrong when adding the series. \
-                Are you sure the series exists?'}, 400
+        bc = series_config.get_config_for_job_type(
+            JOB_TYPE_BASE_SERIES_ANALYSIS, first_only=True)
+        if bc is None:
+            return {'error': 'Something went wrong when adding the series. '
+                    'Missing base analysis job'}, 400
+        is_added = await SeriesManager.add_series(data)
+        if is_added is False:
+            return {'error': 'Something went wrong when adding the series. '
+                    'Series already added'}, 400
+        if is_added is None:
+            return {'error': 'Something went wrong when adding the series. '
+                    'Series does not exists'}, 400
 
         return {'data': list(await SeriesManager.get_series_to_dict())}, 201
 
@@ -196,25 +213,15 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        required_fields = ['config']
-        if not all(required_field in data
-                   for required_field in required_fields):
-            return {'error': 'Something went wrong when updating the series. \
-                Missing required fields'}, 400
-        series_config = SeriesConfigModel.from_dict(data.get('config'))
-        for job_config in list(series_config.job_config.values()):
-            model_parameters = job_config.model_params
-
-            model = await EnodoModelManager.get_model(job_config.model)
-            if model is None:
-                return {'error': 'Unknown model'}, 400
-            if model_parameters is None and len(
-                    model.model_arguments.keys()) > 0:
-                return {'error': 'Missing required fields'}, 400
-            for key in model.model_arguments:
-                if key not in model_parameters.keys():
-                    return {'error': f'Missing required field {key}'}, 400
-
+        try:
+            series_config = SeriesConfigModel(**data.get('config'))
+        except Exception as e:
+            return {'error': 'Invalid series config', 'message': str(e)}, 400
+        bc = series_config.get_config_for_job_type(
+            JOB_TYPE_BASE_SERIES_ANALYSIS, first_only=True)
+        if bc is None:
+            return {'error': 'Something went wrong when adding the series. '
+                    'Missing base analysis job'}, 400
         series = await SeriesManager.get_series(series_name)
         if series is None:
             return {'error': 'Something went wrong when updating the series. \
@@ -288,14 +295,13 @@ class BaseHandler:
             'data': EnodoJobManager.remove_failed_jobs_for_series(series_name)}
 
     @classmethod
-    async def resp_get_possible_analyser_models(cls):
-        """Get all models that are available
+    async def resp_get_possible_analyser_modules(cls):
+        """Get all modules that are available
 
         Returns:
             dict: dict with data
         """
-        data = {'models': [EnodoModel.to_dict(
-            model) for model in EnodoModelManager.models]}
+        data = {'modules': list(ClientManager.modules.values())}
         return {'data': data}
 
     @classmethod
@@ -304,7 +310,7 @@ class BaseHandler:
 
     @classmethod
     async def resp_get_enodo_config(cls):
-        return {'data': Config.get_settings()}
+        return {'data': Config.get_settings(include_secrets=False)}
 
     @classmethod
     async def resp_set_config(cls, data):
@@ -324,7 +330,7 @@ class BaseHandler:
                     section, key, keys_and_values[key])
         Config.write_settings()
         Config.setup_settings_variables()
-        await ServerState.setup_siridb_connection()
+
         return {'data': True}
 
     @classmethod
@@ -351,11 +357,11 @@ class BaseHandler:
         await SeriesManager.add_label(data.get('description'),
                                       data.get('name'),
                                       data.get('series_config'))
-        return {'data': True}
+        return {'data': True}, 201
 
     @classmethod
     async def resp_remove_enodo_label(cls, data):
         data = SeriesManager.remove_label(data.get('name'))
         if not data:
             return {'error': "Cannot remove label"}, 400
-        return {'data': data}
+        return {'data': data}, 200

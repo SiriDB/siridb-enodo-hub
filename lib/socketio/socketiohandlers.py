@@ -41,7 +41,7 @@ class SocketIoHandler:
 
         async with cls._sio.session(sid) as session:
             session['auth'] = True
-        
+
         return True
 
     @classmethod
@@ -64,7 +64,7 @@ class SocketIoHandler:
     @socketio_auth_required
     async def get_series_details(cls, sid, data, event):
         series_name = data.get('series_name')
-        resp = await BaseHandler.resp_get_single_monitored_series(
+        resp, status = await BaseHandler.resp_get_single_monitored_series(
             series_name)
         return safe_json_dumps(resp)
 
@@ -90,6 +90,14 @@ class SocketIoHandler:
         series_name = data.get('series_name')
         resp = await BaseHandler.resp_get_series_static_rules_hits(
             series_name)
+        return safe_json_dumps(resp)
+
+    @classmethod
+    @socketio_auth_required
+    async def run_siridb_query(cls, sid, data, event):
+        query = data.get('query')
+        resp, status = await BaseHandler.resp_run_siridb_query(
+            query)
         return safe_json_dumps(resp)
 
     @classmethod
@@ -135,8 +143,8 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
-    async def get_enodo_models(cls, sid, data, event=None):
-        return await BaseHandler.resp_get_possible_analyser_models()
+    async def get_enodo_modules(cls, sid, data, event=None):
+        return await BaseHandler.resp_get_possible_analyser_modules()
 
     @classmethod
     @socketio_auth_required
@@ -234,10 +242,10 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
-    async def subscribe_enodo_models(cls, sid, data, event):
+    async def subscribe_enodo_modules(cls, sid, data, event):
         if cls._sio is not None:
-            cls._sio.enter_room(sid, 'enodo_model_updates')
-            return await BaseHandler.resp_get_possible_analyser_models()
+            cls._sio.enter_room(sid, 'enodo_module_updates')
+            return await BaseHandler.resp_get_possible_analyser_modules()
 
     @classmethod
     @socketio_auth_required
@@ -248,9 +256,9 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
-    async def unsubscribe_enodo_models(cls, sid, data, event):
+    async def unsubscribe_enodo_modules(cls, sid, data, event):
         if cls._sio is not None:
-            cls._sio.leave_room(sid, 'enodo_model_updates')
+            cls._sio.leave_room(sid, 'enodo_module_updates')
 
     @classmethod
     @socketio_auth_required
@@ -297,12 +305,14 @@ class SocketIoHandler:
     @classmethod
     @socketio_auth_required
     async def add_enodo_label(cls, sid, data, event):
-        return await BaseHandler.resp_add_enodo_label(data)
+        resp, status = await BaseHandler.resp_add_enodo_label(data)
+        return resp
 
     @classmethod
     @socketio_auth_required
     async def remove_enodo_label(cls, sid, data, event):
-        return await BaseHandler.resp_remove_enodo_label(data)
+        resp, status = await BaseHandler.resp_remove_enodo_label(data)
+        return resp
 
     @classmethod
     async def internal_updates_queue_subscribers(cls, change_type, job):
@@ -333,11 +343,11 @@ class SocketIoHandler:
             }, room=sub.get('sid'))
 
     @classmethod
-    async def internal_updates_enodo_models_subscribers(cls, change_type,
-                                                        model_data):
+    async def internal_updates_enodo_modules_subscribers(
+            cls, change_type, module_data):
         if cls._sio is not None:
             await cls._sio.emit('update', {
-                'resource': 'enodo_model',
+                'resource': 'enodo_module',
                 'updateType': change_type,
-                'resourceData': model_data
-            }, room='enodo_model_updates')
+                'resourceData': module_data
+            }, room='enodo_module_updates')

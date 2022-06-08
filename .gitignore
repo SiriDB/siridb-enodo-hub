@@ -1,5 +1,7 @@
 test
 test/*
+build
+dist
 .idea
 .idea/*
 .idea/vcs.xml

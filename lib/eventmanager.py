@@ -12,7 +12,7 @@ from lib.config import Config
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, \
     SUBSCRIPTION_CHANGE_TYPE_UPDATE, SUBSCRIPTION_CHANGE_TYPE_DELETE
 from lib.serverstate import ServerState
-from lib.util import save_disk_data, load_disk_data
+from lib.util import save_disk_data, load_disk_data, cls_lock
 
 ENODO_EVENT_ANOMALY_DETECTED = "event_anomaly_detected"
 ENODO_EVENT_JOB_QUEUE_TOO_LONG = "job_queue_too_long"
@@ -39,7 +39,7 @@ ENODO_EVENT_SEVERITY_LEVELS = [
 
 class EnodoEvent:
     """
-    EnodoEvent class. Holds data for an event (error/warning/etc) 
+    EnodoEvent class. Holds data for an event (error/warning/etc)
     that occured. No state data is saved.
     """
     __slots__ = ('title', 'message', 'event_type',
@@ -126,9 +126,9 @@ class EnodoEventOutput:
 
 class EnodoEventOutputWebhook(EnodoEventOutput):
     """
-    EnodoEventOutputWebhook Class. Class to describe webhook method as 
-    output method of events. This method uses a template which can be 
-    used {{ event.var }} will be replaced with a instance variable named var 
+    EnodoEventOutputWebhook Class. Class to describe webhook method as
+    output method of events. This method uses a template which can be
+    used {{ event.var }} will be replaced with a instance variable named var
     on the event instance
     """
 
@@ -206,7 +206,7 @@ class EnodoEventManager:
     outputs = None
     # Next id is always current. will be incremented when setting new id
     _next_output_id = None
-    _locked = False
+    _lock = None
     _max_output_id = None
 
     @classmethod
@@ -214,24 +214,14 @@ class EnodoEventManager:
         cls.outputs = []
         cls._next_output_id = 0
         cls._max_output_id = 1000
+        cls._lock = asyncio.Lock()
 
     @classmethod
-    async def _lock(cls):
-        while cls._locked is True:
-            await asyncio.sleep(0.1)
-        cls._locked = True
-
-    @classmethod
-    async def _unlock(cls):
-        cls._locked = False
-
-    @classmethod
+    @cls_lock()
     async def _get_next_output_id(cls):
-        await cls._lock()
         if cls._next_output_id + 1 >= cls._max_output_id:
             cls._next_output_id = 0
         cls._next_output_id += 1
-        await cls._unlock()
         return cls._next_output_id
 
     @classmethod
@@ -261,26 +251,24 @@ class EnodoEventManager:
         return False
 
     @classmethod
+    @cls_lock()
     async def _remove_event_output(cls, output):
-        await cls._lock()
         cls.outputs.remove(output)
         await internal_updates_event_output_subscribers(
             SUBSCRIPTION_CHANGE_TYPE_DELETE, output.rid)
-        await cls._unlock()
 
     @classmethod
+    @cls_lock()
     async def _update_event_output(cls, output, data):
-        await cls._lock()
         output.update(data)
         await internal_updates_event_output_subscribers(
             SUBSCRIPTION_CHANGE_TYPE_UPDATE, output.to_dict())
-        await cls._unlock()
 
     @classmethod
     async def handle_event(cls, event, series=None):
         if isinstance(event, EnodoEvent):
             if event.event_type in ENODO_SERIES_RELATED_EVENT_TYPES:
-                if series is not None and series.is_ignored() == True:
+                if series is not None and series.is_ignored() is True:
                     return False
             for output in cls.outputs:
                 await output.send_event(event)

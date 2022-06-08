@@ -34,7 +34,20 @@ async def does_series_exist(siridb_client, series_name):
     return exists
 
 
-# @classmethod
+async def query_time_unit(siridb_client):
+    result = None
+    try:
+        result = await siridb_client.query(
+            f'show time_precision')
+    except (QueryError, InsertError, ServerError, PoolError,
+            AuthenticationError, UserAuthError) as e:
+        print("Connection problem with SiriDB server")
+        pass
+    if result is None:
+        return None
+    return result["data"][0]["value"]
+
+
 async def query_series_data(siridb_client, series_name, selector="*"):
     result = None
     try:

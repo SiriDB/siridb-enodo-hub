@@ -4,17 +4,16 @@ import os
 import re
 
 import qpack
+from enodo.protocol.package import create_header, UPDATE_SERIES
 
 from lib.config import Config
-from lib.events import EnodoEvent
-from lib.events.enodoeventmanager import ENODO_EVENT_ANOMALY_DETECTED,\
-    EnodoEventManager
+from lib.eventmanager import ENODO_EVENT_ANOMALY_DETECTED,\
+    EnodoEventManager, EnodoEvent
 from lib.serverstate import ServerState
 from lib.siridb.siridb import query_series_datapoint_count,\
     drop_series, insert_points, query_series_data, does_series_exist,\
     query_group_expression_by_name
 from lib.socket import ClientManager
-from lib.socket.package import create_header, UPDATE_SERIES
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD,\
     SUBSCRIPTION_CHANGE_TYPE_DELETE
 from lib.util import load_disk_data, save_disk_data
@@ -32,7 +31,7 @@ class SeriesManager:
         cls._labels_last_update = None
 
     @classmethod
-    async def series_changed(cls, change_type, series_name):
+    async def series_changed(cls, change_type: str, series_name: str):
         if cls._update_cb is not None:
             if change_type == "delete":
                 await cls._update_cb(change_type, series_name, series_name)
@@ -43,25 +42,31 @@ class SeriesManager:
                     series_name)
 
     @classmethod
-    async def add_series(cls, series):
+    async def add_series(cls, series: dict):
+        resp = await cls._add_series(series)
+        if resp:
+            logging.info(f"Added new series: {series.get('name')}")
+            return True
+        return resp
+
+    @classmethod
+    async def _add_series(cls, series: dict):
         if series.get('name') in cls._series:
             return False
         if await does_series_exist(
                 ServerState.get_siridb_data_conn(), series.get('name')):
             collected_datapoints = await query_series_datapoint_count(
                 ServerState.get_siridb_data_conn(), series.get('name'))
-            if collected_datapoints:
+            if collected_datapoints is not None:
                 cls._series[series.get(
                     'name')] = Series.from_dict(series)
                 cls._series[series.get(
                     'name')].state.datapoint_count = collected_datapoints
-                logging.info(
-                    f"Added new series: {series.get('name')}")
                 await cls.series_changed(
                     SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name'))
                 await cls.update_listeners(cls.get_listener_series_info())
                 return True
-        return False
+        return None
 
     @classmethod
     async def get_series(cls, series_name):
@@ -77,7 +82,7 @@ class SeriesManager:
     @classmethod
     def get_listener_series_info(cls):
         series = [{"name": series_name,
-                   "realtime": series.series_config.realtime}
+                   "realtime": series.config.realtime}
                   for series_name, series in cls._series.items()]
         labels = [
             {"name": label.get('selector'),
@@ -149,8 +154,8 @@ class SeriesManager:
     @classmethod
     async def cleanup_series(cls, series_name):
         await drop_series(
-                ServerState.get_siridb_forecast_conn(),
-                f"/enodo_{re.escape(series_name)}.*?.*?$/")
+            ServerState.get_siridb_output_conn(),
+            f"/enodo_{re.escape(series_name)}.*?.*?$/")
 
     @classmethod
     async def add_to_datapoint_counter(cls, series_name, value):
@@ -166,10 +171,10 @@ class SeriesManager:
         series = cls._series.get(series_name, None)
         if series is not None:
             await drop_series(
-                ServerState.get_siridb_forecast_conn(),
+                ServerState.get_siridb_output_conn(),
                 f'"enodo_{series_name}_forecast_{job_config_name}"')
             await insert_points(
-                ServerState.get_siridb_forecast_conn(),
+                ServerState.get_siridb_output_conn(),
                 f'enodo_{series_name}_forecast_{job_config_name}', points)
 
     @classmethod
@@ -184,11 +189,13 @@ class SeriesManager:
                 ENODO_EVENT_ANOMALY_DETECTED, series=series)
             await EnodoEventManager.handle_event(event)
             await drop_series(
-                ServerState.get_siridb_forecast_conn(),
+                ServerState.get_siridb_output_conn(),
                 f'"enodo_{series_name}_anomalies_{job_config_name}"')
-            await insert_points(
-                ServerState.get_siridb_forecast_conn(),
-                f'enodo_{series_name}_anomalies_{job_config_name}', points)
+            if len(points) > 0:
+                await insert_points(
+                    ServerState.get_siridb_output_conn(),
+                    f'enodo_{series_name}_anomalies_{job_config_name}',
+                    points)
 
     @classmethod
     async def add_static_rule_hits_to_series(cls, series_name,
@@ -196,16 +203,16 @@ class SeriesManager:
         series = cls._series.get(series_name, None)
         if series is not None:
             await drop_series(
-                ServerState.get_siridb_forecast_conn(),
+                ServerState.get_siridb_output_conn(),
                 f'"enodo_{series_name}_static_rules_{job_config_name}"')
             await insert_points(
-                ServerState.get_siridb_forecast_conn(),
+                ServerState.get_siridb_output_conn(),
                 f'enodo_{series_name}_static_rules_{job_config_name}', points)
 
     @classmethod
     async def get_series_forecast(cls, series_name):
         values = await query_series_data(
-            ServerState.get_siridb_forecast_conn(), f'forecast_{series_name}')
+            ServerState.get_siridb_output_conn(), f'forecast_{series_name}')
         if values is not None:
             return values.get(f'forecast_{series_name}', None)
         return None
@@ -213,7 +220,7 @@ class SeriesManager:
     @classmethod
     async def get_series_anomalies(cls, series_name):
         values = await query_series_data(
-            ServerState.get_siridb_forecast_conn(), f'anomalies_{series_name}')
+            ServerState.get_siridb_output_conn(), f'anomalies_{series_name}')
         if values is not None:
             return values.get(f'anomalies_{series_name}', None)
         return None
@@ -226,7 +233,7 @@ class SeriesManager:
             listener.writer.write(series_update + update)
 
     @classmethod
-    async def read_from_disk(cls):
+    async def load_from_disk(cls):
         if not os.path.exists(Config.series_save_path):
             pass
         else:
@@ -234,11 +241,19 @@ class SeriesManager:
             series_data = data.get('series')
             if series_data is not None:
                 for s in series_data:
-                    cls._series[s.get('name')] = Series.from_dict(s)
+                    try:
+                        await cls._add_series(s)
+                    except Exception as e:
+                        logging.warning(
+                            "Tried loading invalid data when "
+                            "loading series")
+                        logging.debug(
+                            f"Corresponding error: {e}, "
+                            f'exception class: {e.__class__.__name__}')
             label_data = data.get('labels')
             if label_data is not None:
-                for l in label_data:
-                    cls._labels[l.get('grouptag')] = l
+                for la in label_data:
+                    cls._labels[la.get('grouptag')] = la
 
     @classmethod
     async def save_to_disk(cls):

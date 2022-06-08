@@ -1,92 +1,88 @@
+import asyncio
 import time
+from typing import Optional
 
 from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_NONE, \
-    JOB_STATUS_DONE
-from enodo.model.config.series import SeriesConfigModel, SeriesState
+    JOB_STATUS_DONE, JOB_STATUS_FAILED
+from enodo.model.config.series import SeriesConfigModel, SeriesState, \
+    SeriesJobConfigModel
+
+from lib.socket.clientmanager import ClientManager
 
 
 class Series:
-    # detecting_anomalies_status forecast_status series_analysed_status
-    __slots__ = ('rid', 'name', 'series_config', 'state',
+    __slots__ = ('rid', 'name', 'config', 'state',
                  '_datapoint_count_lock', 'series_characteristics')
 
-    def __init__(self, name, config, state=None,
-                 series_characteristics=None, **kwargs):
+    def __init__(self,
+                 name: str,
+                 config:
+                 dict,
+                 state: Optional[dict] = None,
+                 series_characteristics: Optional[dict] = None,
+                 **kwargs):
         self.rid = name
         self.name = name
-        self.series_config = SeriesConfigModel.from_dict(config)
-        if state is None:
-            state = {}
-        self.state = SeriesState.from_dict(state)
+        self.config = SeriesConfigModel(**config)
+        self.state = SeriesState() if state is None else SeriesState(**state)
         self.series_characteristics = series_characteristics
+        self._datapoint_count_lock = asyncio.Lock()
 
-        self._datapoint_count_lock = False
-
-    async def set_datapoints_counter_lock(self, is_locked):
-        """
-        Set lock so it can or can not be changed
-        :param is_locked:
-        :return:
-        """
-        self._datapoint_count_lock = is_locked
-
-    async def get_datapoints_counter_lock(self):
-        return self._datapoint_count_lock
-
-    def get_errors(self):
-        from ..enodojobmanager import EnodoJobManager # To stop circular import
+    def get_errors(self) -> list:
+        # To stop circular import
+        from ..jobmanager import EnodoJobManager
         errors = [
             job.error
             for job in EnodoJobManager.get_failed_jobs_for_series(
                 self.name)]
         return errors
 
-    def is_ignored(self):
-        from ..enodojobmanager import EnodoJobManager # To stop circular import
+    def is_ignored(self) -> bool:
+        # To stop circular import
+        from ..jobmanager import EnodoJobManager
         return EnodoJobManager.has_series_failed_jobs(self.name)
 
-    async def get_model(self, job_name):
-        return self.series_config.get_config_for_job(job_name).model
+    async def get_module(self, job_name: str) -> SeriesJobConfigModel:
+        return self.config.get_config_for_job(job_name).module
 
-    async def get_job_status(self, job_config_name):
+    async def get_job_status(self, job_config_name: str) -> int:
         return self.state.get_job_status(job_config_name)
 
-    async def set_job_status(self, config_name, status):
+    async def set_job_status(self, config_name: str, status: int):
         self.state.set_job_status(config_name, status)
 
     @property
-    def base_analysis_job(self):
-        job_config = self.series_config.get_config_for_job_type(
+    def base_analysis_job(self) -> SeriesJobConfigModel:
+        job_config = self.config.get_config_for_job_type(
             JOB_TYPE_BASE_SERIES_ANALYSIS)
         if job_config is None or job_config is False:
             return False
         return job_config
 
-    def get_job(self, job_config_name):
-        return self.series_config.get_config_for_job(job_config_name)
+    def get_job(self, job_config_name: str) -> SeriesJobConfigModel:
+        return self.config.get_config_for_job(job_config_name)
 
-    def base_analysis_status(self):
-        job_config = self.series_config.get_config_for_job_type(
+    def base_analysis_status(self) -> int:
+        job_config = self.config.get_config_for_job_type(
             JOB_TYPE_BASE_SERIES_ANALYSIS)
         if job_config is None or job_config is False:
             return False
         return self.state.get_job_status(job_config.config_name)
 
-    def get_datapoints_count(self):
+    def get_datapoints_count(self) -> int:
         return self.state.datapoint_count
 
-    async def add_to_datapoints_count(self, add_to_count):
+    async def add_to_datapoints_count(self, add_to_count: int):
         """
         Add value to existing value of data points counter
         :param add_to_count:
         :return:
         """
-        if self._datapoint_count_lock is False:
+        async with self._datapoint_count_lock:
             self.state.datapoint_count += add_to_count
 
-    async def schedule_job(self, job_config_name, initial=False):
-        job_config = self.series_config.get_config_for_job(
-            job_config_name)
+    async def schedule_job(self, job_config_name: str, initial=False):
+        job_config = self.config.get_config_for_job(job_config_name)
         if job_config is None:
             return False
 
@@ -114,59 +110,68 @@ class Series:
             job_schedule['value'] = next_value
             self.state.set_job_schedule(job_config_name, job_schedule)
 
-    async def is_job_due(self, job_config_name):
+    async def is_job_due(self, job_config_name: str) -> bool:
         job_status = self.state.get_job_status(job_config_name)
         job_schedule = self.state.get_job_schedule(job_config_name)
 
-        if job_status == JOB_STATUS_NONE or job_status == JOB_STATUS_DONE:
-            job_config = self.series_config.get_config_for_job(
-                job_config_name)
-            if job_config.requires_job is not None:
-                required_job_status = self.state.get_job_status(
-                    job_config.requires_job)
-                if required_job_status is not JOB_STATUS_DONE:
-                    return False
-            if job_schedule["value"] is None:
-                return True
-            if job_schedule["type"] == "TS" and \
-                    job_schedule["value"] <= int(time.time()):
-                return True
-            if job_schedule["type"] == "N" and \
-                    job_schedule["value"] <= self.state.datapoint_count:
-                return True
+        if job_status not in [JOB_STATUS_NONE, JOB_STATUS_DONE]:
+            jcs = "Job failed" if job_status == JOB_STATUS_FAILED else \
+                "Already active"
+            self.state.set_job_check_status(job_config_name, jcs)
+            return False
+
+        job_config = self.config.get_config_for_job(job_config_name)
+        module = ClientManager.get_module(job_config.module)
+        if module is None:
+            self.state.set_job_check_status(
+                job_config_name, "Unknown module")
+            return False
+        r_job = job_config.requires_job
+        if r_job is not None and self.config.get_config_for_job(
+                r_job) is not None:
+            required_job_status = self.state.get_job_status(r_job)
+            if required_job_status is not JOB_STATUS_DONE:
+                self.state.set_job_check_status(
+                    job_config_name,
+                    f"Waiting for required job {r_job}")
+                return False
+        if job_schedule["value"] is None:
+            return True
+        if job_schedule["type"] == "TS" and \
+                job_schedule["value"] <= int(time.time()):
+            return True
+        if job_schedule["type"] == "N" and \
+                job_schedule["value"] <= self.state.datapoint_count:
+            return True
+        self.state.set_job_check_status(
+            job_config_name, "Not yet scheduled")
         return False
 
-    def update(self, data):
+    def update(self, data: dict) -> bool:
         config = data.get('config')
         if config is not None:
-            self.series_config = SeriesConfigModel.from_dict(config)
+            self.config = SeriesConfigModel(**config)
 
         return True
 
-    def to_dict(self, static_only=False):
+    def to_dict(self, static_only=False) -> dict:
         if static_only:
             return {
                 'name': self.name,
-                'datapoint_count': self.state.datapoint_count,
-                'job_statuses': self.state.job_schedule.to_dict(),
-                'job_schedule': self.state.job_schedule.to_dict(),
-                'config': self.series_config.to_dict(),
-                'series_characteristics': self.series_characteristics,
-                'health': self.state.health
+                'state': self.state,
+                'config': self.config,
+                'series_characteristics': self.series_characteristics
             }
         return {
             'rid': self.rid,
             'name': self.name,
-            'datapoint_count': self.state.datapoint_count,
-            'job_statuses': self.state.job_statuses.to_dict(),
-            'job_schedule': self.state.job_schedule.to_dict(),
-            'config': self.series_config.to_dict(),
+            'state': self.state,
+            'config': self.config,
             'ignore': self.is_ignored(),
             'error': self.get_errors(),
-            'series_characteristics': self.series_characteristics,
-            'health': self.state.health
+            'series_characteristics': self.series_characteristics
         }
 
     @classmethod
-    def from_dict(cls, data_dict):
+    def from_dict(cls, data_dict: dict) -> 'Series':
         return Series(**data_dict)

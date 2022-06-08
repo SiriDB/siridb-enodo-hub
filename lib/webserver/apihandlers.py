@@ -1,3 +1,4 @@
+from json import JSONDecodeError
 import urllib.parse
 from urllib.parse import unquote
 from aiohttp import web
@@ -47,7 +48,7 @@ class ApiHandlers:
     @classmethod
     @EnodoAuth.auth.required
     async def get_single_monitored_series(cls, request):
-        """Returns all details and data points of a specific series.
+        """Returns all details
 
         Args:
             request (Request): aiohttp request
@@ -56,10 +57,10 @@ class ApiHandlers:
             _type_: _description_
         """
         series_name = unquote(request.match_info['series_name'])
-
+        data, status = await BaseHandler.resp_get_single_monitored_series(
+            series_name)
         return web.json_response(
-            data=await BaseHandler.resp_get_single_monitored_series(
-                series_name), dumps=safe_json_dumps)
+            data, dumps=safe_json_dumps, status=status)
 
     @classmethod
     @EnodoAuth.auth.required
@@ -114,6 +115,27 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
+    async def run_siridb_query(cls, request):
+        """Run siridb query
+
+        Args:
+            query (string): siridb query, free format
+
+        Returns:
+            dict with siridb response
+        """
+        try:
+            data = await request.json()
+        except JSONDecodeError as e:
+            resp, status = {'error': 'Invalid JSON'}, 400
+        else:
+            resp, status = await BaseHandler.resp_run_siridb_query(
+                data['query'])
+        return web.json_response(
+            resp, dumps=safe_json_dumps, status=status)
+
+    @classmethod
+    @EnodoAuth.auth.required
     async def add_series(cls, request):
         """Add new series to monitor.
 
@@ -123,8 +145,12 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        data = await request.json()
-        resp, status = await BaseHandler.resp_add_series(data)
+        try:
+            data = await request.json()
+        except JSONDecodeError as e:
+            resp, status = {'error': 'Invalid JSON'}, 400
+        else:
+            resp, status = await BaseHandler.resp_add_series(data)
         return web.json_response(data=resp, status=status)
 
     @classmethod
@@ -191,12 +217,16 @@ class ApiHandlers:
             output_type (int): type of output stream
             data        (Object): data for output
         """
-        data = await request.json()
-        output_type = data.get('output_type')
-        output_data = data.get('data')
+        try:
+            data = await request.json()
+        except JSONDecodeError as e:
+            resp, status = {'error': 'Invalid JSON'}, 400
+        else:
+            output_type = data.get('output_type')
+            output_data = data.get('data')
 
-        resp, status = await BaseHandler.resp_add_event_output(
-            output_type, output_data)
+            resp, status = await BaseHandler.resp_add_event_output(
+                output_type, output_data)
         return web.json_response(data=resp, status=status)
 
     @classmethod
@@ -217,8 +247,8 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
-    async def get_possible_analyser_models(cls, request):
-        """Returns list of possible models with corresponding parameters
+    async def get_possible_analyser_modules(cls, request):
+        """Returns list of possible modules with corresponding parameters
 
         Args:
             request (Request): aiohttp request
@@ -228,7 +258,7 @@ class ApiHandlers:
         """
 
         return web.json_response(
-            data=await BaseHandler.resp_get_possible_analyser_models(),
+            data=await BaseHandler.resp_get_possible_analyser_modules(),
             status=200)
 
     @classmethod
@@ -247,7 +277,7 @@ class ApiHandlers:
 
     @classmethod
     async def get_enodo_readiness(cls, request):
-        """Get status of this analyser instance
+        """Get ready status of this hub instance
 
         Args:
             request (Request): aiohttp request
@@ -259,6 +289,19 @@ class ApiHandlers:
         return web.Response(
             body="OK\r\n" if ready else "SERVICE UNAVAILABLE\r\n",
             status=200 if ready else 503)
+
+    @classmethod
+    async def get_enodo_liveness(cls, request):
+        """Get liveness status of this hub instance
+
+        Args:
+            request (Request): aiohttp request
+
+        Returns:
+            _type_: _description_
+        """
+        return web.Response(
+            body="OK\r\n", status=200)
 
     @classmethod
     @EnodoAuth.auth.required
@@ -320,9 +363,9 @@ class ApiHandlers:
         return web.json_response(data={
             'data': {
                 'listeners': [
-                    l.to_dict() for l in ClientManager.listeners.values()],
+                    li.to_dict() for li in ClientManager.listeners.values()],
                 'workers': [
-                    w.to_dict() for w in ClientManager.workers.values()]
+                    wo.to_dict() for wo in ClientManager.workers.values()]
             }
         },
             status=200,
@@ -372,12 +415,17 @@ class ApiHandlers:
         JSON POST data:
             description (String): description of the label
             name (String): name of the label
-            series_config (Object): series config to assign to child series of label
+            series_config (Object): series config to assign to child series
+                                    of label
         """
-        data = await request.json()
-        resp = await BaseHandler.resp_add_enodo_label(data)
+        try:
+            data = await request.json()
+        except JSONDecodeError as e:
+            resp, status = {'error': 'Invalid JSON'}, 400
+        else:
+            resp, status = await BaseHandler.resp_add_enodo_label(data)
         return web.json_response(data={
-            'data': resp}, status=201)
+            'data': resp}, status=status)
 
     @classmethod
     @EnodoAuth.auth.required
@@ -390,7 +438,11 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        data = await request.json()
-        resp = await BaseHandler.resp_remove_enodo_label(data)
+        try:
+            data = await request.json()
+        except JSONDecodeError as e:
+            resp, status = {'error': 'Invalid JSON'}, 400
+        else:
+            resp, status = await BaseHandler.resp_remove_enodo_label(data)
         return web.json_response(data={
-            'data': resp}, status=200 if resp else 400)
+            'data': resp}, status=status)
