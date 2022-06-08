@@ -171,6 +171,29 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
+    async def add_series_job_config(cls, request):
+        """Add a job config to a series
+
+        Args:
+            request (Request): aiohttp request
+
+        Returns:
+            _type_: _description_
+        """
+        series_name = urllib.parse.unquote(
+            request.match_info['series_name'])
+        try:
+            data = await request.json()
+        except JSONDecodeError as e:
+            resp, status = {'error': 'Invalid JSON'}, 400
+        else:
+            resp, status = await BaseHandler.resp_add_job_config(
+                series_name, data)
+        return web.json_response(
+            data=resp, status=status)
+
+    @classmethod
+    @EnodoAuth.auth.required
     async def remove_series_job_config(cls, request):
         """Remove a job config from a series
 
@@ -184,9 +207,10 @@ class ApiHandlers:
             request.match_info['series_name'])
         job_config_name = urllib.parse.unquote(
             request.match_info['job_config_name'])
+        data, status = await BaseHandler.resp_remove_job_config(
+            series_name, job_config_name)
         return web.json_response(
-            data={}, status=await BaseHandler.resp_remove_job_config(
-                series_name, job_config_name))
+            data=data, status=status)
 
     @classmethod
     @EnodoAuth.auth.required

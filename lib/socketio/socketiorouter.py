@@ -38,9 +38,6 @@ class SocketIoRouter:
             event='/api/series/delete',
             handler=SocketIoHandler.remove_series)
         self._sio_on(
-            event='/api/series/update',
-            handler=SocketIoHandler.update_series)
-        self._sio_on(
             event='/api/event/output',
             handler=SocketIoHandler.get_event_outputs)
         self._sio_on(
