@@ -24,7 +24,7 @@ from version import VERSION
 class BaseHandler:
 
     @classmethod
-    def resp_get_monitored_series(cls, regex_filter=None):
+    async def resp_get_monitored_series(cls, regex_filter=None):
         """Get monitored series
 
         Args:
@@ -36,10 +36,10 @@ class BaseHandler:
         if regex_filter is not None and not regex_valid(regex_filter):
             return {'data': []}
         return {'data': list(
-            SeriesManager.get_series_to_dict(regex_filter))}
+            await SeriesManager.get_series_to_dict(regex_filter))}
 
     @classmethod
-    def resp_get_single_monitored_series(cls, series_name):
+    async def resp_get_single_monitored_series(cls, series_name):
         """Get monitored series details
 
         Args:
@@ -48,7 +48,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = SeriesManager.get_series(series_name)
+        series = await SeriesManager.get_series(series_name)
         if series is None:
             return {'data': ''}, 404
         series_data = series.to_dict()
@@ -64,7 +64,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = SeriesManager.get_series(series_name)
+        series = await SeriesManager.get_series(series_name)
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_all_series_results(
@@ -80,7 +80,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = SeriesManager.get_series(series_name)
+        series = await SeriesManager.get_series(series_name)
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_forecasts(
@@ -97,7 +97,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = SeriesManager.get_series(series_name)
+        series = await SeriesManager.get_series(series_name)
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_anomalies(
@@ -113,7 +113,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = SeriesManager.get_series(series_name)
+        series = await SeriesManager.get_series(series_name)
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
         return {'data': await query_series_static_rules_hits(
@@ -219,7 +219,7 @@ class BaseHandler:
             return {'error': 'Something went wrong when adding the series. '
                     'Series does not exists'}, 400
 
-        return {'data': list(SeriesManager.get_series_to_dict())}, 201
+        return {'data': list(await SeriesManager.get_series_to_dict())}, 201
 
     @classmethod
     async def resp_update_series(cls, series_name, data):
@@ -241,7 +241,7 @@ class BaseHandler:
         if bc is None:
             return {'error': 'Something went wrong when adding the series. '
                     'Missing base analysis job'}, 400
-        series = SeriesManager.get_series(series_name)
+        series = await SeriesManager.get_series(series_name)
         if series is None:
             return {'error': 'Something went wrong when updating the series. \
                 Are you sure the series exists?'}, 400
@@ -253,7 +253,7 @@ class BaseHandler:
             )
         )
 
-        return {'data': list(SeriesManager.get_series_to_dict())}, 201
+        return {'data': list(await SeriesManager.get_series_to_dict())}, 201
 
     @classmethod
     async def resp_remove_series(cls, series_name):
@@ -333,17 +333,18 @@ class BaseHandler:
         return {'data': True}
 
     @classmethod
-    def resp_get_enodo_stats(cls):
+    async def resp_get_enodo_stats(cls):
         return {'data': {
             "no_series": SeriesManager.get_series_count(),
-            "no_ignored_series": SeriesManager.get_ignored_series_count(),
-            "no_open_jobs": EnodoJobManager.get_open_jobs_count(),
-            "no_active_jobs": EnodoJobManager.get_active_jobs_count(),
-            "no_failed_jobs": EnodoJobManager.get_failed_jobs_count(),
-            "no_listeners": ClientManager.get_listener_count(),
-            "no_workers": ClientManager.get_worker_count(),
-            "no_busy_workers": ClientManager.get_busy_worker_count(),
-            "no_output_streams": len(EnodoEventManager.outputs)
+            "no_ignored_series":
+                await SeriesManager.get_ignored_series_count(),
+                "no_open_jobs": EnodoJobManager.get_open_jobs_count(),
+                "no_active_jobs": EnodoJobManager.get_active_jobs_count(),
+                "no_failed_jobs": EnodoJobManager.get_failed_jobs_count(),
+                "no_listeners": ClientManager.get_listener_count(),
+                "no_workers": ClientManager.get_worker_count(),
+                "no_busy_workers": ClientManager.get_busy_worker_count(),
+                "no_output_streams": len(EnodoEventManager.outputs)
         }}
 
     @classmethod
@@ -359,8 +360,8 @@ class BaseHandler:
         return {'data': True}, 201
 
     @classmethod
-    def resp_remove_enodo_label(cls, data):
-        data = SeriesManager.remove_label(data.get('name'))
+    async def resp_remove_enodo_label(cls, data):
+        data = await SeriesManager.remove_label(data.get('name'))
         if not data:
             return {'error': "Cannot remove label"}, 400
         return {'data': data}, 200

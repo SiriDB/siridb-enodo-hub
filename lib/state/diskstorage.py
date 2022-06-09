@@ -72,5 +72,16 @@ class DiskStorage(StorageBase):
                     return data
         return False
 
+    async def get_all_rids_for_type(self, resource_type: str) -> list:
+        resp = []
+        type_path = os.path.join(self._base_path, resource_type)
+        if not os.path.isdir(type_path):
+            return resp
+        for filename in os.listdir(type_path):
+            file_path = os.path.join(type_path, filename)
+            if os.path.isfile(file_path):
+                resp.append(filename.removesuffix(".json"))
+        return resp
+
     async def close(self):
         pass

@@ -52,19 +52,19 @@ class SocketIoHandler:
     @classmethod
     @socketio_auth_required
     async def get_all_series(cls, sid, regex_filter, event):
-        return cls._get_all_series(regex_filter)
+        return await cls._get_all_series(regex_filter)
 
     @classmethod
-    def _get_all_series(cls, regex_filter):
+    async def _get_all_series(cls, regex_filter):
         regex_filter = regex_filter if regex_filter else None
-        resp = BaseHandler.resp_get_monitored_series(regex_filter)
+        resp = await BaseHandler.resp_get_monitored_series(regex_filter)
         return safe_json_dumps(resp)
 
     @classmethod
     @socketio_auth_required
     async def get_series_details(cls, sid, data, event):
         series_name = data.get('series_name')
-        resp, status = BaseHandler.resp_get_single_monitored_series(
+        resp, status = await BaseHandler.resp_get_single_monitored_series(
             series_name)
         return safe_json_dumps(resp)
 
@@ -216,7 +216,7 @@ class SocketIoHandler:
     async def subscribe_series(cls, sid, data, event=None):
         if cls._sio is not None:
             cls._sio.enter_room(sid, 'series_updates')
-            return cls._get_all_series(None)
+            return await cls._get_all_series(None)
 
     @classmethod
     @socketio_auth_required
@@ -234,7 +234,7 @@ class SocketIoHandler:
 
         if cls._sio is not None and regex is not None:
             SubscriptionManager.add_subscriber(sid, regex)
-            return cls._get_all_series(regex)
+            return await cls._get_all_series(regex)
         else:
             return {'error': 'incorrect regex'}
 
@@ -285,7 +285,7 @@ class SocketIoHandler:
     @classmethod
     @socketio_auth_required
     async def get_enodo_stats(cls, sid, data, event):
-        resp = BaseHandler.resp_get_enodo_stats()
+        resp = await BaseHandler.resp_get_enodo_stats()
         return resp
 
     @classmethod
@@ -315,7 +315,7 @@ class SocketIoHandler:
     @classmethod
     @socketio_auth_required
     async def remove_enodo_label(cls, sid, data, event):
-        resp, status = BaseHandler.resp_remove_enodo_label(data)
+        resp, status = await BaseHandler.resp_remove_enodo_label(data)
         return resp
 
     @classmethod

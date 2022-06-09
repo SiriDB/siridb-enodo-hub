@@ -1,2 +1,2 @@
 from .storagebase import StorageBase
-from .resource import StoredResource
+from .resource import StoredResource, ProxyResource

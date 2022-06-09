@@ -52,7 +52,6 @@ class EnodoJob(StoredResource):
         self.send_at = send_at
         self.error = error
         self.worker_id = worker_id
-        self.created()
 
     @property
     def should_be_stored(self):
@@ -139,7 +138,7 @@ class EnodoJobManager:
             async with cls._lock:
                 cls._deactivate_job(job)
             await cls._send_worker_cancel_job(job.worker_id, job.rid)
-            series = SeriesManager.get_series(job.series_name)
+            series = await SeriesManager.get_series(job.series_name)
             series.set_job_status(job.job_config.config_name,
                                   JOB_STATUS_NONE)
         jobs = []
@@ -148,13 +147,13 @@ class EnodoJobManager:
         for job in jobs:
             cls._open_jobs.remove(job)
             job.delete()
-            series = SeriesManager.get_series(job.series_name)
+            series = await SeriesManager.get_series(job.series_name)
             series.set_job_status(job.job_config.config_name,
                                   JOB_STATUS_NONE)
 
     @classmethod
     async def create_job(cls, job_config_name: str, series_name: str):
-        series = SeriesManager.get_series(series_name)
+        series = await SeriesManager.get_series(series_name)
         series.set_job_status(job_config_name, JOB_STATUS_OPEN)
         series.state.set_job_check_status(
             job_config_name,
@@ -302,7 +301,7 @@ class EnodoJobManager:
     async def _set_job_failed(cls, job: EnodoJob, error: str):
         if job is not None:
             job.error = error
-            series = SeriesManager.get_series(job.series_name)
+            series = await SeriesManager.get_series(job.series_name)
             if series is not None:
                 series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_FAILED)
@@ -334,7 +333,7 @@ class EnodoJobManager:
     @cls_lock()
     async def _try_activate_job(cls, next_job: EnodoJob):
         try:
-            series = SeriesManager.get_series(
+            series = await SeriesManager.get_series(
                 next_job.series_name)
             if series is None:
                 return
@@ -399,7 +398,7 @@ class EnodoJobManager:
         job_type = job_response.get('job_type')
         job = cls.get_activated_job(job_id)
         await cls.deactivate_job(job_id)
-        series = SeriesManager.get_series(job_response.get('name'))
+        series = await SeriesManager.get_series(job_response.get('name'))
         if job_type == JOB_TYPE_FORECAST_SERIES:
             try:
                 await SeriesManager.add_forecast_to_series(
@@ -491,7 +490,7 @@ class EnodoJobManager:
     async def _send_worker_job_request(cls, worker: WorkerClient,
                                        job: EnodoJob):
         try:
-            series = SeriesManager.get_series(job.series_name)
+            series = await SeriesManager.get_series(job.series_name)
             job_data = EnodoJobRequestDataModel(
                 job_id=job.rid, job_config=job.job_config,
                 series_name=job.series_name,

@@ -93,7 +93,6 @@ class WorkerClient(EnodoClient):
         elif isinstance(worker_config, dict):
             worker_config = WorkerConfigModel(**worker_config)
         self.worker_config = worker_config
-        self.created()
 
     def support_module_for_job(
             self, job_type: str, module_name: str) -> bool:
@@ -364,7 +363,7 @@ class ClientManager:
         if len(pending_jobs) > 0:
             for job in pending_jobs:
                 await EnodoJobManager.cancel_job(job)
-                series = cls.series_manager.get_series(job.series_name)
+                series = await cls.series_manager.get_series(job.series_name)
                 series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_OPEN)
                 await series.set_job_status(

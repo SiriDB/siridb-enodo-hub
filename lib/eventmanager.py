@@ -12,12 +12,11 @@ from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, \
 from lib.serverstate import ServerState
 from lib.state.resource import StoredResource
 from lib.util import cls_lock
-from lib.config import Config
 from lib.serverstate import ServerState
 from lib.socketio import (SUBSCRIPTION_CHANGE_TYPE_ADD,
                           SUBSCRIPTION_CHANGE_TYPE_DELETE,
                           SUBSCRIPTION_CHANGE_TYPE_UPDATE)
-from lib.util import cls_lock, load_disk_data, save_disk_data
+from lib.util import cls_lock
 
 ENODO_EVENT_ANOMALY_DETECTED = "event_anomaly_detected"
 ENODO_EVENT_JOB_QUEUE_TOO_LONG = "job_queue_too_long"

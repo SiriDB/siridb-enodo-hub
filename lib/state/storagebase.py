@@ -28,5 +28,9 @@ class StorageBase:
         pass
 
     @abstractmethod
+    async def get_all_rids_for_type(self, resource_type: str) -> list:
+        pass
+
+    @abstractmethod
     async def close(self):
         pass

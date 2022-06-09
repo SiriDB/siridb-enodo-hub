@@ -97,9 +97,8 @@ class Server:
 
         # Setup internal managers for handling and managing series,
         # clients, jobs, events and modules
-        SeriesManager.prepare(
+        await SeriesManager.prepare(
             SocketIoHandler.internal_updates_series_subscribers)
-        await SeriesManager.load_from_disk()
         await ClientManager.setup(SeriesManager)
         EnodoJobManager.setup(
             SocketIoHandler.internal_updates_queue_subscribers)
@@ -235,7 +234,7 @@ class Server:
 
             series_names = SeriesManager.get_all_series()
             for series_name in series_names:
-                series = SeriesManager.get_series(series_name)
+                series = await SeriesManager.get_series(series_name)
                 # Check if series is valid and not ignored
                 if series is None or series.is_ignored():
                     continue

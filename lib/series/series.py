@@ -28,7 +28,6 @@ class Series(StoredResource):
         self.state = SeriesState() if state is None else SeriesState(**state)
         self.series_characteristics = series_characteristics
         self._datapoint_count_lock = asyncio.Lock()
-        self.created()
 
     def get_errors(self) -> list:
         # To stop circular import

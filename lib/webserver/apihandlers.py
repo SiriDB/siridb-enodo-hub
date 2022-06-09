@@ -41,7 +41,7 @@ class ApiHandlers:
         # TODO implement filter
 
         return web.json_response(
-            data=BaseHandler.resp_get_monitored_series(regex_filter),
+            data=await BaseHandler.resp_get_monitored_series(regex_filter),
             dumps=safe_json_dumps)
 
     @classmethod
@@ -56,7 +56,7 @@ class ApiHandlers:
             _type_: _description_
         """
         series_name = unquote(request.match_info['series_name'])
-        data, status = BaseHandler.resp_get_single_monitored_series(
+        data, status = await BaseHandler.resp_get_single_monitored_series(
             series_name)
         return web.json_response(
             data, dumps=safe_json_dumps, status=status)
@@ -380,7 +380,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp = BaseHandler.resp_get_enodo_stats()
+        resp = await BaseHandler.resp_get_enodo_stats()
         return web.json_response(data={
             'data': resp}, status=200)
 
@@ -441,6 +441,6 @@ class ApiHandlers:
         except JSONDecodeError as e:
             resp, status = {'error': 'Invalid JSON'}, 400
         else:
-            resp, status = BaseHandler.resp_remove_enodo_label(data)
+            resp, status = await BaseHandler.resp_remove_enodo_label(data)
         return web.json_response(data={
             'data': resp}, status=status)
