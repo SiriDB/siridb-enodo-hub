@@ -289,6 +289,33 @@ class EnodoJobManager:
 
     @classmethod
     @cls_lock()
+    async def cancel_jobs_by_config_name(cls, series_name: str,
+                                         job_config_name: str):
+        jobs = []
+        for job in cls._open_jobs:
+            if job.series_name == series_name and \
+                    job.job_config.config_name == job_config_name:
+                jobs.append(job)
+        for job in jobs:
+            cls._open_jobs.remove(job)
+        jobs = []
+
+        for job in cls._active_jobs:
+            if job.series_name == series_name and \
+                    job.job_config.config_name == job_config_name:
+                jobs.append(job)
+        for job in jobs:
+            cls._active_jobs.remove(job)
+
+        for job in cls._failed_jobs:
+            if job.series_name == series_name and \
+                    job.job_config.config_name == job_config_name:
+                jobs.append(job)
+        for job in jobs:
+            cls._active_jobs.remove(job)
+
+    @classmethod
+    @cls_lock()
     async def set_job_failed(cls, job_id: int, error: str):
         j = None
         for job in cls._active_jobs:

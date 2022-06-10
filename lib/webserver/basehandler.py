@@ -1,4 +1,9 @@
 import asyncio
+import logging
+from aiohttp import web
+
+from siridb.connector.lib.exceptions import QueryError, InsertError, \
+    ServerError, PoolError, AuthenticationError, UserAuthError
 
 from aiohttp import web
 from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS
@@ -147,8 +152,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        return {'data': [
-            output.to_dict() for output in EnodoEventManager.outputs]}, 200
+        return {'data': EnodoEventManager.get_outputs()}, 200
 
     @classmethod
     async def resp_add_event_output(cls, output_type, data):
@@ -222,40 +226,6 @@ class BaseHandler:
         return {'data': list(await SeriesManager.get_series_to_dict())}, 201
 
     @classmethod
-    async def resp_update_series(cls, series_name, data):
-        """Update series
-
-        Args:
-            series_name (string): name of series
-            data (dict): config of series
-
-        Returns:
-            dict: dict with data
-        """
-        try:
-            series_config = SeriesConfigModel(**data.get('config'))
-        except Exception as e:
-            return {'error': 'Invalid series config', 'message': str(e)}, 400
-        bc = series_config.get_config_for_job_type(
-            JOB_TYPE_BASE_SERIES_ANALYSIS, first_only=True)
-        if bc is None:
-            return {'error': 'Something went wrong when adding the series. '
-                    'Missing base analysis job'}, 400
-        series = await SeriesManager.get_series(series_name)
-        if series is None:
-            return {'error': 'Something went wrong when updating the series. \
-                Are you sure the series exists?'}, 400
-        series.update(data)
-
-        asyncio.ensure_future(
-            SeriesManager.series_changed(
-                SUBSCRIPTION_CHANGE_TYPE_UPDATE, series_name
-            )
-        )
-
-        return {'data': list(await SeriesManager.get_series_to_dict())}, 201
-
-    @classmethod
     async def resp_remove_series(cls, series_name):
         """Remove series
 
@@ -270,6 +240,61 @@ class BaseHandler:
             EnodoJobManager.remove_failed_jobs_for_series(series_name)
             return 200
         return 404
+
+    @classmethod
+    async def resp_add_job_config(cls, series_name, job_config):
+        """add job config to series config
+
+        Args:
+            series_name (string): name of sereis
+            job_config_name (string): name of job config
+
+        Returns:
+            dict: dict with data if succeeded and error when necessary
+        """
+
+        series = await SeriesManager.get_series(series_name)
+        if series is None:
+            return {"error": "Series does not exist"}, 400
+
+        try:
+            series.add_job_config(job_config)
+        except Exception as e:
+            return {"error": str(e)}, 400
+        else:
+            logging.info(
+                f"Added new job config to series {series_name}")
+            return {"data": {"successful": True}}, 200
+
+    @classmethod
+    async def resp_remove_job_config(cls, series_name, job_config_name):
+        """Remove job config from series config
+
+        Args:
+            series_name (string): name of sereis
+            job_config_name (string): name of job config
+
+        Returns:
+            dict: dict with data if succeeded and error when necessary
+        """
+
+        series = await SeriesManager.get_series(series_name)
+        if series is None:
+            return {"error": "Series does not exist"}, 400
+
+        try:
+            removed = series.remove_job_config(job_config_name)
+        except Exception as e:
+            return {"error": str(e)}, 400
+        else:
+            if removed:
+                await EnodoJobManager.cancel_jobs_by_config_name(
+                    series_name,
+                    job_config_name)
+            logging.info(
+                f"Removed job config \"{job_config_name}\" "
+                f"from series {series_name}")
+            return {"data": {"successful": removed}}, 200 if removed else 404
 
     @classmethod
     def resp_get_jobs_queue(cls):
