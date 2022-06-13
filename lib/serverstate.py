@@ -1,5 +1,6 @@
 from asyncio import Lock
 import logging
+import time
 
 from aiojobs import create_scheduler
 from siridb.connector import SiriDBClient
@@ -22,6 +23,7 @@ class ServerState:
     readiness = None
     scheduler = None
     storage = None
+    job_schedule_index = {}
 
     @classmethod
     async def async_setup(cls, sio, storage):
@@ -134,6 +136,27 @@ class ServerState:
         if cls.siridb_output_client is None:
             return cls.siridb_data_client.connected
         return cls.siridb_output_client.connected
+
+    @classmethod
+    def index_series_schedules(cls, series):
+        job_schedules = series.state.get_all_job_schedules()
+        earliest = None
+        for job_config_name in series.config.job_config:
+            schedule = job_schedules.get(job_config_name)
+            next_ts = None
+            if schedule is None:
+                next_ts = int(time.time())
+            else:
+                if schedule["type"] == "N":
+                    if series.state.interval is not None:
+                        next_ts = int(
+                            series.state.interval) * int(schedule["value"])
+                elif schedule["type"] == "TS":
+                    next_ts = int(schedule["value"])
+            if next_ts is not None:
+                if earliest is None or next_ts < earliest:
+                    earliest = next_ts
+        cls.job_schedule_index[series.rid] = earliest
 
     @classmethod
     async def refresh_siridb_status(cls):

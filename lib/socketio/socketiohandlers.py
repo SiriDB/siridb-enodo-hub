@@ -57,7 +57,7 @@ class SocketIoHandler:
     @classmethod
     async def _get_all_series(cls, regex_filter):
         regex_filter = regex_filter if regex_filter else None
-        resp = await BaseHandler.resp_get_monitored_series(regex_filter)
+        resp = BaseHandler.resp_get_monitored_series(regex_filter)
         return safe_json_dumps(resp)
 
     @classmethod
@@ -151,13 +151,13 @@ class SocketIoHandler:
     @classmethod
     @socketio_auth_required
     async def resolve_failed_job(cls, sid, data, event=None):
-        return BaseHandler.resp_resolve_failed_job(
+        return await BaseHandler.resp_resolve_failed_job(
             data.get('series_name'))
 
     @classmethod
     @socketio_auth_required
     async def get_event_outputs(cls, sid, data, event=None):
-        return BaseHandler.resp_get_event_outputs()
+        return await BaseHandler.resp_get_event_outputs()
 
     @classmethod
     @socketio_auth_required
@@ -242,7 +242,7 @@ class SocketIoHandler:
     async def subscribe_event_output(cls, sid, data, event):
         if cls._sio is not None:
             cls._sio.enter_room(sid, 'event_output_updates')
-            return BaseHandler.resp_get_event_outputs()
+            return await BaseHandler.resp_get_event_outputs()
 
     @classmethod
     @socketio_auth_required

@@ -9,10 +9,9 @@ class DiskStorage(StorageBase):
 
     def __init__(self, base_path: str):
         self._base_path = os.path.join(base_path, "data")
-        self._cache = {}
         self.load_as_needed = False
 
-    def delete(self, resource: StoredResource):
+    async def delete(self, resource: StoredResource):
         rid = resource.rid
         resource_type = resource.resource_type
         logging.debug(f"Removing data of {rid} of type {resource_type}")
@@ -24,16 +23,20 @@ class DiskStorage(StorageBase):
             except Exception:
                 logging.error("Could not delete file {file_path}")
 
-    def store(self, resource: StoredResource):
+    async def store(self, resource: StoredResource):
         data = resource.to_store_data
         rid = resource.rid
         resource_type = resource.resource_type
-        logging.debug(f"Saving data of {rid} of type {resource_type}")
+        logging.debug(
+            f"Saving data of {rid} of type {resource_type}")
         file_path = os.path.join(
             self._base_path, resource_type, f"{rid}.json")
-        if not os.path.exists(
-                os.path.join(self._base_path, resource_type)):
-            os.makedirs(os.path.join(self._base_path, resource_type))
+        if not os.path.exists(os.path.join(
+                self._base_path,
+                resource_type)):
+            os.makedirs(
+                os.path.join(
+                    self._base_path, resource_type))
         with open(file_path, 'w') as file:
             file.write(json.dumps(data))
 

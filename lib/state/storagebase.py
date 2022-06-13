@@ -12,11 +12,15 @@ class StorageBase:
         pass
 
     @abstractmethod
-    def store(self, resource: StoredResource):
+    async def startup(self):
         pass
 
     @abstractmethod
-    def delete(self, resource: StoredResource):
+    async def store(self, resource: StoredResource):
+        pass
+
+    @abstractmethod
+    async def delete(self, resource: StoredResource):
         pass
 
     @abstractmethod

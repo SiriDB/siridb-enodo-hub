@@ -1,8 +1,11 @@
+from asyncio import ensure_future
+from typing import Any
 from abc import abstractproperty
-from collections import namedtuple
 import functools
-from typing import Any, Coroutine, Iterator
 from lib.serverstate import ServerState
+
+
+resource_manager_index = {}
 
 
 class StoredResource:
@@ -15,7 +18,7 @@ class StoredResource:
         async def wrapped(self, *args, **kwargs):
             resp = await func(self, *args, **kwargs)
             if self.should_be_stored and not self._is_deleted:
-                ServerState.storage.store(self)
+                await ServerState.storage.store(self)
             return resp
         return wrapped
 
@@ -24,26 +27,31 @@ class StoredResource:
         @functools.wraps(func)
         def wrapped(self, *args, **kwargs):
             resp = func(self, *args, **kwargs)
-            if self.should_be_stored and not self._is_deleted:
-                ServerState.storage.store(self)
+            ensure_future(self.store())
             return resp
         return wrapped
 
-    def created(self):
+    async def store(self):
         if self.should_be_stored and not self._is_deleted:
-            ServerState.storage.store(self)
+            await ServerState.storage.store(self)
 
-    def delete(self):
+    @classmethod
+    async def create(cls, data):
+        rm = resource_manager_index[cls.resource_type]
+        return await rm.create_resource(data)
+
+    async def delete(self):
         if self.should_be_stored:
             self._is_deleted = True
-            ServerState.storage.delete(self)
+            await ServerState.storage.delete(self)
 
     @property
     def should_be_stored(self):
         return True
 
+    @classmethod
     @abstractproperty
-    def resource_type(self):
+    def resource_type(cls):
         pass
 
     def keep_in_memory(self):
@@ -54,106 +62,81 @@ class StoredResource:
         return self.to_dict()
 
 
-class InMemoryResource(StoredResource):
-
-    def keep_in_memory(self):
-        return True
-
-
-ProxyResource = namedtuple('ProxyResource', ['rid'])
-
-
-class ResourceCollectionIterator:
-    def __init__(self, collection: 'ResourceCollection'):
-        self._resources = dict(collection.resources)
-        self._collection = collection
+class ResourceIterator:
+    def __init__(self, resource_manager):
+        self._resource_manager = resource_manager
+        self._rids = list(resource_manager.get_resource_rids())
 
     def __iter__(self):
         self.i = 0
         return self
 
-    def __next__(self) -> Coroutine:
-        if self.i >= len(self._resources.values()) - 1:
-            raise StopIteration
-        resp = self._resources.values()[self.i]
-        self.i += 1
-        return self._collection.get_resource(resp)
-
-
-class InMemoryResourceCollectionIterator(ResourceCollectionIterator):
     def __next__(self):
-        if self.i >= len(self._resources.values()) - 1:
+        if self.i >= len(self._rids):
             raise StopIteration
-        resp = self._resources.values()[self.i]
+        resp = self._resource_manager.get_resource(self.rids[self.i])
         self.i += 1
         return resp
 
 
-class ResourceCollection:
+class ResourceManager:
 
-    def __init__(self, resource_type: str, resource_class: Any):
-        self.resources = {}
+    def __new__(cls, resource_type, *args, **kwargs):
+        if resource_type in resource_manager_index:
+            return resource_manager_index[resource_type]
+        return super().__new__(cls)
+
+    def __init__(
+            self, resource_type: str, resource_class: Any,
+            keep_in_memory=False):
         self._resource_type = resource_type
         self._resource_class = resource_class
+        self._keep_in_memory = keep_in_memory
+        self._resources = {}
+        resource_manager_index[resource_type] = self
 
-    async def load_resources(self):
+    async def cleanup(self):
+        rids = self.get_resource_rids()
+        for rid in rids:
+            self._resources[rid] = None
+
+    async def load(self):
         rids = await ServerState.storage.get_all_rids_for_type(
             self._resource_type)
-        self.resources = {rid: ProxyResource(rid)
-                          for rid in rids}
+        self._resources = {rid: None for rid in rids}
 
-    async def add(self, rid):
-        if rid not in self.resources:
-            self.resources[rid] = ProxyResource(rid)
+    async def create_resource(self, resource: dict):
+        rc = self._resource_class(**resource)
+        await rc.store()
+        self._resources[rc.rid] = rc
+        ServerState.index_series_schedules(rc)
+        return rc
 
-    async def delete(self, rid):
-        if rid in self.resources:
-            del self.resources[rid]
+    async def delete_resource(self, resource: StoredResource):
+        del self._resources[resource.rid]
+        await resource.delete()
 
-    def get_rids(self):
-        return list(self.resources.keys())
+    async def get_resource(self, rid: str) -> StoredResource:
+        if rid not in self._resources:
+            return None
+        if self._resources[rid] is None:
+            self._resources[rid] = \
+                self._resource_class(**(
+                    await ServerState.storage.load_by_type_and_rid(
+                        self._resource_type, rid)))
+        return self._resources[rid]
 
-    def get_count(self) -> int:
-        return len(self.resources.keys())
+    def get_resource_rids(self) -> list:
+        return list(self._resources.keys())
 
-    def get_itter(self) -> Iterator:
-        return ResourceCollectionIterator(self)
+    def rid_exists(self, rid: str) -> bool:
+        return rid in self._resources
 
-    async def get_resource(self, rid: str):
-        data = await ServerState.storage.load_by_type_and_rid(
-            self._resource_type, rid)
+    def get_resource_count(self) -> int:
+        return len(self._resources)
 
-        return self._resource_class(
-            **data) if data is not False else None
-
-    async def get(self, rid: str) -> Coroutine:
-        proxy = self.resources.get(rid)
-        if proxy is None:
-            return proxy
-        return await self.get_resource(proxy.rid)
-
-    async def get_resources(self):
-        return [(await self.get_resource(rid))
-                for rid in self.resources.keys()]
-
-
-class InMemoryResourceCollection(ResourceCollection):
-
-    async def load_resources(self):
-        resources = await ServerState.storage.load_by_type(self._resource_type)
-        self.resources = {
-            resource.get('rid'): self._resource_class(**resource)
-            for resource in resources}
-
-    async def add(self, resource):
-        if resource not in self.resources:
-            self.resources[resource.rid] = resource
-
-    async def get(self, rid: str) -> StoredResource:
-        return self.resources.get(rid)
-
-    async def get_resources(self):
-        return list(self.resources.values())
-
-    def get_itter(self) -> Iterator:
-        return InMemoryResourceCollectionIterator(self)
+    async def itter(self):
+        rids = list(self.get_resource_rids())
+        for rid in rids:
+            resp = await self.get_resource(rid)
+            yield resp

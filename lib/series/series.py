@@ -6,6 +6,7 @@ from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_NONE, \
     JOB_STATUS_DONE, JOB_STATUS_FAILED
 from enodo.model.config.series import SeriesConfigModel, SeriesState, \
     SeriesJobConfigModel
+from lib.serverstate import ServerState
 
 from lib.socket.clientmanager import ClientManager
 from lib.state.resource import StoredResource
@@ -71,6 +72,17 @@ class Series(StoredResource):
             return False
         return self.state.get_job_status(job_config.config_name)
 
+    @StoredResource.changed
+    def add_job_config(self, job_config):
+        self.config.add_config_for_job(job_config)
+
+    @StoredResource.changed
+    def remove_job_config(self, job_config_name):
+        removed = self.config.remove_config_for_job(
+            job_config_name)
+        self.state.remove_job_state(job_config_name)
+        return removed
+
     def get_datapoints_count(self) -> int:
         return self.state.datapoint_count
 
@@ -113,6 +125,7 @@ class Series(StoredResource):
         if next_value is not None:
             job_schedule['value'] = next_value
             self.state.set_job_schedule(job_config_name, job_schedule)
+        ServerState.index_series_schedules(self)
 
     def is_job_due(self, job_config_name: str) -> bool:
         job_status = self.state.get_job_status(job_config_name)
@@ -158,6 +171,7 @@ class Series(StoredResource):
             self.config = SeriesConfigModel(**config)
         return True
 
+    @classmethod
     @property
     def resource_type(self):
         return "series"
@@ -169,6 +183,7 @@ class Series(StoredResource):
     def to_dict(self, static_only=False) -> dict:
         if static_only:
             return {
+                'rid': self.rid,
                 'name': self.name,
                 'state': self.state,
                 'config': self.config,

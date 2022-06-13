@@ -29,7 +29,7 @@ from version import VERSION
 class BaseHandler:
 
     @classmethod
-    async def resp_get_monitored_series(cls, regex_filter=None):
+    def resp_get_monitored_series(cls, regex_filter=None):
         """Get monitored series
 
         Args:
@@ -41,7 +41,7 @@ class BaseHandler:
         if regex_filter is not None and not regex_valid(regex_filter):
             return {'data': []}
         return {'data': list(
-            await SeriesManager.get_series_to_dict(regex_filter))}
+            SeriesManager.get_all_series_names(regex_filter))}
 
     @classmethod
     async def resp_get_single_monitored_series(cls, series_name):
@@ -146,13 +146,13 @@ class BaseHandler:
         return {'data': output}, 200
 
     @classmethod
-    def resp_get_event_outputs(cls):
+    async def resp_get_event_outputs(cls):
         """get all event output steams
 
         Returns:
             dict: dict with data
         """
-        return {'data': EnodoEventManager.get_outputs()}, 200
+        return {'data': await EnodoEventManager.get_outputs()}, 200
 
     @classmethod
     async def resp_add_event_output(cls, output_type, data):
@@ -223,7 +223,7 @@ class BaseHandler:
             return {'error': 'Something went wrong when adding the series. '
                     'Series does not exists'}, 400
 
-        return {'data': list(await SeriesManager.get_series_to_dict())}, 201
+        return {'data': SeriesManager.get_all_series_names()}, 201
 
     @classmethod
     async def resp_remove_series(cls, series_name):
@@ -237,7 +237,7 @@ class BaseHandler:
         """
         if await SeriesManager.remove_series(series_name):
             await EnodoJobManager.cancel_jobs_for_series(series_name)
-            EnodoJobManager.remove_failed_jobs_for_series(series_name)
+            await EnodoJobManager.remove_failed_jobs_for_series(series_name)
             return 200
         return 404
 
@@ -314,9 +314,10 @@ class BaseHandler:
             EnodoJob.to_dict(j) for j in EnodoJobManager.get_failed_jobs()]}
 
     @classmethod
-    def resp_resolve_failed_job(cls, series_name):
+    async def resp_resolve_failed_job(cls, series_name):
         return {
-            'data': EnodoJobManager.remove_failed_jobs_for_series(series_name)}
+            'data': await EnodoJobManager.remove_failed_jobs_for_series(
+                series_name)}
 
     @classmethod
     def resp_get_possible_analyser_modules(cls):

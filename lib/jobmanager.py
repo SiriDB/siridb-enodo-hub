@@ -61,6 +61,7 @@ class EnodoJob(StoredResource):
     def to_store_data(self):
         return EnodoJob.to_dict(self)
 
+    @classmethod
     @property
     def resource_type(self):
         return "failed_jobs"
@@ -136,7 +137,7 @@ class EnodoJobManager:
             jobs.append(job)
         for job in jobs:
             async with cls._lock:
-                cls._deactivate_job(job)
+                await cls._deactivate_job(job)
             await cls._send_worker_cancel_job(job.worker_id, job.rid)
             series = await SeriesManager.get_series(job.series_name)
             series.set_job_status(job.job_config.config_name,
@@ -146,7 +147,7 @@ class EnodoJobManager:
             jobs.append(job)
         for job in jobs:
             cls._open_jobs.remove(job)
-            job.delete()
+            await job.delete()
             series = await SeriesManager.get_series(job.series_name)
             series.set_job_status(job.job_config.config_name,
                                   JOB_STATUS_NONE)
@@ -190,10 +191,10 @@ class EnodoJobManager:
         return jobs
 
     @classmethod
-    def remove_failed_jobs_for_series(cls, series_name: str):
+    async def remove_failed_jobs_for_series(cls, series_name: str):
         for job in cls.get_failed_jobs_for_series(series_name):
             cls._failed_jobs.remove(job)
-            job.delete()
+            await job.delete()
 
     @classmethod
     @cls_lock()
@@ -238,13 +239,13 @@ class EnodoJobManager:
                 j = job
                 break
 
-        cls._deactivate_job(j)
+        await cls._deactivate_job(j)
 
     @classmethod
-    def _deactivate_job(cls, job: EnodoJob):
+    async def _deactivate_job(cls, job: EnodoJob):
         if job in cls._active_jobs:
             cls._active_jobs.remove(job)
-            job.delete()
+            await job.delete()
             del cls._active_jobs_index[job.rid]
 
     @classmethod
@@ -269,7 +270,7 @@ class EnodoJobManager:
 
         for job in jobs:
             cls._open_jobs.remove(job)
-            job.delete()
+            await job.delete()
             if cls._update_queue_cb is not None:
                 await cls._update_queue_cb(
                     SUBSCRIPTION_CHANGE_TYPE_DELETE, job.rid)
@@ -282,7 +283,7 @@ class EnodoJobManager:
 
         for job in jobs:
             cls._active_jobs.remove(job)
-            job.delete()
+            await job.delete()
             if cls._update_queue_cb is not None:
                 await cls._update_queue_cb(
                     SUBSCRIPTION_CHANGE_TYPE_DELETE, job.rid)

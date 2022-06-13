@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import time
 
 import qpack
 from enodo.protocol.package import create_header, UPDATE_SERIES
@@ -18,7 +19,7 @@ from lib.siridb.siridb import (
 from lib.socket import ClientManager
 from lib.socketio import (SUBSCRIPTION_CHANGE_TYPE_ADD,
                           SUBSCRIPTION_CHANGE_TYPE_DELETE)
-from lib.state.resourcemanager import ResourceManager
+from lib.state.resource import ResourceManager
 
 
 class SeriesManager:
@@ -26,13 +27,16 @@ class SeriesManager:
     _labels_last_update = None
     _update_cb = None
     _srm = None  # Series Resource Manager
+    _schedule = {}
 
     @classmethod
     async def prepare(cls, update_cb=None):
         cls._update_cb = update_cb
         cls._labels_last_update = None
-        cls._srm = ResourceManager("series", Series)
+        cls._srm = ResourceManager("series", Series, True)
         await cls._srm.load()
+        async for series in cls._srm.itter():
+            ServerState.index_series_schedules(series)
 
     @classmethod
     async def series_changed(cls, change_type: str, series_name: str):
@@ -61,8 +65,9 @@ class SeriesManager:
             ServerState.get_siridb_data_conn(), series.get('name'))
         # If collected_datapoints is None, the series does not exist.
         if collected_datapoints is not None:
-            resp = await cls._srm.create_resource(series)
+            resp = await Series.create(series)
             resp.state.datapoint_count = collected_datapoints
+            await resp.store()
             asyncio.ensure_future(cls.series_changed(
                 SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name')))
             asyncio.ensure_future(
@@ -81,8 +86,7 @@ class SeriesManager:
     @classmethod
     async def get_listener_series_info(cls):
         resp = []
-        for series_co in cls._srm.itter():
-            series = await series_co
+        async for series in cls._srm.itter():
             if series is not None:
                 resp.append({"name": series.rid,
                              "realtime": series.config.realtime})
@@ -127,22 +131,21 @@ class SeriesManager:
     @classmethod
     async def get_ignored_series_count(cls):
         count = 0
-        for series_co in cls._srm.itter():
-            series = await series_co
+        async for series in cls._srm.itter():
             if series.is_ignored is True:
                 count += 1
 
         return count
 
     @classmethod
-    async def get_series_to_dict(cls, regex_filter=None):
-        series = await cls._srm.get_resources()
+    def get_all_series_names(cls, regex_filter=None):
+        series_names = cls._srm.get_resource_rids()
         if regex_filter is not None:
             pattern = re.compile(regex_filter)
             return [
-                series.to_dict() for series in series if
-                pattern.match(series.name)]
-        return [series.to_dict() for series in series]
+                series_name for series_name in series_names if
+                pattern.match(series_name)]
+        return series_names
 
     @classmethod
     async def remove_series(cls, series_name):

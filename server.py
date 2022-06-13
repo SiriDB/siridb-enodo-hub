@@ -15,6 +15,7 @@ from enodo.protocol.package import LISTENER_NEW_SERIES_POINTS, \
     WORKER_JOB_CANCELLED
 from enodo.jobs import JOB_STATUS_NONE, JOB_STATUS_DONE
 from lib.state.diskstorage import DiskStorage
+from lib.state.thingsdbstorage import ThingsDBStorage
 
 from lib.webserver.apihandlers import ApiHandlers, auth
 from lib.config import Config
@@ -32,6 +33,7 @@ from lib.socketio.socketiohandlers import SocketIoHandler
 from lib.socketio.socketiorouter import SocketIoRouter
 from lib.util import print_custom_aiohttp_startup_message
 from lib.webserver.routes import setup_routes
+from lib.state.resource import resource_manager_index
 from version import VERSION
 
 
@@ -68,8 +70,13 @@ class Server:
                 lambda: asyncio.ensure_future(self.stop_server()))
 
         # Setup server state object
+        if Config.storage_type == "thingsdb":
+            storage = ThingsDBStorage()
+        else:
+            storage = DiskStorage(Config.base_dir)
+        await storage.startup()
         await ServerState.async_setup(sio=self.sio,
-                                      storage=DiskStorage(Config.base_dir))
+                                      storage=storage)
 
         # Setup internal security token for authenticating
         # backend socket connections
@@ -104,7 +111,6 @@ class Server:
             SocketIoHandler.internal_updates_queue_subscribers)
         await EnodoJobManager.load_from_disk()
         await EnodoEventManager.async_setup()
-        await EnodoEventManager.load_from_disk()
         await ClientManager.load_from_disk()
 
         scheduler = ServerState.scheduler
@@ -114,6 +120,8 @@ class Server:
         self._connection_management_task = await scheduler.spawn(
             self._manage_connections())
         self._watch_tasks_task = await scheduler.spawn(self.watch_tasks())
+        self._cleanup_resource_managers = await scheduler.spawn(
+            self.clean_resource_manager())
 
         # Open backend socket connection
         await self.backend_socket.create()
@@ -125,6 +133,12 @@ class Server:
         await ServerState.storage.close()
         await ServerState.scheduler.close()
         await self.backend_socket.stop()
+
+    async def clean_resource_manager(self):
+        while ServerState.running:
+            for manager in resource_manager_index.values():
+                await manager.cleanup()
+            await asyncio.sleep(10)
 
     async def wait_for_queue(self):
         """Wait for queue to be empty or until max amount of seconds
@@ -293,6 +307,8 @@ class Server:
         logging.info('...Doing clean up')
         await self.clean_up()
 
+        if ServerState.storage is not None:
+            await ServerState.storage.close()
         ServerState.stop()
 
         logging.info('...Stopping all running tasks')

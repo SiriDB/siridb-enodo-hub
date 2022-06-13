@@ -18,7 +18,8 @@ EMPTY_CONFIG_FILE = {
         'save_to_disk_interval': '20',
         'enable_rest_api': 'true',
         'enable_socket_io_api': 'false',
-        'disable_safe_mode': 'false'
+        'disable_safe_mode': 'false',
+        'storage_type': 'disk'
     },
     'analyser': {
         'watcher_interval': '2',
@@ -113,6 +114,7 @@ class Config:
     internal_security_token = None
     jobs_save_path = None
     disable_safe_mode = None
+    storage_type = None
 
     # Enodo Events
     max_in_queue_before_warning = None
@@ -268,13 +270,25 @@ class Config:
         cls.event_outputs_save_path = os.path.join(
             cls.base_dir, 'data/outputs.json')
 
+        cls.storage_type = cls._config.get_r('hub', 'storage_type')
+
+        # ThingsDB
+        cls.thingsdb_host = cls._config.get_r('thingsdb', 'host', False)
+        cls.thingsdb_port = cls.to_int(
+            cls._config.get_r('thingsdb', 'port', False))
+        cls.thingsdb_user = cls._config.get_r('thingsdb', 'user', False)
+        cls.thingsdb_password = cls._config.get_r(
+            'thingsdb', 'password', False)
+
         # SiriDB
         cls.siridb_host = cls._config.get_r('siridb_data', 'host')
         cls.siridb_port = cls.to_int(
             cls._config.get_r('siridb_data', 'port'))
         cls.siridb_user = cls._config.get_r('siridb_data', 'user')
-        cls.siridb_password = cls._config.get_r('siridb_data', 'password')
-        cls.siridb_database = cls._config.get_r('siridb_data', 'database')
+        cls.siridb_password = cls._config.get_r(
+            'siridb_data', 'password')
+        cls.siridb_database = cls._config.get_r(
+            'siridb_data', 'database')
 
         # SiriDB Forecast
         cls.siridb_output_host = cls._config.get_r(

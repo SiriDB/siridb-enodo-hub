@@ -41,7 +41,7 @@ class ApiHandlers:
         # TODO implement filter
 
         return web.json_response(
-            data=await BaseHandler.resp_get_monitored_series(regex_filter),
+            data=BaseHandler.resp_get_monitored_series(regex_filter),
             dumps=safe_json_dumps)
 
     @classmethod
@@ -240,7 +240,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp, status = BaseHandler.resp_get_event_outputs()
+        resp, status = await BaseHandler.resp_get_event_outputs()
         return web.json_response(data=resp, status=status)
 
     @classmethod

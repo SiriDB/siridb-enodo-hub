@@ -113,6 +113,7 @@ class WorkerClient(EnodoClient):
     def get_config(self) -> WorkerConfigModel:
         return self.worker_config
 
+    @classmethod
     @property
     def resource_type(self):
         return "workers"
