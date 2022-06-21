@@ -6,11 +6,13 @@ from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_NONE, \
     JOB_STATUS_DONE, JOB_STATUS_FAILED
 from enodo.model.config.series import SeriesConfigModel, SeriesState, \
     SeriesJobConfigModel
+from lib.serverstate import ServerState
 
 from lib.socket.clientmanager import ClientManager
+from lib.state.resource import StoredResource
 
 
-class Series:
+class Series(StoredResource):
     __slots__ = ('rid', 'name', 'config', 'state',
                  '_datapoint_count_lock', 'series_characteristics')
 
@@ -27,6 +29,7 @@ class Series:
         self.state = SeriesState() if state is None else SeriesState(**state)
         self.series_characteristics = series_characteristics
         self._datapoint_count_lock = asyncio.Lock()
+        self.lock = asyncio.Lock()
 
     def get_errors(self) -> list:
         # To stop circular import
@@ -42,13 +45,13 @@ class Series:
         from ..jobmanager import EnodoJobManager
         return EnodoJobManager.has_series_failed_jobs(self.name)
 
-    async def get_module(self, job_name: str) -> SeriesJobConfigModel:
+    def get_module(self, job_name: str) -> SeriesJobConfigModel:
         return self.config.get_config_for_job(job_name).module
 
-    async def get_job_status(self, job_config_name: str) -> int:
+    def get_job_status(self, job_config_name: str) -> int:
         return self.state.get_job_status(job_config_name)
 
-    async def set_job_status(self, config_name: str, status: int):
+    def set_job_status(self, config_name: str, status: int):
         self.state.set_job_status(config_name, status)
 
     @property
@@ -69,6 +72,15 @@ class Series:
             return False
         return self.state.get_job_status(job_config.config_name)
 
+    def add_job_config(self, job_config):
+        self.config.add_config_for_job(job_config)
+
+    def remove_job_config(self, job_config_name):
+        removed = self.config.remove_config_for_job(
+            job_config_name)
+        self.state.remove_job_state(job_config_name)
+        return removed
+
     def get_datapoints_count(self) -> int:
         return self.state.datapoint_count
 
@@ -81,7 +93,7 @@ class Series:
         async with self._datapoint_count_lock:
             self.state.datapoint_count += add_to_count
 
-    async def schedule_job(self, job_config_name: str, initial=False):
+    def schedule_job(self, job_config_name: str, initial=False):
         job_config = self.config.get_config_for_job(job_config_name)
         if job_config is None:
             return False
@@ -109,8 +121,9 @@ class Series:
         if next_value is not None:
             job_schedule['value'] = next_value
             self.state.set_job_schedule(job_config_name, job_schedule)
+        ServerState.index_series_schedules(self)
 
-    async def is_job_due(self, job_config_name: str) -> bool:
+    def is_job_due(self, job_config_name: str) -> bool:
         job_status = self.state.get_job_status(job_config_name)
         job_schedule = self.state.get_job_schedule(job_config_name)
 
@@ -151,12 +164,21 @@ class Series:
         config = data.get('config')
         if config is not None:
             self.config = SeriesConfigModel(**config)
-
         return True
+
+    @classmethod
+    @property
+    def resource_type(self):
+        return "series"
+
+    @property
+    def to_store_data(self):
+        return self.to_dict(static_only=True)
 
     def to_dict(self, static_only=False) -> dict:
         if static_only:
             return {
+                'rid': self.rid,
                 'name': self.name,
                 'state': self.state,
                 'config': self.config,

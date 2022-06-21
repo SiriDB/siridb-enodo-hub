@@ -1,10 +1,9 @@
-from json import JSONDecodeError
 import urllib.parse
+from json import JSONDecodeError
 from urllib.parse import unquote
+
 from aiohttp import web
-
 from aiohttp_basicauth import BasicAuthMiddleware
-
 from lib.config import Config
 from lib.serverstate import ServerState
 from lib.socket import ClientManager
@@ -18,7 +17,7 @@ auth = BasicAuthMiddleware(username=None, password=None, force=False)
 class ApiHandlers:
 
     @classmethod
-    async def prepare(cls):
+    def prepare(cls):
         EnodoAuth.auth.username = Config.basic_auth_username
         EnodoAuth.auth.password = Config.basic_auth_password
 
@@ -42,7 +41,7 @@ class ApiHandlers:
         # TODO implement filter
 
         return web.json_response(
-            data=await BaseHandler.resp_get_monitored_series(regex_filter),
+            data=BaseHandler.resp_get_monitored_series(regex_filter),
             dumps=safe_json_dumps)
 
     @classmethod
@@ -64,7 +63,7 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
-    async def get_series_forecast(cls, request):
+    async def get_all_series_output(cls, request):
         """Returns forecast data of a specific series.
 
         Args:
@@ -76,8 +75,26 @@ class ApiHandlers:
         series_name = unquote(request.match_info['series_name'])
 
         return web.json_response(
-            data=await BaseHandler.resp_get_series_forecasts(
+            data=await BaseHandler.resp_get_all_series_output(
                 series_name), dumps=safe_json_dumps)
+
+    @classmethod
+    @EnodoAuth.auth.required
+    async def get_series_forecast(cls, request):
+        """Returns forecast data of a specific series.
+
+        Args:
+            request (Request): aiohttp request
+
+        Returns:
+            _type_: _description_
+        """
+        series_name = unquote(request.match_info['series_name'])
+        only_future = True if "future" in request.rel_url.query else False
+
+        return web.json_response(
+            data=await BaseHandler.resp_get_series_forecasts(
+                series_name, only_future), dumps=safe_json_dumps)
 
     @classmethod
     @EnodoAuth.auth.required
@@ -282,7 +299,7 @@ class ApiHandlers:
         """
 
         return web.json_response(
-            data=await BaseHandler.resp_get_possible_analyser_modules(),
+            data=BaseHandler.resp_get_possible_analyser_modules(),
             status=200)
 
     @classmethod
@@ -296,7 +313,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp = await BaseHandler.resp_get_enodo_hub_status()
+        resp = BaseHandler.resp_get_enodo_hub_status()
         return web.json_response(data=resp, status=200)
 
     @classmethod
@@ -352,7 +369,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp = await BaseHandler.resp_get_enodo_config()
+        resp = BaseHandler.resp_get_enodo_config()
         return web.json_response(data=resp, status=200)
 
     @classmethod
@@ -370,7 +387,7 @@ class ApiHandlers:
             key/value pairs settings
         """
         data = await request.json()
-        resp = await BaseHandler.resp_set_config(data)
+        resp = BaseHandler.resp_set_config(data)
         return web.json_response(data=resp, status=200)
 
     @classmethod
@@ -421,7 +438,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp = await BaseHandler.resp_get_enodo_labels()
+        resp = BaseHandler.resp_get_enodo_labels()
         return web.json_response(data={
             'data': resp}, status=200)
 

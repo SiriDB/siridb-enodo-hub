@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta3.2.14] - 2022-06-21
+
+### Added
+- Endpoint for fetching all analysis results for a series (for all job types)
+- Query param `future` for the `api/series/anomaly_test_series/forecasts` endpoint, to only return points in the future
+- Added thingsdb support for saving hub state
+
 ## [0.1.0-beta3.2.13] - 2022-06-08
 
 ### Added

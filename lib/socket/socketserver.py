@@ -161,7 +161,7 @@ class SocketServer:
 
         if client_data.get('client_type') == 'listener':
             update = qpack.packb(
-                SeriesManager.get_listener_series_info())
+                await SeriesManager.get_listener_series_info())
             header = create_header(
                 len(update),
                 UPDATE_SERIES, packet_id)

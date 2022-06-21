@@ -1,5 +1,6 @@
 from asyncio import Lock
 import logging
+import time
 
 from aiojobs import create_scheduler
 from siridb.connector import SiriDBClient
@@ -21,19 +22,21 @@ class ServerState:
     siridb_ts_unit = {}
     readiness = None
     scheduler = None
+    storage = None
+    job_schedule_index = {}
 
     @classmethod
-    async def async_setup(cls, sio):
+    async def async_setup(cls, sio, storage):
         cls.running = True
         cls.work_queue = True
         cls.readiness = False
         cls.sio = sio
         cls.siridb_data_client_lock = Lock()
         cls.siridb_output_client_lock = Lock()
+        cls.storage = storage
 
         cls.tasks_last_runs = {
             'watch_series': None,
-            'save_to_disk': None,
             'check_jobs': None,
             'manage_connections': None
         }
@@ -133,6 +136,32 @@ class ServerState:
         if cls.siridb_output_client is None:
             return cls.siridb_data_client.connected
         return cls.siridb_output_client.connected
+
+    @classmethod
+    def index_series_schedules(cls, series):
+        job_schedules = series.state.get_all_job_schedules()
+        earliest = None
+        for job_config_name in series.config.job_config:
+            schedule = job_schedules.get(job_config_name)
+            next_ts = None
+            if schedule is None:
+                next_ts = int(time.time())
+            else:
+                if schedule["type"] == "N":
+                    if series.state.interval is not None:
+                        points_left = int(schedule["value"] -
+                                          series.get_datapoints_count())
+                        if points_left < 0:
+                            points_left = 0
+                        next_ts = int(
+                            time.time() + int(series.state.interval) *
+                            points_left)
+                elif schedule["type"] == "TS":
+                    next_ts = int(schedule["value"])
+            if next_ts is not None:
+                if earliest is None or next_ts < earliest:
+                    earliest = next_ts
+        cls.job_schedule_index[series.rid] = earliest
 
     @classmethod
     async def refresh_siridb_status(cls):
