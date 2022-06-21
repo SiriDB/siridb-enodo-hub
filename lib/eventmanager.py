@@ -231,7 +231,9 @@ class EnodoEventManager:
     @classmethod
     async def create_event_output(cls, output_type, data):
         data["rid"] = cls._get_next_output_id()
-        output = await cls._erm.create_resource(data)
+        output = None
+        async with cls._erm.create_resource(data) as resp:
+            output = resp
         # output = EnodoEventOutput.create(output_type, data)
         # cls.outputs.append(output)
         # asyncio.ensure_future(internal_updates_event_output_subscribers(

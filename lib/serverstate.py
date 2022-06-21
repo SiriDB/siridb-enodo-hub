@@ -149,8 +149,13 @@ class ServerState:
             else:
                 if schedule["type"] == "N":
                     if series.state.interval is not None:
+                        points_left = int(schedule["value"] -
+                                          series.get_datapoints_count())
+                        if points_left < 0:
+                            points_left = 0
                         next_ts = int(
-                            series.state.interval) * int(schedule["value"])
+                            time.time() + int(series.state.interval) *
+                            points_left)
                 elif schedule["type"] == "TS":
                     next_ts = int(schedule["value"])
             if next_ts is not None:

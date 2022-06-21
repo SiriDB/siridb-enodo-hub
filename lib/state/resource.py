@@ -1,4 +1,6 @@
 from asyncio import ensure_future
+import time
+import contextlib
 from typing import Any
 from abc import abstractproperty
 import functools
@@ -11,6 +13,7 @@ resource_manager_index = {}
 class StoredResource:
 
     _is_deleted = None
+    _last_accessed = None
 
     @staticmethod
     def async_changed(func):
@@ -33,12 +36,14 @@ class StoredResource:
 
     async def store(self):
         if self.should_be_stored and not self._is_deleted:
+            resource_manager_index[self.resource_type].set_cache(self)
             await ServerState.storage.store(self)
 
     @classmethod
     async def create(cls, data):
         rm = resource_manager_index[cls.resource_type]
-        return await rm.create_resource(data)
+        async with rm.create_resource(data) as rc:
+            return rc
 
     async def delete(self):
         if self.should_be_stored:
@@ -95,26 +100,35 @@ class ResourceManager:
         self._resources = {}
         resource_manager_index[resource_type] = self
 
-    async def cleanup(self):
+    def cleanup(self):
         rids = self.get_resource_rids()
         for rid in rids:
-            self._resources[rid] = None
+            if self._resources[rid] is None:
+                continue
+            if self._resources[rid]._last_accessed is None or int(
+                    time.time() - self._resources[rid]._last_accessed) > 60:
+                self._resources[rid] = None
 
     async def load(self):
         rids = await ServerState.storage.get_all_rids_for_type(
             self._resource_type)
         self._resources = {rid: None for rid in rids}
 
+    @contextlib.asynccontextmanager
     async def create_resource(self, resource: dict):
         rc = self._resource_class(**resource)
+        yield rc
         await rc.store()
         self._resources[rc.rid] = rc
-        ServerState.index_series_schedules(rc)
-        return rc
+        if self._resource_type == "series":
+            ServerState.index_series_schedules(rc)
 
     async def delete_resource(self, resource: StoredResource):
         del self._resources[resource.rid]
         await resource.delete()
+
+    def set_cache(self, resource):
+        self._resources[resource.rid] = resource
 
     async def get_resource(self, rid: str) -> StoredResource:
         if rid not in self._resources:
@@ -124,6 +138,7 @@ class ResourceManager:
                 self._resource_class(**(
                     await ServerState.storage.load_by_type_and_rid(
                         self._resource_type, rid)))
+        self._resources[rid]._last_accessed = time.time()
         return self._resources[rid]
 
     def get_resource_rids(self) -> list:

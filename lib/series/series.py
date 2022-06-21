@@ -29,6 +29,7 @@ class Series(StoredResource):
         self.state = SeriesState() if state is None else SeriesState(**state)
         self.series_characteristics = series_characteristics
         self._datapoint_count_lock = asyncio.Lock()
+        self.lock = asyncio.Lock()
 
     def get_errors(self) -> list:
         # To stop circular import
@@ -50,7 +51,6 @@ class Series(StoredResource):
     def get_job_status(self, job_config_name: str) -> int:
         return self.state.get_job_status(job_config_name)
 
-    @StoredResource.changed
     def set_job_status(self, config_name: str, status: int):
         self.state.set_job_status(config_name, status)
 
@@ -72,11 +72,9 @@ class Series(StoredResource):
             return False
         return self.state.get_job_status(job_config.config_name)
 
-    @StoredResource.changed
     def add_job_config(self, job_config):
         self.config.add_config_for_job(job_config)
 
-    @StoredResource.changed
     def remove_job_config(self, job_config_name):
         removed = self.config.remove_config_for_job(
             job_config_name)
@@ -86,7 +84,6 @@ class Series(StoredResource):
     def get_datapoints_count(self) -> int:
         return self.state.datapoint_count
 
-    @StoredResource.async_changed
     async def add_to_datapoints_count(self, add_to_count: int):
         """
         Add value to existing value of data points counter
@@ -96,7 +93,6 @@ class Series(StoredResource):
         async with self._datapoint_count_lock:
             self.state.datapoint_count += add_to_count
 
-    @StoredResource.changed
     def schedule_job(self, job_config_name: str, initial=False):
         job_config = self.config.get_config_for_job(job_config_name)
         if job_config is None:
@@ -164,7 +160,6 @@ class Series(StoredResource):
             job_config_name, "Not yet scheduled")
         return False
 
-    @StoredResource.changed
     def update(self, data: dict) -> bool:
         config = data.get('config')
         if config is not None:

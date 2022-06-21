@@ -136,8 +136,9 @@ class Server:
 
     async def clean_resource_manager(self):
         while ServerState.running:
+            logging.debug("Cleaning resource manager caches")
             for manager in resource_manager_index.values():
-                await manager.cleanup()
+                manager.cleanup()
             await asyncio.sleep(10)
 
     async def wait_for_queue(self):
@@ -210,16 +211,16 @@ class Server:
         # Check if series does have any failed jobs
         if len(EnodoJobManager.get_failed_jobs_for_series(series_name)) > 0:
             return
-
         # Check if base analysis has already run
         if series.base_analysis_status() == JOB_STATUS_NONE:
             base_analysis_job = series.base_analysis_job
             module = ClientManager.get_module(
                 base_analysis_job.module)
             if module is None:
-                series.state.set_job_check_status(
-                    base_analysis_job.config_name,
-                    "Unknown module")
+                async with SeriesManager.get_series(series_name) as s:
+                    s.state.set_job_check_status(
+                        base_analysis_job.config_name,
+                        "Unknown module")
                 return
             await EnodoJobManager.create_job(
                 base_analysis_job.config_name, series_name)
@@ -236,7 +237,8 @@ class Server:
                 continue
             if job_config_name not in job_schedules:
                 # Job has not been schedules yet, let's add it
-                series.schedule_job(job_config_name, initial=True)
+                async with SeriesManager.get_series(series_name) as s:
+                    s.schedule_job(job_config_name, initial=True)
 
     async def watch_series(self):
         """Background task to check each series if
@@ -246,9 +248,10 @@ class Server:
             ServerState.tasks_last_runs['watch_series'] = \
                 datetime.datetime.now()
 
-            series_names = SeriesManager.get_all_series()
-            for series_name in series_names:
-                series = await SeriesManager.get_series(series_name)
+            for series_name, ts in ServerState.job_schedule_index.items():
+                if ts > time():
+                    continue
+                series = await SeriesManager.get_series_read_only(series_name)
                 # Check if series is valid and not ignored
                 if series is None or series.is_ignored():
                     continue
@@ -260,14 +263,16 @@ class Server:
                     if series.get_datapoints_count() < \
                             series.config.min_data_points:
                         continue
-                elif series.get_datapoints_count() < Config.min_data_points:
+                elif series.get_datapoints_count() < \
+                        Config.min_data_points:
                     continue
 
                 try:
                     await self._check_for_jobs(series, series_name)
                 except Exception as e:
                     logging.error(
-                        f"Something went wrong when trying to create new job")
+                        f"Something went wrong when "
+                        "trying to create new job")
                     logging.debug(
                         f"Corresponding error: {e}, "
                         f'exception class: {e.__class__.__name__}')

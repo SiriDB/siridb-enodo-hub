@@ -11,7 +11,7 @@ from enodo.model.config.worker import (WORKER_MODE_DEDICATED_JOB_TYPE,
 from enodo.protocol.package import UPDATE_SERIES, create_header
 from enodo.jobs import JOB_STATUS_OPEN
 from lib.serverstate import ServerState
-from lib.state.resource import StoredResource
+from lib.state.resource import ResourceManager, StoredResource
 from lib.eventmanager import (ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE,
                               EnodoEvent, EnodoEventManager)
 
@@ -147,10 +147,14 @@ class ClientManager:
     _dedicated_for_series = {}
     _dedicated_for_job_type = {}
 
+    _crm = None
+
     @classmethod
     async def setup(cls, series_manager):
         cls.series_manager = series_manager
         await cls._refresh_dedicated_cache()
+        cls._crm = ResourceManager("workers", WorkerClient, True)
+        await cls._crm.load()
 
     @classmethod
     @property
@@ -221,11 +225,15 @@ class ClientManager:
         client_id = client_data.get('client_id')
         if client_id not in cls.workers:
             logging.info(f'New worker with id: {client_id} connected')
-            client = WorkerClient(client_id, peername, writer,
-                                  client_data.get('module'),
-                                  client_data.get('lib_version', None),
-                                  busy=client_data.get('busy', None),
-                                  online=True)
+            client = await WorkerClient.create({
+                "client_id": client_id,
+                "ip_address": peername,
+                "writer": writer,
+                "module": client_data.get('module'),
+                "lib_version": client_data.get('lib_version', None),
+                "busy": client_data.get('busy', None),
+                "online": True
+            })
             await cls.add_client(client)
         else:
             logging.info(f'Known worker with id: {client_id} connected')
@@ -359,18 +367,17 @@ class ClientManager:
     async def check_for_pending_series(cls, client: WorkerClient):
         # To stop circular import
         from ..jobmanager import EnodoJobManager
+        from ..series.seriesmanager import SeriesManager
         pending_jobs = EnodoJobManager.get_active_jobs_by_worker(
             client.client_id)
         if len(pending_jobs) > 0:
             for job in pending_jobs:
                 await EnodoJobManager.cancel_job(job)
-                series = await cls.series_manager.get_series(job.series_name)
-                series.set_job_status(
-                    job.job_config.config_name, JOB_STATUS_OPEN)
-                await series.set_job_status(
-                    job.job_config.config_name, JOB_STATUS_OPEN)
-                logging.info(
-                    f'Setting for series job status pending to false...')
+                async with SeriesManager.get_series(job.series_name) as series:
+                    series.set_job_status(
+                        job.job_config.config_name, JOB_STATUS_OPEN)
+                    logging.info(
+                        f'Setting for series job status pending to false...')
 
     @ classmethod
     async def load_from_disk(cls):

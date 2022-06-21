@@ -116,6 +116,12 @@ class Config:
     disable_safe_mode = None
     storage_type = None
 
+    # ThingsDB
+    thingsdb_host = None
+    thingsdb_port = None
+    thingsdb_auth_token = None
+    thingsdb_scope = None
+
     # Enodo Events
     max_in_queue_before_warning = None
 
@@ -273,12 +279,15 @@ class Config:
         cls.storage_type = cls._config.get_r('hub', 'storage_type')
 
         # ThingsDB
-        cls.thingsdb_host = cls._config.get_r('thingsdb', 'host', False)
+        thingsdb_enabled = cls.storage_type == "thingsdb"
+        cls.thingsdb_host = cls._config.get_r(
+            'thingsdb', 'host', thingsdb_enabled)
         cls.thingsdb_port = cls.to_int(
-            cls._config.get_r('thingsdb', 'port', False))
-        cls.thingsdb_user = cls._config.get_r('thingsdb', 'user', False)
-        cls.thingsdb_password = cls._config.get_r(
-            'thingsdb', 'password', False)
+            cls._config.get_r('thingsdb', 'port', thingsdb_enabled))
+        cls.thingsdb_auth_token = cls._config.get_r(
+            'thingsdb', 'auth_token', thingsdb_enabled)
+        cls.thingsdb_scope = cls._config.get_r(
+            'thingsdb', 'scope', thingsdb_enabled)
 
         # SiriDB
         cls.siridb_host = cls._config.get_r('siridb_data', 'host')

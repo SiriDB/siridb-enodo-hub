@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 import re
 import time
@@ -40,14 +41,16 @@ class SeriesManager:
 
     @classmethod
     async def series_changed(cls, change_type: str, series_name: str):
-        if cls._update_cb is not None:
-            if change_type == "delete":
-                await cls._update_cb(change_type, series_name, series_name)
-            else:
-                await cls._update_cb(
-                    change_type,
-                    (await cls.get_series(series_name)).to_dict(),
-                    series_name)
+        pass
+        # if cls._update_cb is not None:
+        #     if change_type == "delete":
+        #         await cls._update_cb(change_type, series_name, series_name)
+        #     else:
+        #         async with SeriesManager.get_series(series_name) as series:
+        #             await cls._update_cb(
+        #                 change_type,
+        #                 series.to_dict(),
+        #                 series_name)
 
     @classmethod
     async def add_series(cls, series: dict):
@@ -65,9 +68,8 @@ class SeriesManager:
             ServerState.get_siridb_data_conn(), series.get('name'))
         # If collected_datapoints is None, the series does not exist.
         if collected_datapoints is not None:
-            resp = await Series.create(series)
-            resp.state.datapoint_count = collected_datapoints
-            await resp.store()
+            async with cls._srm.create_resource(series) as resp:
+                resp.state.datapoint_count = collected_datapoints
             asyncio.ensure_future(cls.series_changed(
                 SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name')))
             asyncio.ensure_future(
@@ -76,7 +78,18 @@ class SeriesManager:
         return None
 
     @classmethod
+    @contextlib.asynccontextmanager
     async def get_series(cls, series_name):
+        series = await cls._srm.get_resource(series_name)
+        if series is None:
+            yield None
+            return
+        async with series.lock:
+            yield series
+            await series.store()
+
+    @classmethod
+    async def get_series_read_only(cls, series_name):
         return await cls._srm.get_resource(series_name)
 
     @classmethod
@@ -162,6 +175,8 @@ class SeriesManager:
 
     @classmethod
     async def cleanup_series(cls, series_name):
+        if series_name in ServerState.job_schedule_index:
+            del ServerState.job_schedule_index[series_name]
         await drop_series(
             ServerState.get_siridb_output_conn(),
             f"/enodo_{re.escape(series_name)}.*?.*?$/")
