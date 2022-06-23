@@ -5,7 +5,7 @@ from lib.state.resource import StoredResource
 
 # {
 #    "name":"Static rules on Forecast template",
-#    "description":"Apply static rules on the result of a forecast job. Used to see if any threshold will be hit in the future",
+#    "description":"Apply static rules on the result of a forecast job",
 #    "category":"thresholds",
 #    "job_config_template":{
 #       "activated":true,
