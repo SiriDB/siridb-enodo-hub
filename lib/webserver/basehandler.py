@@ -1,5 +1,5 @@
-import asyncio
 import logging
+from uuid import uuid4
 from aiohttp import web
 
 from siridb.connector.lib.exceptions import QueryError, InsertError, \
@@ -12,6 +12,7 @@ from enodo.model.config.series import SeriesConfigModel
 from lib.config import Config
 from lib.eventmanager import EnodoEventManager
 from lib.jobmanager import EnodoJob, EnodoJobManager
+from lib.series.jobtemplate import SeriesJobConfigTemplate
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
 from lib.siridb.siridb import (
@@ -19,6 +20,7 @@ from lib.siridb.siridb import (
     query_series_static_rules_hits, query_all_series_results)
 from lib.socket.clientmanager import ClientManager
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
+from lib.state.resource import ResourceManager
 from lib.util import regex_valid
 from siridb.connector.lib.exceptions import (
     AuthenticationError, InsertError, PoolError, QueryError,
@@ -223,7 +225,7 @@ class BaseHandler:
             return {'error': 'Something went wrong when adding the series. '
                     'Series does not exists'}, 400
 
-        return {'data': SeriesManager.get_all_series_names()}, 201
+        return {'data': True}, 201
 
     @classmethod
     async def resp_remove_series(cls, series_name):
@@ -296,6 +298,46 @@ class BaseHandler:
                     f"from series {series_name}")
                 return {"data": {"successful": removed}}, 200 \
                     if removed else 404
+
+    @classmethod
+    async def resp_get_job_config_templates(cls, job_type):
+        trm = ResourceManager(
+            "job_config_templates", SeriesJobConfigTemplate, 0)
+        await trm.load()
+        templates = []
+        async for template in trm.itter():
+            if template.job_config_template.job_type == job_type:
+                templates.append(template)
+
+        return {'data': templates}, 200
+
+    @classmethod
+    async def resp_add_job_config_templates(cls, job_template: dict):
+        trm = ResourceManager(
+            "job_config_templates", SeriesJobConfigTemplate, 0)
+        await trm.load()
+        if trm.rid_exists(job_template.get("rid")):
+            return {'error': "template already exists"}, 400
+
+        if job_template.get("rid") is None:
+            job_template["rid"] = str(uuid4()).replace("-", "")
+
+        async with trm.create_resource(job_template) as template:
+            return {'data': template}, 201
+
+    @classmethod
+    async def resp_remove_job_config_templates(cls, rid: str):
+        trm = ResourceManager(
+            "job_config_templates", SeriesJobConfigTemplate, 0)
+        await trm.load()
+
+        if not trm.rid_exists(rid):
+            return {'error': "template does not exists"}, 404
+
+        template = await trm.get_resource(rid)
+        await trm.delete_resource(template)
+
+        return {'data': None}, 200
 
     @classmethod
     def resp_get_jobs_queue(cls):

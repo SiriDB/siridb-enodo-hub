@@ -221,7 +221,7 @@ class EnodoEventManager:
     async def async_setup(cls):
         cls._lock = asyncio.Lock()
         cls._erm = ResourceManager(
-            "outputs", EnodoEventOutputWebhook, True)
+            "outputs", EnodoEventOutputWebhook, 50)
         await cls._erm.load()
 
     @classmethod
