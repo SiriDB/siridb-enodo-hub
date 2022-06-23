@@ -1,10 +1,10 @@
 from asyncio import ensure_future
-import time
 import contextlib
 from typing import Any
 from abc import abstractproperty
 import functools
 from lib.serverstate import ServerState
+from lib.state.lruqueue import LRUQueue
 
 
 resource_manager_index = {}
@@ -93,33 +93,30 @@ class ResourceManager:
 
     def __init__(
             self, resource_type: str, resource_class: Any,
-            keep_in_memory=False):
+            keep_in_memory=120):
         self._resource_type = resource_type
         self._resource_class = resource_class
-        self._keep_in_memory = keep_in_memory
         self._resources = {}
+        self._lruqueue = LRUQueue(keep_in_memory)
         resource_manager_index[resource_type] = self
+        self._loaded = False
 
     def cleanup(self):
-        rids = self.get_resource_rids()
-        for rid in rids:
-            if self._resources[rid] is None:
-                continue
-            if self._resources[rid]._last_accessed is None or int(
-                    time.time() - self._resources[rid]._last_accessed) > 60:
-                self._resources[rid] = None
+        pass
 
     async def load(self):
-        rids = await ServerState.storage.get_all_rids_for_type(
-            self._resource_type)
-        self._resources = {rid: None for rid in rids}
+        if not self._loaded:
+            rids = await ServerState.storage.get_all_rids_for_type(
+                self._resource_type)
+            self._resources = {rid: None for rid in rids}
+            self._loaded = True
 
     @contextlib.asynccontextmanager
     async def create_resource(self, resource: dict):
         rc = self._resource_class(**resource)
         yield rc
         await rc.store()
-        self._resources[rc.rid] = rc
+        self._resources[rc.rid] = None
         if self._resource_type == "series":
             ServerState.index_series_schedules(rc)
 
@@ -128,18 +125,19 @@ class ResourceManager:
         await resource.delete()
 
     def set_cache(self, resource):
-        self._resources[resource.rid] = resource
+        self._lruqueue.put(resource.rid, resource)
 
     async def get_resource(self, rid: str) -> StoredResource:
         if rid not in self._resources:
             return None
-        if self._resources[rid] is None:
-            self._resources[rid] = \
+        resp = self._lruqueue.get(rid)
+        if resp is None:
+            resp = \
                 self._resource_class(**(
                     await ServerState.storage.load_by_type_and_rid(
                         self._resource_type, rid)))
-        self._resources[rid]._last_accessed = time.time()
-        return self._resources[rid]
+            self._lruqueue.put(rid, resp)
+        return resp
 
     def get_resource_rids(self) -> list:
         return list(self._resources.keys())
@@ -151,7 +149,7 @@ class ResourceManager:
         return len(self._resources)
 
     async def itter(self):
-        rids = list(self.get_resource_rids())
+        rids = self.get_resource_rids()
         for rid in rids:
             resp = await self.get_resource(rid)
             yield resp

@@ -55,7 +55,7 @@ class EnodoConfigParser(RawConfigParser):
         self.env_support = env_support
         super(EnodoConfigParser, self).__init__(**kwargs)
 
-    def get_r(self, section, option, required=True, default=None):
+    def get_r(self, section, option, required=True, default=None) -> str:
         value = None
         try:
             value = RawConfigParser.get(self, section, option)
@@ -276,7 +276,8 @@ class Config:
         cls.event_outputs_save_path = os.path.join(
             cls.base_dir, 'data/outputs.json')
 
-        cls.storage_type = cls._config.get_r('hub', 'storage_type')
+        cls.storage_type = cls._config.get_r(
+            'hub', 'storage_type').lower()
 
         # ThingsDB
         thingsdb_enabled = cls.storage_type == "thingsdb"

@@ -34,7 +34,7 @@ class SeriesManager:
     async def prepare(cls, update_cb=None):
         cls._update_cb = update_cb
         cls._labels_last_update = None
-        cls._srm = ResourceManager("series", Series, True)
+        cls._srm = ResourceManager("series", Series)
         await cls._srm.load()
         async for series in cls._srm.itter():
             ServerState.index_series_schedules(series)
@@ -67,9 +67,10 @@ class SeriesManager:
         collected_datapoints = await query_series_datapoint_count(
             ServerState.get_siridb_data_conn(), series.get('name'))
         # If collected_datapoints is None, the series does not exist.
-        if collected_datapoints is not None:
+        if True or collected_datapoints is not None:
             async with cls._srm.create_resource(series) as resp:
-                resp.state.datapoint_count = collected_datapoints
+                pass
+                # resp.state.datapoint_count = collected_datapoints
             asyncio.ensure_future(cls.series_changed(
                 SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name')))
             asyncio.ensure_future(
@@ -162,6 +163,7 @@ class SeriesManager:
 
     @classmethod
     async def remove_series(cls, series_name):
+        # TODO: check if fetch is necesarry
         series = await cls._srm.get_resource(series_name)
         if series is not None:
             await cls._srm.delete_resource(series)

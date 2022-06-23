@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta3.2.15] - 2022-06-23
+
+### Changed
+- Changed resource caching by max time since last use to an LRU queue cache
+
+### Added
+- Job config template resource and endpoints
+
 ## [0.1.0-beta3.2.14] - 2022-06-21
 
 ### Added

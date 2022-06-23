@@ -153,7 +153,7 @@ class ClientManager:
     async def setup(cls, series_manager):
         cls.series_manager = series_manager
         await cls._refresh_dedicated_cache()
-        cls._crm = ResourceManager("workers", WorkerClient, True)
+        cls._crm = ResourceManager("workers", WorkerClient)
         await cls._crm.load()
 
     @classmethod

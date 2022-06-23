@@ -231,6 +231,62 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
+    async def get_job_config_templates(cls, request):
+        """Get all job config templates from a specific job_type
+
+        Args:
+            request (Request): aiohttp request
+
+        Returns:
+            _type_: _description_
+        """
+        job_type = urllib.parse.unquote(
+            request.match_info['job_type'])
+        data, status = await BaseHandler.resp_get_job_config_templates(
+            job_type)
+        return web.json_response(
+            data=data, status=status)
+
+    @classmethod
+    @EnodoAuth.auth.required
+    async def add_job_config_templates(cls, request):
+        """Add a job config template
+
+        Args:
+            request (Request): aiohttp request
+
+        Returns:
+            _type_: _description_
+        """
+        try:
+            data = await request.json()
+        except JSONDecodeError as e:
+            resp, status = {'error': 'Invalid JSON'}, 400
+        else:
+            resp, status = await BaseHandler.resp_add_job_config_templates(
+                data)
+        return web.json_response(data=resp, status=status)
+
+    @classmethod
+    @EnodoAuth.auth.required
+    async def remove_job_config_templates(cls, request):
+        """Remove a job config template
+
+        Args:
+            request (Request): aiohttp request
+
+        Returns:
+            _type_: _description_
+        """
+        rid = urllib.parse.unquote(
+            request.match_info['rid'])
+        data, status = await BaseHandler.resp_remove_job_config_templates(
+            rid)
+        return web.json_response(
+            data=data, status=status)
+
+    @classmethod
+    @EnodoAuth.auth.required
     async def get_enodo_event_outputs(cls, request):
         """Get all event outputs
 
