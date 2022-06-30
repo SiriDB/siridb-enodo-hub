@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta3.2.15] - 2022-06-30
+
+### Added
+- Series templates
+
+### Changed
+- Series can now be added with a written config or by reference to an existing template
+
 ## [0.1.0-beta3.2.15] - 2022-06-23
 
 ### Changed
