@@ -472,7 +472,7 @@ class EnodoJobManager:
                         f'exception class: {e.__class__.__name__}')
         elif job_type == JOB_TYPE_BASE_SERIES_ANALYSIS:
             try:
-                series.series_characteristics = \
+                series.state.characteristics = \
                     job_response.get('characteristics')
                 series.state.health = job_response.get('health')
                 series.state.interval = job_response.get('interval')

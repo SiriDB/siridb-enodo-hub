@@ -208,15 +208,17 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        try:
-            series_config = SeriesConfigModel(**data.get('config'))
-        except Exception as e:
-            return {'error': 'Invalid series config', 'message': str(e)}, 400
-        bc = series_config.get_config_for_job_type(
-            JOB_TYPE_BASE_SERIES_ANALYSIS, first_only=True)
-        if bc is None:
-            return {'error': 'Something went wrong when adding the series. '
-                    'Missing base analysis job'}, 400
+        if not isinstance(data.get('config'), str):
+            try:
+                series_config = SeriesConfigModel(**data.get('config'))
+            except Exception as e:
+                return {'error': 'Invalid series config',
+                        'message': str(e)}, 400
+            bc = series_config.get_config_for_job_type(
+                JOB_TYPE_BASE_SERIES_ANALYSIS, first_only=True)
+            if bc is None:
+                return {'error': 'Something went wrong when adding '
+                        'the series. Missing base analysis job'}, 400
         is_added = await SeriesManager.add_series(data)
         if is_added is False:
             return {'error': 'Something went wrong when adding the series. '
@@ -336,6 +338,38 @@ class BaseHandler:
 
         template = await trm.get_resource(rid)
         await trm.delete_resource(template)
+
+        return {'data': None}, 200
+
+    @classmethod
+    def resp_get_series_config_templates(cls):
+        scrm = ServerState.series_config_template_rm
+        templates = scrm.get_cached_resources()
+
+        return {'data': templates}, 200
+
+    @classmethod
+    async def resp_add_series_config_templates(cls, config_template: dict):
+        scrm = ServerState.series_config_template_rm
+
+        if scrm.rid_exists(config_template.get("rid")):
+            return {'error': "template already exists"}, 400
+
+        if config_template.get("rid") is None:
+            config_template["rid"] = str(uuid4()).replace("-", "")
+
+        async with scrm.create_resource(config_template) as template:
+            return {'data': template}, 201
+
+    @classmethod
+    async def resp_remove_series_config_templates(cls, rid: str):
+        scrm = ServerState.series_config_template_rm
+
+        if not scrm.rid_exists(rid):
+            return {'error': "template does not exists"}, 404
+
+        template = await scrm.get_resource(rid)
+        await scrm.delete_resource(template)
 
         return {'data': None}, 200
 

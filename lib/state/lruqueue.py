@@ -9,6 +9,9 @@ class LRUQueue:
         self.cache = OrderedDict()
         self.capacity = capacity
 
+    def all(self) -> list:
+        return list(self.cache.values())
+
     def get(self, key: str) -> Any:
         if key not in self.cache:
             return None

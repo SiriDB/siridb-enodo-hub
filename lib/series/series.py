@@ -1,6 +1,6 @@
 import asyncio
 import time
-from typing import Optional
+from typing import Optional, Union
 
 from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_NONE, \
     JOB_STATUS_DONE, JOB_STATUS_FAILED
@@ -14,22 +14,32 @@ from lib.state.resource import StoredResource
 
 class Series(StoredResource):
     __slots__ = ('rid', 'name', 'config', 'state',
-                 '_datapoint_count_lock', 'series_characteristics')
+                 '_datapoint_count_lock', '_config_from_template')
 
     def __init__(self,
                  name: str,
-                 config:
-                 dict,
+                 config: Union[dict, str],
                  state: Optional[dict] = None,
-                 series_characteristics: Optional[dict] = None,
                  **kwargs):
         self.rid = name
         self.name = name
-        self.config = SeriesConfigModel(**config)
+        self._config_from_template = False
+        self._setup_config(config)
         self.state = SeriesState() if state is None else SeriesState(**state)
-        self.series_characteristics = series_characteristics
         self._datapoint_count_lock = asyncio.Lock()
         self.lock = asyncio.Lock()
+
+    def _setup_config(self, config):
+        if isinstance(config, dict):
+            self.config = SeriesConfigModel(**config)
+            return
+        self._config_from_template = True
+        config = ServerState.series_config_template_rm.get_cached_resource(
+            config)
+        if config is None:
+            raise Exception("Invalid series config template rid")
+        config = SeriesConfigModel(**config.series_config)
+        self.config = config
 
     def get_errors(self) -> list:
         # To stop circular import
@@ -181,8 +191,8 @@ class Series(StoredResource):
                 'rid': self.rid,
                 'name': self.name,
                 'state': self.state,
-                'config': self.config,
-                'series_characteristics': self.series_characteristics
+                'config': self.config if self._config_from_template is False
+                else self.config.rid
             }
         return {
             'rid': self.rid,
@@ -190,8 +200,7 @@ class Series(StoredResource):
             'state': self.state,
             'config': self.config,
             'ignore': self.is_ignored(),
-            'error': self.get_errors(),
-            'series_characteristics': self.series_characteristics
+            'error': self.get_errors()
         }
 
     @classmethod

@@ -43,15 +43,24 @@ def setup_routes(app, cors):
     app.router.add_post(
         "/api/series/{series_name}/job",
         ApiHandlers.add_series_job_config)
+    # app.router.add_get(
+    #     "/api/template/job/{job_type}",
+    #     ApiHandlers.get_job_config_templates)
+    # app.router.add_post(
+    #     "/api/template/job",
+    #     ApiHandlers.add_job_config_templates)
+    # app.router.add_delete(
+    #     "/api/template/job/{rid}",
+    #     ApiHandlers.remove_job_config_templates)
     app.router.add_get(
-        "/api/job/templates/{job_type}",
-        ApiHandlers.get_job_config_templates)
+        "/api/template/series",
+        ApiHandlers.get_series_config_templates)
     app.router.add_post(
-        "/api/job/templates",
-        ApiHandlers.add_job_config_templates)
+        "/api/template/series",
+        ApiHandlers.add_series_config_templates)
     app.router.add_delete(
-        "/api/job/templates/{rid}",
-        ApiHandlers.remove_job_config_templates)
+        "/api/template/series/{rid}",
+        ApiHandlers.remove_series_config_templates)
     app.router.add_get(
         "/api/enodo/module", ApiHandlers.get_possible_analyser_modules,
         allow_head=False)

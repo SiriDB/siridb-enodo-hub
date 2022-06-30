@@ -31,9 +31,10 @@ class ThingsDBStorage(StorageBase):
         resource_type = resource.resource_type
         logging.debug(
             f"Saving data of {rid} of type {resource_type}")
-        await self.client.query(f"""//ti
+        resp = await self.client.query(f"""//ti
             .{resource_type}.set('{rid}', object);
         """, object=data, scope=self._scope)
+        return resp['#'] if '#' in resp else resp
 
     async def load_by_type(self, resource_type: str) -> list:
         resp = await self.client.query(f".{resource_type}"
@@ -47,7 +48,12 @@ class ThingsDBStorage(StorageBase):
         resp = await self.client.query(q, self._scope)
         return resp
 
-    async def get_all_rids_for_type(self, resource_type: str) -> list:
+    async def get_all_rids_for_type(self, resource_type: str,
+                                    with_storage_id: bool = False) -> list:
+        if with_storage_id:
+            q = f".{resource_type}.map(|rid, s| [rid, s.id()])"
+            resp = await self.client.query(q, self._scope)
+            return resp
         q = f".{resource_type}.map(|rid, _| rid)"
         resp = await self.client.query(q, self._scope)
         return resp
