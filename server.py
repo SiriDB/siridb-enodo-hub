@@ -14,6 +14,8 @@ from enodo.protocol.package import LISTENER_NEW_SERIES_POINTS, \
     WORKER_UPDATE_BUSY, WORKER_JOB_RESULT, WORKER_REFUSED, \
     WORKER_JOB_CANCELLED
 from enodo.jobs import JOB_STATUS_NONE, JOB_STATUS_DONE
+from lib.series.jobtemplate import SeriesJobConfigTemplate
+from lib.series.seriestemplate import SeriesConfigTemplate
 from lib.state.diskstorage import DiskStorage
 from lib.state.thingsdbstorage import ThingsDBStorage
 
@@ -23,6 +25,7 @@ from lib.eventmanager import EnodoEventManager
 from lib.jobmanager import EnodoJobManager
 
 from lib.logging import prepare_logger
+from lib.series.series import Series
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
 from lib.socket import ClientManager
@@ -33,7 +36,7 @@ from lib.socketio.socketiohandlers import SocketIoHandler
 from lib.socketio.socketiorouter import SocketIoRouter
 from lib.util import print_custom_aiohttp_startup_message
 from lib.webserver.routes import setup_routes
-from lib.state.resource import resource_manager_index
+from lib.state.resource import ResourceManager, resource_manager_index
 from version import VERSION
 
 
@@ -101,6 +104,15 @@ class Server:
         if self.sio is not None:
             SocketIoHandler.prepare(self.sio)
             SocketIoRouter(self.sio)
+
+        ServerState.series_rm = ResourceManager('series', Series)
+        await ServerState.series_rm.load()
+        ServerState.job_config_template_rm = ResourceManager(
+            'job_config_templates', SeriesJobConfigTemplate)
+        await ServerState.job_config_template_rm.load()
+        ServerState.series_config_template_rm = ResourceManager(
+            'series_config_templates', SeriesConfigTemplate, cache_only=True)
+        await ServerState.series_config_template_rm.load()
 
         # Setup internal managers for handling and managing series,
         # clients, jobs, events and modules
@@ -247,9 +259,9 @@ class Server:
         while ServerState.running:
             ServerState.tasks_last_runs['watch_series'] = \
                 datetime.datetime.now()
-
+            current_time = time()
             for series_name, ts in ServerState.job_schedule_index.items():
-                if ts > time():
+                if ts > current_time:
                     continue
                 series = await SeriesManager.get_series_read_only(series_name)
                 # Check if series is valid and not ignored

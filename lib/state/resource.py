@@ -93,13 +93,14 @@ class ResourceManager:
 
     def __init__(
             self, resource_type: str, resource_class: Any,
-            keep_in_memory=120):
+            keep_in_memory=120, cache_only=False):
         self._resource_type = resource_type
         self._resource_class = resource_class
         self._resources = {}
         self._lruqueue = LRUQueue(keep_in_memory)
         resource_manager_index[resource_type] = self
         self._loaded = False
+        self._cache_only = cache_only
 
     def cleanup(self):
         pass
@@ -109,6 +110,12 @@ class ResourceManager:
             rids = await ServerState.storage.get_all_rids_for_type(
                 self._resource_type)
             self._resources = {rid: None for rid in rids}
+
+            if self._cache_only:
+                for rid in rids:
+                    resp = await self.get_resource(rid)
+                    self._lruqueue.put(rid, resp)
+
             self._loaded = True
 
     @contextlib.asynccontextmanager
@@ -126,6 +133,12 @@ class ResourceManager:
 
     def set_cache(self, resource):
         self._lruqueue.put(resource.rid, resource)
+
+    def get_cached_resource(self, rid: str) -> StoredResource:
+        return self._lruqueue.get(rid)
+
+    def get_cached_resources(self) -> list:
+        return list(self._lruqueue.all())
 
     async def get_resource(self, rid: str) -> StoredResource:
         if rid not in self._resources:

@@ -39,6 +39,7 @@ class DiskStorage(StorageBase):
                     self._base_path, resource_type))
         with open(file_path, 'w') as file:
             file.write(json.dumps(data))
+        return rid
 
     async def load_by_type(self, resource_type: str) -> list:
         resp = []
@@ -75,7 +76,8 @@ class DiskStorage(StorageBase):
                     return data
         return False
 
-    async def get_all_rids_for_type(self, resource_type: str) -> list:
+    async def get_all_rids_for_type(self, resource_type: str,
+                                    with_storage_id: bool = False) -> list:
         resp = []
         type_path = os.path.join(self._base_path, resource_type)
         if not os.path.isdir(type_path):

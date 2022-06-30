@@ -67,10 +67,9 @@ class SeriesManager:
         collected_datapoints = await query_series_datapoint_count(
             ServerState.get_siridb_data_conn(), series.get('name'))
         # If collected_datapoints is None, the series does not exist.
-        if True or collected_datapoints is not None:
+        if collected_datapoints is not None:
             async with cls._srm.create_resource(series) as resp:
-                pass
-                # resp.state.datapoint_count = collected_datapoints
+                resp.state.datapoint_count = collected_datapoints
             asyncio.ensure_future(cls.series_changed(
                 SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name')))
             asyncio.ensure_future(

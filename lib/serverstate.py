@@ -25,6 +25,10 @@ class ServerState:
     storage = None
     job_schedule_index = {}
 
+    series_rm = None
+    series_config_template_rm = None
+    job_config_template_rm = None
+
     @classmethod
     async def async_setup(cls, sio, storage):
         cls.running = True
@@ -53,9 +57,7 @@ class ServerState:
 
         await cls.setup_siridb_data_connection()
         await cls.setup_siridb_output_connection()
-
         cls.scheduler = await create_scheduler()
-
         await cls.refresh_siridb_status()
 
     @classmethod

@@ -32,7 +32,8 @@ class StorageBase:
         pass
 
     @abstractmethod
-    async def get_all_rids_for_type(self, resource_type: str) -> list:
+    async def get_all_rids_for_type(self, resource_type: str,
+                                    with_storage_id: bool = False) -> list:
         pass
 
     @abstractmethod
