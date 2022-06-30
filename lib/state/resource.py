@@ -115,7 +115,7 @@ class ResourceManager:
                 for rid in rids:
                     resp = await self.get_resource(rid)
                     self._lruqueue.put(rid, resp)
-                    
+
             self._loaded = True
 
     @contextlib.asynccontextmanager

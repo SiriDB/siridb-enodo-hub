@@ -24,7 +24,7 @@ class ServerState:
     scheduler = None
     storage = None
     job_schedule_index = {}
-    
+
     series_rm = None
     series_config_template_rm = None
     job_config_template_rm = None
