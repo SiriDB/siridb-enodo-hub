@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
-## [0.1.0-beta3.2.15] - 2022-06-30
+## [0.1.0-beta3.2.17] - 2022-07-07
+
+### Added
+- Series `meta` property for meta data
+- Fields filter function, applied to series templates GET endpoint
+
+## [0.1.0-beta3.2.16] - 2022-06-30
 
 ### Added
 - Series templates

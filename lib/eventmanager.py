@@ -48,7 +48,7 @@ class EnodoEvent:
     that occured. No state data is saved.
     """
     __slots__ = ('title', 'message', 'event_type',
-                 'series_name', 'ts', 'severity', 'uuid')
+                 'series', 'ts', 'severity', 'uuid')
 
     def __init__(self, title, message, event_type, series=None):
         if event_type not in ENODO_EVENT_TYPES:
@@ -56,7 +56,7 @@ class EnodoEvent:
         self.title = title
         self.message = message
         self.event_type = event_type
-        self.series_name = series  # only needs to be set if it regards a
+        self.series = series  # only needs to be set if it regards a
         # series related event
         self.ts = int(time.time())
         self.uuid = str(uuid.uuid4()).replace("-", "")
@@ -66,7 +66,7 @@ class EnodoEvent:
             'title': self.title,
             'event_type': self.event_type,
             'message': self.message,
-            'series_name': self.series_name,
+            'series': self.series,
             'ts': self.ts,
             'uuid': self.uuid
         }
@@ -174,7 +174,7 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
                 logging.debug(
                     f'Calling EnodoEventOutput webhook {self.url}')
                 async with aiohttp.ClientSession(
-                        timeout=aiohttp.ClientTimeout(total=2)) as session:
+                        timeout=aiohttp.ClientTimeout(total=3)) as session:
                     await session.post(
                         self.url,
                         data=self._get_payload(event),

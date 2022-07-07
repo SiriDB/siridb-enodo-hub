@@ -13,16 +13,18 @@ from lib.state.resource import StoredResource
 
 
 class Series(StoredResource):
-    __slots__ = ('rid', 'name', 'config', 'state',
+    __slots__ = ('rid', 'name', 'config', 'state', 'meta',
                  '_datapoint_count_lock', '_config_from_template')
 
     def __init__(self,
                  name: str,
                  config: Union[dict, str],
                  state: Optional[dict] = None,
+                 meta: Optional[dict] = None,
                  **kwargs):
         self.rid = name
         self.name = name
+        self.meta = meta
         self._config_from_template = False
         self._setup_config(config)
         self.state = SeriesState() if state is None else SeriesState(**state)
@@ -190,6 +192,7 @@ class Series(StoredResource):
             return {
                 'rid': self.rid,
                 'name': self.name,
+                'meta': self.meta,
                 'state': self.state,
                 'config': self.config if self._config_from_template is False
                 else self.config.rid
@@ -197,6 +200,7 @@ class Series(StoredResource):
         return {
             'rid': self.rid,
             'name': self.name,
+            'meta': self.meta,
             'state': self.state,
             'config': self.config,
             'ignore': self.is_ignored(),
