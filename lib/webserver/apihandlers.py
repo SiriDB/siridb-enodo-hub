@@ -296,7 +296,16 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        data, status = BaseHandler.resp_get_series_config_templates()
+        fields = None
+        if "fields" in request.rel_url.query:
+            fields = urllib.parse.unquote(
+                request.rel_url.query['fields'])
+            if fields == "":
+                fields = None
+            if fields is not None:
+                fields = fields.split(",")
+        data, status = BaseHandler.resp_get_series_config_templates(
+            fields=fields)
         return web.json_response(
             data=data, status=status)
 
@@ -390,7 +399,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        output_id = int(request.match_info['output_id'])
+        output_id = request.match_info['output_id']
 
         resp, status = await BaseHandler.resp_remove_event_output(output_id)
         return web.json_response(data=resp, status=status)

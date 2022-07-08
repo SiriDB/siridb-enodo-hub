@@ -28,6 +28,15 @@ from siridb.connector.lib.exceptions import (
 from version import VERSION
 
 
+def apply_fields_filter(resources: list, fields: list) -> list:
+    resources = [dict(t) for t in resources]
+    if fields is not None:
+        resources = [
+            {k: v for k, v in resource.items() if k in fields}
+            for resource in resources]
+    return resources
+
+
 class BaseHandler:
 
     @classmethod
@@ -219,6 +228,10 @@ class BaseHandler:
             if bc is None:
                 return {'error': 'Something went wrong when adding '
                         'the series. Missing base analysis job'}, 400
+        if 'meta' in data and (data.get('meta') is not None and
+                               not isinstance(data.get('meta'), dict)):
+            return {'error': 'Something went wrong when adding '
+                    'the series. Meta data must be a dict'}, 400
         is_added = await SeriesManager.add_series(data)
         if is_added is False:
             return {'error': 'Something went wrong when adding the series. '
@@ -342,9 +355,12 @@ class BaseHandler:
         return {'data': None}, 200
 
     @classmethod
-    def resp_get_series_config_templates(cls):
+    def resp_get_series_config_templates(cls, fields=None):
         scrm = ServerState.series_config_template_rm
         templates = scrm.get_cached_resources()
+
+        # TODO: make this field filter general for all get endpoints
+        templates = apply_fields_filter(templates, fields)
 
         return {'data': templates}, 200
 
