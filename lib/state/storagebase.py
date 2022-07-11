@@ -20,6 +20,10 @@ class StorageBase:
         pass
 
     @abstractmethod
+    async def create(self, resource: StoredResource):
+        pass
+
+    @abstractmethod
     async def delete(self, resource: StoredResource):
         pass
 
@@ -32,8 +36,12 @@ class StorageBase:
         pass
 
     @abstractmethod
-    async def get_all_rids_for_type(self, resource_type: str,
-                                    with_storage_id: bool = False) -> list:
+    async def load_by_type_and_key(self, resource_type: str, key: Any,
+                                   value: Any) -> dict:
+        pass
+
+    @abstractmethod
+    async def get_all_rids_for_type(self, resource_type: str) -> list:
         pass
 
     @abstractmethod

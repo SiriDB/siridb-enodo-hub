@@ -34,8 +34,7 @@ class SeriesManager:
     async def prepare(cls, update_cb=None):
         cls._update_cb = update_cb
         cls._labels_last_update = None
-        cls._srm = ResourceManager("series", Series)
-        await cls._srm.load()
+        cls._srm = ServerState.series_rm
         async for series in cls._srm.itter():
             ServerState.index_series_schedules(series)
 
@@ -62,7 +61,8 @@ class SeriesManager:
 
     @classmethod
     async def _add_series(cls, series: dict):
-        if cls._srm.rid_exists(series.get('name')):
+        if await cls._srm.get_resource_by_key("name",
+                                              series.get('name')) is not None:
             return False
         collected_datapoints = await query_series_datapoint_count(
             ServerState.get_siridb_data_conn(), series.get('name'))
@@ -80,7 +80,7 @@ class SeriesManager:
     @classmethod
     @contextlib.asynccontextmanager
     async def get_series(cls, series_name):
-        series = await cls._srm.get_resource(series_name)
+        series = await cls._srm.get_resource_by_key("name", series_name)
         if series is None:
             yield None
             return
@@ -90,11 +90,11 @@ class SeriesManager:
 
     @classmethod
     async def get_series_read_only(cls, series_name):
-        return await cls._srm.get_resource(series_name)
+        return await cls._srm.get_resource_by_key("name", series_name)
 
-    @classmethod
-    def get_all_series(cls):
-        return cls._srm.get_resource_rids()
+    # @classmethod
+    # def get_all_series(cls):
+    #     return cls._srm.get_resource_rid_values()
 
     @classmethod
     async def get_listener_series_info(cls):
@@ -152,7 +152,7 @@ class SeriesManager:
 
     @classmethod
     def get_all_series_names(cls, regex_filter=None):
-        series_names = cls._srm.get_resource_rids()
+        series_names = cls._srm.get_resource_rid_values()
         if regex_filter is not None:
             pattern = re.compile(regex_filter)
             return [
@@ -163,7 +163,7 @@ class SeriesManager:
     @classmethod
     async def remove_series(cls, series_name):
         # TODO: check if fetch is necesarry
-        series = await cls._srm.get_resource(series_name)
+        series = await cls._srm.get_resource_by_key("name", series_name)
         if series is not None:
             await cls._srm.delete_resource(series)
             await cls.cleanup_series(series_name)
@@ -184,7 +184,7 @@ class SeriesManager:
 
     @classmethod
     async def add_to_datapoint_counter(cls, series_name, value):
-        series = await cls._srm.get_resource(series_name)
+        series = await cls._srm.get_resource_by_key("name", series_name)
         if series is not None:
             await series.add_to_datapoints_count(value)
         elif series_name not in cls._series:
@@ -193,7 +193,8 @@ class SeriesManager:
     @classmethod
     async def add_forecast_to_series(cls, series_name,
                                      job_config_name, points):
-        if cls._srm.rid_exists(series_name):
+        if await cls._srm.get_resource_by_key(
+                "name", series_name) is not None:
             await drop_series(
                 ServerState.get_siridb_output_conn(),
                 f'"enodo_{series_name}_forecast_{job_config_name}"')
@@ -204,7 +205,7 @@ class SeriesManager:
     @classmethod
     async def add_anomalies_to_series(cls, series_name,
                                       job_config_name, points):
-        series = await cls._srm.get_resource(series_name)
+        series = await cls._srm.get_resource_by_key("name", series_name)
         if series is not None:
             event = EnodoEvent(
                 'Anomaly detected!',
@@ -224,7 +225,8 @@ class SeriesManager:
     @classmethod
     async def add_static_rule_hits_to_series(cls, series_name,
                                              job_config_name, points):
-        if cls._srm.rid_exists(series_name):
+        if await cls._srm.get_resource_by_key(
+                "name", series_name) is not None:
             await drop_series(
                 ServerState.get_siridb_output_conn(),
                 f'"enodo_{series_name}_static_rules_{job_config_name}"')

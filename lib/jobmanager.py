@@ -102,10 +102,6 @@ class EnodoJobManager:
             cls._active_jobs_index[job.rid] = job
 
     @classmethod
-    def _get_next_job_id(cls) -> int:
-        return str(uuid.uuid4()).replace("-", "")
-
-    @classmethod
     def get_active_jobs(cls) -> list:
         return cls._active_jobs
 
@@ -158,8 +154,7 @@ class EnodoJobManager:
                 job_config_name,
                 "Job created")
             job_config = series.get_job(job_config_name)
-            job_id = cls._get_next_job_id()
-            job = EnodoJob(job_id, series.name, job_config,
+            job = EnodoJob(None, series.name, job_config,
                            job_data=None)  # TODO: Catch exception
             await cls._add_job(job)
 

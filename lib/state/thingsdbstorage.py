@@ -17,45 +17,72 @@ class ThingsDBStorage(StorageBase):
         await self.client.connect(Config.thingsdb_host,
                                   port=Config.thingsdb_port)
         await self.client.authenticate(Config.thingsdb_auth_token)
+        self.client.set_default_scope(self._scope)
 
     async def delete(self, resource: StoredResource):
         rid = resource.rid
         resource_type = resource.resource_type
         logging.debug(f"Removing data of {rid} of type {resource_type}")
-        q = f".{resource_type}.has('{rid}') && .{resource_type}.del('{rid}')"
-        await self.client.query(q, self._scope)
+        q = ".get(resource_type).remove(|item| item.id()==rid)"
+        await self.client.query(q, resource_type=resource_type, rid=int(rid))
+
+    async def create(self, resource: StoredResource):
+        data = resource.to_store_data
+        resource_type = resource.resource_type
+
+        logging.debug(
+            f"Creating resource of type {resource_type}")
+        resp = await self.client.query("""//ti
+            .get(resource_type).push(object);
+            str(object.id());
+        """, object=data, resource_type=resource_type)
+        resource.rid = resp
+        return resource
 
     async def store(self, resource: StoredResource):
         data = resource.to_store_data
         rid = resource.rid
         resource_type = resource.resource_type
+
         logging.debug(
             f"Saving data of {rid} of type {resource_type}")
-        resp = await self.client.query(f"""//ti
-            .{resource_type}.set('{rid}', object);
-        """, object=data, scope=self._scope)
-        return resp['#'] if '#' in resp else resp
+        resp = await self.client.query("""//ti
+            a = thing(rid);
+            a.assign(data);
+        """, data=data, rid=int(rid))
+        return resource
 
     async def load_by_type(self, resource_type: str) -> list:
-        resp = await self.client.query(f".{resource_type}"
-                                       ".map(|_, item| item.copy(10))",
-                                       self._scope)
+        resp = await self.client.query(
+            """.get(resource_type).map(|item| {
+            item["rid"] = str(item.id()); item.copy(10)})""",
+            resource_type=resource_type)
         return resp
+
+    async def load_by_type_and_key(self, resource_type: str, key: Any,
+                                   value: Any) -> dict:
+        resp = await self.client.query(
+            """.get(resource_type).filter(|item| item.get(key) == value)
+            .map(|item| {item["rid"] = str(item.id()); item.copy(10)})""",
+            resource_type=resource_type, key=key, value=value)
+        if len(resp) < 1:
+            return None
+        return resp[0]
 
     async def load_by_type_and_rid(
             self, resource_type: str, rid: Any) -> dict:
-        q = (f".{resource_type}.get('{rid}').copy(10)")
-        resp = await self.client.query(q, self._scope)
+        resp = await self.client.query(
+            """//ti
+            t = thing(rid);
+            t['rid'] = str(t.id());
+            t.copy(10)
+            """,
+            rid=int(rid))
         return resp
 
-    async def get_all_rids_for_type(self, resource_type: str,
-                                    with_storage_id: bool = False) -> list:
-        if with_storage_id:
-            q = f".{resource_type}.map(|rid, s| [rid, s.id()])"
-            resp = await self.client.query(q, self._scope)
-            return resp
-        q = f".{resource_type}.map(|rid, _| rid)"
-        resp = await self.client.query(q, self._scope)
+    async def get_all_rids_for_type(self, resource_type: str) -> list:
+        q = ".get(resource_type).map(|item| str(item.id()))"
+        resp = await self.client.query(q, resource_type=resource_type)
         return resp
 
     async def close(self):

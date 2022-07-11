@@ -371,9 +371,6 @@ class BaseHandler:
         if scrm.rid_exists(config_template.get("rid")):
             return {'error': "template already exists"}, 400
 
-        if config_template.get("rid") is None:
-            config_template["rid"] = str(uuid4()).replace("-", "")
-
         async with scrm.create_resource(config_template) as template:
             return {'data': template}, 201
 
@@ -463,7 +460,7 @@ class BaseHandler:
                 "no_listeners": ClientManager.get_listener_count(),
                 "no_workers": ClientManager.get_worker_count(),
                 "no_busy_workers": ClientManager.get_busy_worker_count(),
-                "no_output_streams": len(EnodoEventManager.outputs)
+                "no_output_streams": len(await EnodoEventManager.get_outputs())
         }}
 
     @classmethod

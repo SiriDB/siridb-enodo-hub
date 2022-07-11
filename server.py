@@ -105,11 +105,9 @@ class Server:
             SocketIoHandler.prepare(self.sio)
             SocketIoRouter(self.sio)
 
-        ServerState.series_rm = ResourceManager('series', Series)
+        ServerState.series_rm = ResourceManager(
+            'series', Series, extra_index_field="name")
         await ServerState.series_rm.load()
-        ServerState.job_config_template_rm = ResourceManager(
-            'job_config_templates', SeriesJobConfigTemplate)
-        await ServerState.job_config_template_rm.load()
         ServerState.series_config_template_rm = ResourceManager(
             'series_config_templates', SeriesConfigTemplate, cache_only=True)
         await ServerState.series_config_template_rm.load()

@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from typing import Any
+import uuid
 from lib.state import StoredResource, StorageBase
 
 
@@ -23,8 +24,9 @@ class DiskStorage(StorageBase):
             except Exception:
                 logging.error("Could not delete file {file_path}")
 
-    async def store(self, resource: StoredResource):
+    async def create(self, resource: StoredResource):
         data = resource.to_store_data
+        resource.rid = str(uuid.uuid4()).replace("-", "")
         rid = resource.rid
         resource_type = resource.resource_type
         logging.debug(
@@ -37,6 +39,20 @@ class DiskStorage(StorageBase):
             os.makedirs(
                 os.path.join(
                     self._base_path, resource_type))
+        with open(file_path, 'w') as file:
+            file.write(json.dumps(data))
+        return rid
+
+    async def store(self, resource: StoredResource):
+        data = resource.to_store_data
+        rid = resource.rid
+        resource_type = resource.resource_type
+        logging.debug(
+            f"Saving data of {rid} of type {resource_type}")
+        file_path = os.path.join(
+            self._base_path, resource_type, f"{rid}.json")
+        if not os.path.exists(file_path):
+            raise Exception("Resource does not exist (anymore)")
         with open(file_path, 'w') as file:
             file.write(json.dumps(data))
         return rid
@@ -60,6 +76,10 @@ class DiskStorage(StorageBase):
                         resp.append(data)
         return resp
 
+    async def load_by_type_and_key(self, resource_type: str, key: Any,
+                                   value: Any) -> dict:
+        pass
+
     async def load_by_type_and_rid(
             self, resource_type: str, rid: Any) -> dict:
         file_path = os.path.join(self._base_path,
@@ -76,8 +96,7 @@ class DiskStorage(StorageBase):
                     return data
         return False
 
-    async def get_all_rids_for_type(self, resource_type: str,
-                                    with_storage_id: bool = False) -> list:
+    async def get_all_rids_for_type(self, resource_type: str) -> list:
         resp = []
         type_path = os.path.join(self._base_path, resource_type)
         if not os.path.isdir(type_path):

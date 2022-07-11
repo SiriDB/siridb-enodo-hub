@@ -92,8 +92,6 @@ class EnodoEventOutput(StoredResource):
         :param custom_name: custom name
         """
         self.rid = rid
-        if self.rid is None:
-            self.rid = str(uuid.uuid4()).replace("-", "")
         self.severity = severity
         self.for_event_types = for_event_types
         self.vendor_name = vendor_name
@@ -146,13 +144,13 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
     """
 
     def __init__(
-            self, url, rid=None, headers=None, payload=None, **kwargs):
+            self, url, headers=None, payload=None, **kwargs):
         """
         Call webhook url with data of EnodoEvent
         :param id: id of output
         :param url: url to call
         """
-        super().__init__(rid=rid, **kwargs)
+        super().__init__(**kwargs)
         self.url = url
         self.payload = payload
         self.headers = headers
@@ -225,12 +223,7 @@ class EnodoEventManager:
         await cls._erm.load()
 
     @classmethod
-    def _get_next_output_id(cls):
-        return str(uuid.uuid4()).replace("-", "")
-
-    @classmethod
     async def create_event_output(cls, output_type, data):
-        data["rid"] = cls._get_next_output_id()
         output = None
         async with cls._erm.create_resource(data) as resp:
             output = resp

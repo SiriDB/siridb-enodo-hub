@@ -163,7 +163,7 @@ class ServerState:
             if next_ts is not None:
                 if earliest is None or next_ts < earliest:
                     earliest = next_ts
-        cls.job_schedule_index[series.rid] = earliest
+        cls.job_schedule_index[series.name] = earliest
 
     @classmethod
     async def refresh_siridb_status(cls):

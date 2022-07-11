@@ -5,13 +5,12 @@ from lib.state.resource import StoredResource
 
 class SeriesConfigTemplate(StoredResource, dict):
 
-    def __init__(self, rid, name, description, config):
+    def __init__(self, name, description, config, rid=None):
 
         for job_config in config.get('job_config'):
             try:
                 SeriesJobConfigModel(**job_config)
             except Exception as e:
-                print(e)
                 raise Exception(
                     f"Invalid job config for template {rid}")
 
@@ -34,6 +33,10 @@ class SeriesConfigTemplate(StoredResource, dict):
     @property
     def rid(self):
         return self.get("rid")
+
+    @rid.setter
+    def rid(self, value):
+        self["rid"] = value
 
     @property
     def config(self):

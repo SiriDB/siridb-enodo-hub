@@ -19,10 +19,11 @@ class Series(StoredResource):
     def __init__(self,
                  name: str,
                  config: Union[dict, str],
+                 rid: Optional[str] = None,
                  state: Optional[dict] = None,
                  meta: Optional[dict] = None,
                  **kwargs):
-        self.rid = name
+        self.rid = rid
         self.name = name
         self.meta = meta
         self._config_from_template = False
