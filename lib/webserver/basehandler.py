@@ -88,8 +88,8 @@ class BaseHandler:
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
 
-        should_fetch_data = True if fields is not None and \
-            "data" in fields else False
+        should_fetch_data = True if fields is None or \
+            (fields is not None and "data" in fields) else False
 
         if should_fetch_data and not forecast_future_only:
             data = await query_all_series_results(

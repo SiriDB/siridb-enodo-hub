@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta3.2.19] - 2022-07-12
+
+### Fixed
+- Fixed bug with filtering fields for all output endpoint
+
 ## [0.1.0-beta3.2.18] - 2022-07-12
 
 ### Added
