@@ -25,6 +25,7 @@ from lib.util import regex_valid
 from siridb.connector.lib.exceptions import (
     AuthenticationError, InsertError, PoolError, QueryError,
     ServerError, UserAuthError)
+from lib.util.util import parse_output_series_name
 from version import VERSION
 
 
@@ -71,7 +72,7 @@ class BaseHandler:
         return {'data': series_data}, 200
 
     @classmethod
-    async def resp_get_all_series_output(cls, series_name):
+    async def resp_get_all_series_output(cls, series_name, fields=None):
         """Get all series results
 
         Args:
@@ -83,8 +84,21 @@ class BaseHandler:
         series = await SeriesManager.get_series_read_only(series_name)
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
-        return {'data': await query_all_series_results(
-            ServerState.get_siridb_output_conn(), series_name)}
+        data = await query_all_series_results(
+            ServerState.get_siridb_output_conn(), series_name)
+        resp = []
+        for output_series_name, points in data.items():
+            job_type, job_config_name = parse_output_series_name(
+                series_name,
+                output_series_name)
+            resp.append({
+                "config_name": job_config_name,
+                "job_type": job_type,
+                "data": points
+            })
+        if fields is not None:
+            resp = apply_fields_filter(resp, fields)
+        return {'data': resp}
 
     @classmethod
     async def resp_get_series_forecasts(cls, series_name, only_future):

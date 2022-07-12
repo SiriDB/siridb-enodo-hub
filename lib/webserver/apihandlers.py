@@ -73,10 +73,17 @@ class ApiHandlers:
             _type_: _description_
         """
         series_name = unquote(request.match_info['series_name'])
-
+        fields = None
+        if "fields" in request.rel_url.query:
+            fields = urllib.parse.unquote(
+                request.rel_url.query['fields'])
+            if fields == "":
+                fields = None
+            if fields is not None:
+                fields = fields.split(",")
         return web.json_response(
             data=await BaseHandler.resp_get_all_series_output(
-                series_name), dumps=safe_json_dumps)
+                series_name, fields=fields), dumps=safe_json_dumps)
 
     @classmethod
     @EnodoAuth.auth.required

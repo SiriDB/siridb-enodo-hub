@@ -31,6 +31,15 @@ def regex_valid(regex):
         return False
 
 
+def parse_output_series_name(series_name, output_series_name):
+    # enodo_{series_name}_forecast_{job_config_name}
+    type_and_config_name = output_series_name.replace(
+        f"enodo_{series_name}_", "")
+    job_type = type_and_config_name.split("_")[0]
+    config_name = type_and_config_name.replace(f"{job_type}_", "")
+    return job_type, config_name
+
+
 def load_disk_data(path):
     f = open(path, "r")
     data = f.read()
