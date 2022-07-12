@@ -25,7 +25,9 @@ from lib.util import regex_valid
 from siridb.connector.lib.exceptions import (
     AuthenticationError, InsertError, PoolError, QueryError,
     ServerError, UserAuthError)
-from lib.util.util import get_job_config_output_series_name, parse_output_series_name
+from lib.util.util import (
+    get_job_config_output_series_name, 
+    parse_output_series_name)    
 from version import VERSION
 
 
