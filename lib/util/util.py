@@ -5,6 +5,10 @@ import logging
 import re
 from packaging import version
 
+from enodo.jobs import (
+    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_FORECAST_SERIES,
+    JOB_TYPE_STATIC_RULES)
+
 MIN_DATA_FILE_VERSION = "1.0.0"
 CURRENT_DATA_FILE_VERSION = "1.0.0"
 
@@ -29,6 +33,25 @@ def regex_valid(regex):
         return True
     except re.error:
         return False
+
+
+def parse_output_series_name(series_name, output_series_name):
+    # enodo_{series_name}_forecast_{job_config_name}
+    type_and_config_name = output_series_name.replace(
+        f"enodo_{series_name}_", "")
+    job_type = type_and_config_name.split("_")[0]
+    config_name = type_and_config_name.replace(f"{job_type}_", "")
+    return job_type, config_name
+
+
+def get_job_config_output_series_name(
+        series_name, job_type, config_name):
+    job_prefix_mapping = {
+        JOB_TYPE_FORECAST_SERIES: "forecast",
+        JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES: "anomalies",
+        JOB_TYPE_STATIC_RULES: "static_rules"
+    }
+    return f"enodo_{series_name}_{job_prefix_mapping[job_type]}_{config_name}"
 
 
 def load_disk_data(path):

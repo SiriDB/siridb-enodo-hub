@@ -73,10 +73,23 @@ class ApiHandlers:
             _type_: _description_
         """
         series_name = unquote(request.match_info['series_name'])
-
+        fields = None
+        if "fields" in request.rel_url.query:
+            fields = urllib.parse.unquote(
+                request.rel_url.query['fields'])
+            if fields == "":
+                fields = None
+            if fields is not None:
+                fields = fields.split(",")
+        only_future = False
+        if "forecastFutureOnly" in request.rel_url.query:
+            val = request.rel_url.query['forecastFutureOnly']
+            if val == "1" or val.lower() == "true":
+                only_future = True
         return web.json_response(
             data=await BaseHandler.resp_get_all_series_output(
-                series_name), dumps=safe_json_dumps)
+                series_name, fields=fields, forecast_future_only=only_future),
+            dumps=safe_json_dumps)
 
     @classmethod
     @EnodoAuth.auth.required
@@ -90,7 +103,11 @@ class ApiHandlers:
             _type_: _description_
         """
         series_name = unquote(request.match_info['series_name'])
-        only_future = True if "future" in request.rel_url.query else False
+        only_future = False
+        if "forecastFutureOnly" in request.rel_url.query:
+            val = request.rel_url.query['forecastFutureOnly']
+            if val == "1" or val.lowercase() == "true":
+                only_future = True
 
         return web.json_response(
             data=await BaseHandler.resp_get_series_forecasts(

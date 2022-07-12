@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta3.2.18] - 2022-07-12
+
+### Added
+- Fields filter function, applied to series output `ALL` GET endpoint
+- Return `job_config_name` and `job_type` when returning all series output
+
 ## [0.1.0-beta3.2.17] - 2022-07-07
 
 ### Added

@@ -25,6 +25,9 @@ from lib.util import regex_valid
 from siridb.connector.lib.exceptions import (
     AuthenticationError, InsertError, PoolError, QueryError,
     ServerError, UserAuthError)
+from lib.util.util import (
+    get_job_config_output_series_name,
+    parse_output_series_name)
 from version import VERSION
 
 
@@ -71,7 +74,8 @@ class BaseHandler:
         return {'data': series_data}, 200
 
     @classmethod
-    async def resp_get_all_series_output(cls, series_name):
+    async def resp_get_all_series_output(cls, series_name, fields=None,
+                                         forecast_future_only=False):
         """Get all series results
 
         Args:
@@ -83,8 +87,37 @@ class BaseHandler:
         series = await SeriesManager.get_series_read_only(series_name)
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
-        return {'data': await query_all_series_results(
-            ServerState.get_siridb_output_conn(), series_name)}
+
+        should_fetch_data = True if fields is not None and \
+            "data" in fields else False
+
+        if should_fetch_data and not forecast_future_only:
+            data = await query_all_series_results(
+                ServerState.get_siridb_output_conn(), series_name)
+
+        resp = []
+
+        for job_config in series.config.job_config.values():
+            if job_config.job_type == JOB_TYPE_BASE_SERIES_ANALYSIS:
+                continue  # Ignore since no output
+            points = None
+            output_series_name = get_job_config_output_series_name(
+                series_name, job_config.job_type, job_config.config_name)
+            if should_fetch_data and not forecast_future_only:
+                points = data.get(output_series_name)
+            elif should_fetch_data:
+                points = (await SeriesManager.get_series_output_by_job_type(
+                    series_name, job_config.job_type,
+                    forecast_future_only=forecast_future_only)).get(
+                        output_series_name)
+            resp.append({
+                "config_name": job_config.config_name,
+                "job_type": job_config.job_type,
+                "data": points
+            })
+        if fields is not None:
+            resp = apply_fields_filter(resp, fields)
+        return {'data': resp}
 
     @classmethod
     async def resp_get_series_forecasts(cls, series_name, only_future):

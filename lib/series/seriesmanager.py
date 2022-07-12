@@ -2,10 +2,12 @@ import asyncio
 import contextlib
 import logging
 import re
-import time
 
 import qpack
 from enodo.protocol.package import create_header, UPDATE_SERIES
+from enodo.jobs import (JOB_TYPE_FORECAST_SERIES,
+                        JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES,
+                        JOB_TYPE_STATIC_RULES)
 
 from lib.eventmanager import ENODO_EVENT_ANOMALY_DETECTED,\
     EnodoEventManager, EnodoEvent
@@ -16,7 +18,9 @@ from lib.series.series import Series
 from lib.serverstate import ServerState
 from lib.siridb.siridb import (
     drop_series, insert_points, query_group_expression_by_name,
-    query_series_data, query_series_datapoint_count)
+    query_series_anomalies, query_series_data,
+    query_series_datapoint_count, query_series_forecasts,
+    query_series_static_rules_hits)
 from lib.socket import ClientManager
 from lib.socketio import (SUBSCRIPTION_CHANGE_TYPE_ADD,
                           SUBSCRIPTION_CHANGE_TYPE_DELETE)
@@ -247,6 +251,31 @@ class SeriesManager:
         if values is not None:
             return values.get(f'anomalies_{series_name}', None)
         return None
+
+    @classmethod
+    async def get_series_static_rules(cls, series_name):
+        values = await query_series_data(
+            ServerState.get_siridb_output_conn(),
+            f'static_rules_{series_name}')
+        if values is not None:
+            return values.get(f'static_rules_{series_name}', None)
+        return None
+
+    @classmethod
+    async def get_series_output_by_job_type(cls, series_name, job_type,
+                                            forecast_future_only=False):
+        if job_type == JOB_TYPE_FORECAST_SERIES:
+            return await query_series_forecasts(
+                ServerState.get_siridb_output_conn(),
+                series_name, only_future=forecast_future_only)
+        elif job_type == JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES:
+            return await query_series_anomalies(
+                ServerState.get_siridb_output_conn(), series_name)
+        elif job_type == JOB_TYPE_STATIC_RULES:
+            return await query_series_static_rules_hits(
+                ServerState.get_siridb_output_conn(), series_name)
+
+        return {}
 
     @classmethod
     async def update_listeners(cls, series):
