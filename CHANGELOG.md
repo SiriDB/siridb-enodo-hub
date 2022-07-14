@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta3.2.20] - 2022-07-14
+
+### Changed
+- Implemented generic fields filter for multiple GET endpoints
+
 ## [0.1.0-beta3.2.19] - 2022-07-12
 
 ### Fixed

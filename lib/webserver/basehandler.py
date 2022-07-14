@@ -1,6 +1,7 @@
 import logging
 from uuid import uuid4
 from aiohttp import web
+from attr import field
 
 from siridb.connector.lib.exceptions import QueryError, InsertError, \
     ServerError, PoolError, AuthenticationError, UserAuthError
@@ -27,17 +28,10 @@ from siridb.connector.lib.exceptions import (
     ServerError, UserAuthError)
 from lib.util.util import (
     get_job_config_output_series_name,
-    parse_output_series_name)
+    apply_fields_filter,
+    async_simple_fields_filter,
+    sync_simple_fields_filter)
 from version import VERSION
-
-
-def apply_fields_filter(resources: list, fields: list) -> list:
-    resources = [dict(t) for t in resources]
-    if fields is not None:
-        resources = [
-            {k: v for k, v in resource.items() if k in fields}
-            for resource in resources]
-    return resources
 
 
 class BaseHandler:
@@ -58,6 +52,7 @@ class BaseHandler:
             SeriesManager.get_all_series_names(regex_filter))}
 
     @classmethod
+    @async_simple_fields_filter(is_list=False, return_index=0)
     async def resp_get_single_monitored_series(cls, series_name):
         """Get monitored series details
 
@@ -111,6 +106,7 @@ class BaseHandler:
                     forecast_future_only=forecast_future_only)).get(
                         output_series_name)
             resp.append({
+                "output_series_name": output_series_name,
                 "config_name": job_config.config_name,
                 "job_type": job_config.job_type,
                 "data": points
@@ -190,13 +186,15 @@ class BaseHandler:
         return {'data': output}, 200
 
     @classmethod
+    @async_simple_fields_filter(return_index=0)
     async def resp_get_event_outputs(cls):
         """get all event output steams
 
         Returns:
             dict: dict with data
         """
-        return {'data': await EnodoEventManager.get_outputs()}, 200
+        outputs = await EnodoEventManager.get_outputs()
+        return {'data': outputs}, 200
 
     @classmethod
     async def resp_add_event_output(cls, output_type, data):
@@ -388,13 +386,10 @@ class BaseHandler:
         return {'data': None}, 200
 
     @classmethod
-    def resp_get_series_config_templates(cls, fields=None):
+    @sync_simple_fields_filter(return_index=0)
+    def resp_get_series_config_templates(cls):
         scrm = ServerState.series_config_template_rm
         templates = scrm.get_cached_resources()
-
-        # TODO: make this field filter general for all get endpoints
-        templates = apply_fields_filter(templates, fields)
-
         return {'data': templates}, 200
 
     @classmethod
@@ -446,20 +441,22 @@ class BaseHandler:
                 series_name)}
 
     @classmethod
+    @sync_simple_fields_filter()
     def resp_get_possible_analyser_modules(cls):
         """Get all modules that are available
 
         Returns:
             dict: dict with data
         """
-        data = {'modules': list(ClientManager.modules.values())}
-        return {'data': data}
+        return {'data': list(ClientManager.modules.values())}
 
     @classmethod
+    @sync_simple_fields_filter(is_list=False)
     def resp_get_enodo_hub_status(cls):
         return {'data': {'version': VERSION}}
 
     @classmethod
+    @sync_simple_fields_filter(is_list=False)
     def resp_get_enodo_config(cls):
         return {'data': Config.get_settings(include_secrets=False)}
 
@@ -485,6 +482,7 @@ class BaseHandler:
         return {'data': True}
 
     @classmethod
+    @async_simple_fields_filter(is_list=False)
     async def resp_get_enodo_stats(cls):
         return {'data': {
             "no_series": SeriesManager.get_series_count(),
@@ -496,7 +494,7 @@ class BaseHandler:
                 "no_listeners": ClientManager.get_listener_count(),
                 "no_workers": ClientManager.get_worker_count(),
                 "no_busy_workers": ClientManager.get_busy_worker_count(),
-                "no_output_streams": len(EnodoEventManager.outputs)
+                "no_output_streams": len(await EnodoEventManager.get_outputs())
         }}
 
     @classmethod

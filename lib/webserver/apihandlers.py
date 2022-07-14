@@ -4,10 +4,12 @@ from urllib.parse import unquote
 
 from aiohttp import web
 from aiohttp_basicauth import BasicAuthMiddleware
+from attr import field
 from lib.config import Config
 from lib.serverstate import ServerState
 from lib.socket import ClientManager
 from lib.util import safe_json_dumps
+from lib.util.util import implement_fields_query
 from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
 
@@ -46,7 +48,8 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
-    async def get_single_monitored_series(cls, request):
+    @implement_fields_query
+    async def get_single_monitored_series(cls, request, fields=None):
         """Returns all details
 
         Args:
@@ -57,13 +60,14 @@ class ApiHandlers:
         """
         series_name = unquote(request.match_info['series_name'])
         data, status = await BaseHandler.resp_get_single_monitored_series(
-            series_name)
+            series_name, fields=fields)
         return web.json_response(
             data, dumps=safe_json_dumps, status=status)
 
     @classmethod
     @EnodoAuth.auth.required
-    async def get_all_series_output(cls, request):
+    @implement_fields_query
+    async def get_all_series_output(cls, request, fields=None):
         """Returns forecast data of a specific series.
 
         Args:
@@ -73,14 +77,6 @@ class ApiHandlers:
             _type_: _description_
         """
         series_name = unquote(request.match_info['series_name'])
-        fields = None
-        if "fields" in request.rel_url.query:
-            fields = urllib.parse.unquote(
-                request.rel_url.query['fields'])
-            if fields == "":
-                fields = None
-            if fields is not None:
-                fields = fields.split(",")
         only_future = False
         if "forecastFutureOnly" in request.rel_url.query:
             val = request.rel_url.query['forecastFutureOnly']
@@ -304,7 +300,8 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
-    async def get_series_config_templates(cls, request):
+    @implement_fields_query
+    async def get_series_config_templates(cls, request, fields=None):
         """Get all series config templates
 
         Args:
@@ -313,14 +310,6 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        fields = None
-        if "fields" in request.rel_url.query:
-            fields = urllib.parse.unquote(
-                request.rel_url.query['fields'])
-            if fields == "":
-                fields = None
-            if fields is not None:
-                fields = fields.split(",")
         data, status = BaseHandler.resp_get_series_config_templates(
             fields=fields)
         return web.json_response(
@@ -366,7 +355,8 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
-    async def get_enodo_event_outputs(cls, request):
+    @implement_fields_query
+    async def get_enodo_event_outputs(cls, request, fields=None):
         """Get all event outputs
 
         Args:
@@ -375,7 +365,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp, status = await BaseHandler.resp_get_event_outputs()
+        resp, status = await BaseHandler.resp_get_event_outputs(fields=fields)
         return web.json_response(data=resp, status=status)
 
     @classmethod
@@ -423,7 +413,8 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
-    async def get_possible_analyser_modules(cls, request):
+    @implement_fields_query
+    async def get_possible_analyser_modules(cls, request, fields=None):
         """Returns list of possible modules with corresponding parameters
 
         Args:
@@ -434,12 +425,13 @@ class ApiHandlers:
         """
 
         return web.json_response(
-            data=BaseHandler.resp_get_possible_analyser_modules(),
+            data=BaseHandler.resp_get_possible_analyser_modules(fields=fields),
             status=200)
 
     @classmethod
     @EnodoAuth.auth.required
-    async def get_siridb_enodo_status(cls, request):
+    @implement_fields_query
+    async def get_siridb_enodo_status(cls, request, fields=None):
         """Get status of enodo hub
 
         Args:
@@ -448,7 +440,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp = BaseHandler.resp_get_enodo_hub_status()
+        resp = BaseHandler.resp_get_enodo_hub_status(fields=fields)
         return web.json_response(data=resp, status=200)
 
     @classmethod
@@ -495,7 +487,8 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
-    async def get_settings(cls, request):
+    @implement_fields_query
+    async def get_settings(cls, request, fields=None):
         """Returns current settings dict
 
         Args:
@@ -504,7 +497,7 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp = BaseHandler.resp_get_enodo_config()
+        resp = BaseHandler.resp_get_enodo_config(fields=fields)
         return web.json_response(data=resp, status=200)
 
     @classmethod
@@ -549,7 +542,8 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
-    async def get_enodo_stats(cls, request):
+    @implement_fields_query
+    async def get_enodo_stats(cls, request, fields=None):
         """Return stats and numbers from enodo domain
 
         Args:
@@ -558,9 +552,8 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        resp = await BaseHandler.resp_get_enodo_stats()
-        return web.json_response(data={
-            'data': resp}, status=200)
+        resp = await BaseHandler.resp_get_enodo_stats(fields=fields)
+        return web.json_response(data=resp, status=200)
 
     @classmethod
     @EnodoAuth.auth.required
