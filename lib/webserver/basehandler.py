@@ -1,7 +1,7 @@
 import logging
+from typing import Any
 from uuid import uuid4
 from aiohttp import web
-from attr import field
 
 from siridb.connector.lib.exceptions import QueryError, InsertError, \
     ServerError, PoolError, AuthenticationError, UserAuthError
@@ -64,13 +64,15 @@ class BaseHandler:
         """
         series = await SeriesManager.get_series_read_only(series_name)
         if series is None:
-            return {'data': ''}, 404
+            return {'data': {}}, 404
         series_data = series.to_dict()
         return {'data': series_data}, 200
 
     @classmethod
-    async def resp_get_all_series_output(cls, series_name, fields=None,
-                                         forecast_future_only=False):
+    async def resp_get_all_series_output(cls, series_name,
+                                         fields=None,
+                                         forecast_future_only=False,
+                                         types=None):
         """Get all series results
 
         Args:
@@ -86,19 +88,21 @@ class BaseHandler:
         should_fetch_data = True if fields is None or \
             (fields is not None and "data" in fields) else False
 
-        if should_fetch_data and not forecast_future_only:
+        data = None
+        if should_fetch_data and not forecast_future_only and types is None:
             data = await query_all_series_results(
                 ServerState.get_siridb_output_conn(), series_name)
 
         resp = []
-
         for job_config in series.config.job_config.values():
             if job_config.job_type == JOB_TYPE_BASE_SERIES_ANALYSIS:
                 continue  # Ignore since no output
+            if types is not None and job_config.job_type not in types:
+                continue  # Ignore due to filter
             points = None
             output_series_name = get_job_config_output_series_name(
                 series_name, job_config.job_type, job_config.config_name)
-            if should_fetch_data and not forecast_future_only:
+            if data is not None:
                 points = data.get(output_series_name)
             elif should_fetch_data:
                 points = (await SeriesManager.get_series_output_by_job_type(
@@ -109,60 +113,13 @@ class BaseHandler:
                 "output_series_name": output_series_name,
                 "config_name": job_config.config_name,
                 "job_type": job_config.job_type,
+                "job_meta": series.state.job_analysis_meta.get_job_meta(
+                    job_config.config_name),
                 "data": points
             })
         if fields is not None:
             resp = apply_fields_filter(resp, fields)
         return {'data': resp}
-
-    @classmethod
-    async def resp_get_series_forecasts(cls, series_name, only_future):
-        """Get series forecast results
-
-        Args:
-            series_name (string): name of series
-
-        Returns:
-            dict: dict with data
-        """
-        series = await SeriesManager.get_series_read_only(series_name)
-        if series is None:
-            return web.json_response(data={'data': ''}, status=404)
-        return {'data': await query_series_forecasts(
-            ServerState.get_siridb_output_conn(), series_name,
-            only_future=only_future)}
-
-    @classmethod
-    async def resp_get_series_anomalies(cls, series_name):
-        """Get series anomalies results
-
-        Args:
-            series_name (string): name of series
-
-        Returns:
-            dict: dict with data
-        """
-        series = await SeriesManager.get_series_read_only(series_name)
-        if series is None:
-            return web.json_response(data={'data': ''}, status=404)
-        return {'data': await query_series_anomalies(
-            ServerState.get_siridb_output_conn(), series_name)}
-
-    @classmethod
-    async def resp_get_series_static_rules_hits(cls, series_name):
-        """Get series static rules hits
-
-        Args:
-            series_name (string): name of series
-
-        Returns:
-            dict: dict with data
-        """
-        series = await SeriesManager.get_series_read_only(series_name)
-        if series is None:
-            return web.json_response(data={'data': ''}, status=404)
-        return {'data': await query_series_static_rules_hits(
-            ServerState.get_siridb_output_conn(), series_name)}
 
     @classmethod
     async def resp_run_siridb_query(cls, query):
@@ -346,46 +303,6 @@ class BaseHandler:
                     if removed else 404
 
     @classmethod
-    async def resp_get_job_config_templates(cls, job_type):
-        trm = ResourceManager(
-            "job_config_templates", SeriesJobConfigTemplate, 0)
-        await trm.load()
-        templates = []
-        async for template in trm.itter():
-            if template.job_config_template.job_type == job_type:
-                templates.append(template)
-
-        return {'data': templates}, 200
-
-    @classmethod
-    async def resp_add_job_config_templates(cls, job_template: dict):
-        trm = ResourceManager(
-            "job_config_templates", SeriesJobConfigTemplate, 0)
-        await trm.load()
-        if trm.rid_exists(job_template.get("rid")):
-            return {'error': "template already exists"}, 400
-
-        if job_template.get("rid") is None:
-            job_template["rid"] = str(uuid4()).replace("-", "")
-
-        async with trm.create_resource(job_template) as template:
-            return {'data': template}, 201
-
-    @classmethod
-    async def resp_remove_job_config_templates(cls, rid: str):
-        trm = ResourceManager(
-            "job_config_templates", SeriesJobConfigTemplate, 0)
-        await trm.load()
-
-        if not trm.rid_exists(rid):
-            return {'error': "template does not exists"}, 404
-
-        template = await trm.get_resource(rid)
-        await trm.delete_resource(template)
-
-        return {'data': None}, 200
-
-    @classmethod
     @sync_simple_fields_filter(return_index=0)
     def resp_get_series_config_templates(cls):
         scrm = ServerState.series_config_template_rm
@@ -407,15 +324,57 @@ class BaseHandler:
 
     @classmethod
     async def resp_remove_series_config_templates(cls, rid: str):
+        # TODO: check if series are using this template
+        scrm = ServerState.series_config_template_rm
+
+        if not scrm.rid_exists(rid):
+            return {'error': "template does not exists"}, 404
+
+        async for series in ServerState.series_rm.itter():
+            if series._config_from_template:
+                if series.config.rid == rid:
+                    return {'error': "template is used by series"}, 400
+
+        template = await scrm.get_resource(rid)
+        await scrm.delete_resource(template)
+
+        return {'data': None}, 200
+
+    @classmethod
+    async def resp_update_series_config_templates_static(cls, rid: str,
+                                                         name: str, desc: str):
         scrm = ServerState.series_config_template_rm
 
         if not scrm.rid_exists(rid):
             return {'error': "template does not exists"}, 404
 
         template = await scrm.get_resource(rid)
-        await scrm.delete_resource(template)
+        if name is not None:
+            template['name'] = name
+        if desc is not None:
+            template['description'] = desc
+        await template.store()
 
-        return {'data': None}, 200
+        return {'data': template}, 201
+
+    @classmethod
+    async def resp_update_series_config_templates(cls, rid: str,
+                                                  config: dict):
+        scrm = ServerState.series_config_template_rm
+
+        if not scrm.rid_exists(rid):
+            return {'error': "template does not exists"}, 404
+
+        template = await scrm.get_resource(rid)
+        if config is None:
+            return {'error', 'no config given', 400}
+        template['config'] = config
+        await template.store()
+        async for series in ServerState.series_rm.itter(update=True):
+            if series._config_from_template:
+                ServerState.index_series_schedules(series)
+
+        return {'data': template}, 201
 
     @classmethod
     def resp_get_jobs_queue(cls):

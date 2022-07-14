@@ -130,7 +130,9 @@ def async_simple_fields_filter(
                 org_resp = list(resp)
                 resp = resp[return_index]
             if is_wrapped:
-                resp = resp.get('data', [])
+                if 'data' not in resp:
+                    return resp  # might be an error
+                resp = resp.get('data', [] if is_list else {})
             if fields is not None:
                 if is_list is True:
                     resp = apply_fields_filter(resp, fields)
@@ -157,7 +159,9 @@ def sync_simple_fields_filter(
                 org_resp = list(resp)
                 resp = resp[return_index]
             if is_wrapped:
-                resp = resp.get('data', [])
+                if 'data' not in resp:
+                    return resp  # might be an error
+                resp = resp.get('data', [] if is_list else {})
             if fields is not None:
                 if is_list is True:
                     resp = apply_fields_filter(resp, fields)
