@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta3.2.20] - 2022-07-14
+
+### Removed
+- Removed old job config template routes and handlers
+
+### Added
+- Analysis region to series state job meta
+- Job meta to output
+
+### Changed
+- Implemented generic fields filter for multiple GET endpoints
+- Merged output routes and handlers into one with query param to filter by job_type
+
+## [0.1.0-beta3.2.19] - 2022-07-12
+
+### Fixed
+- Fixed bug with filtering fields for all output endpoint
+
 ## [0.1.0-beta3.2.18] - 2022-07-12
 
 ### Added

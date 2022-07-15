@@ -440,6 +440,10 @@ class EnodoJobManager:
                 series.schedule_job(job.job_config.config_name)
                 series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
+                series.state.job_analysis_meta.set_job_meta(
+                    job.job_config.config_name,
+                    {'analyse_region': job_response.get(
+                        'analyse_region')})
                 await SeriesManager.series_changed(
                     SUBSCRIPTION_CHANGE_TYPE_UPDATE, job_response.get('name'))
             except Exception as e:
@@ -460,6 +464,10 @@ class EnodoJobManager:
                     series.schedule_job(job.job_config.config_name)
                     series.set_job_status(
                         job.job_config.config_name, JOB_STATUS_DONE)
+                    series.state.job_analysis_meta.set_job_meta(
+                        job.job_config.config_name,
+                        {'analyse_region': job_response.get(
+                            'analyse_region')})
                     await SeriesManager.series_changed(
                         SUBSCRIPTION_CHANGE_TYPE_UPDATE,
                         job_response.get('name'))
@@ -492,6 +500,10 @@ class EnodoJobManager:
                 series.schedule_job(job.job_config.config_name)
                 series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
+                series.state.job_analysis_meta.set_job_meta(
+                    job.job_config.config_name,
+                    {'analyse_region': job_response.get(
+                        'analyse_region')})
                 await SeriesManager.add_static_rule_hits_to_series(
                     job_response.get('name'),
                     job.job_config.config_name,

@@ -4,6 +4,7 @@ import json
 import logging
 import re
 from packaging import version
+import urllib.parse
 
 from enodo.jobs import (
     JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_FORECAST_SERIES,
@@ -102,3 +103,90 @@ def cls_lock():
                 raise Exception("Incorrect usage of cls_lock func")
         return wrapped
     return wrapper
+
+
+def apply_fields_filter(resources: list, fields: list) -> list:
+    resources = [dict(t) for t in resources]
+    if fields is not None:
+        resources = [
+            filter_single_dict(resource, fields)
+            for resource in resources]
+    return resources
+
+
+def filter_single_dict(
+        resource: dict, fields: list) -> dict:
+    return {k: v for k, v in resource.items() if k in fields}
+
+
+def async_simple_fields_filter(
+        is_list=True, is_wrapped=True, return_index=None):
+    def wrapper(func):
+        @functools.wraps(func)
+        async def wrapped(*args, **kwargs):
+            fields = kwargs.pop('fields', None)
+            resp = await func(*args, **kwargs)
+            if return_index is not None:
+                org_resp = list(resp)
+                resp = resp[return_index]
+            if is_wrapped:
+                if 'data' not in resp:
+                    return resp  # might be an error
+                resp = resp.get('data', [] if is_list else {})
+            if fields is not None:
+                if is_list is True:
+                    resp = apply_fields_filter(resp, fields)
+                else:
+                    resp = filter_single_dict(resp, fields)
+            if is_wrapped:
+                resp = {"data": resp}
+            if return_index is not None:
+                org_resp[return_index] = resp
+                resp = tuple(org_resp)
+            return resp
+        return wrapped
+    return wrapper
+
+
+def sync_simple_fields_filter(
+        is_list=True, is_wrapped=True, return_index=None):
+    def wrapper(func):
+        @functools.wraps(func)
+        def wrapped(*args, **kwargs):
+            fields = kwargs.pop('fields', None)
+            resp = func(*args, **kwargs)
+            if return_index is not None:
+                org_resp = list(resp)
+                resp = resp[return_index]
+            if is_wrapped:
+                if 'data' not in resp:
+                    return resp  # might be an error
+                resp = resp.get('data', [] if is_list else {})
+            if fields is not None:
+                if is_list is True:
+                    resp = apply_fields_filter(resp, fields)
+                else:
+                    resp = filter_single_dict(resp, fields)
+            if is_wrapped:
+                resp = {"data": resp}
+            if return_index is not None:
+                org_resp[return_index] = resp
+                resp = tuple(org_resp)
+            return resp
+        return wrapped
+    return wrapper
+
+
+def implement_fields_query(func):
+    @functools.wraps(func)
+    async def wrapped(cls, request):
+        fields = None
+        if "fields" in request.rel_url.query:
+            fields = urllib.parse.unquote(
+                request.rel_url.query['fields'])
+            if fields == "":
+                fields = None
+            if fields is not None:
+                fields = fields.split(",")
+        return await func(cls, request, fields=fields)
+    return wrapped

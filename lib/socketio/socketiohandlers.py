@@ -70,31 +70,6 @@ class SocketIoHandler:
 
     @classmethod
     @socketio_auth_required
-    async def get_series_forecasts(cls, sid, data, event):
-        series_name = data.get('series_name')
-        only_future = data.get('only_future')
-        resp = await BaseHandler.resp_get_series_forecasts(
-            series_name, only_future)
-        return safe_json_dumps(resp)
-
-    @classmethod
-    @socketio_auth_required
-    async def get_series_anomalies(cls, sid, data, event):
-        series_name = data.get('series_name')
-        resp = await BaseHandler.resp_get_series_anomalies(
-            series_name)
-        return safe_json_dumps(resp)
-
-    @classmethod
-    @socketio_auth_required
-    async def get_series_static_rules_hits(cls, sid, data, event):
-        series_name = data.get('series_name')
-        resp = await BaseHandler.resp_get_series_static_rules_hits(
-            series_name)
-        return safe_json_dumps(resp)
-
-    @classmethod
-    @socketio_auth_required
     async def run_siridb_query(cls, sid, data, event):
         query = data.get('query')
         resp, status = await BaseHandler.resp_run_siridb_query(

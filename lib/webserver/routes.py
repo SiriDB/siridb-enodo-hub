@@ -19,20 +19,8 @@ def setup_routes(app, cors):
         allow_head=False)
 
     app.router.add_get(
-        "/api/series/{series_name}/all",
+        "/api/series/{series_name}/output",
         ApiHandlers.get_all_series_output,
-        allow_head=False)
-    app.router.add_get(
-        "/api/series/{series_name}/forecasts",
-        ApiHandlers.get_series_forecast,
-        allow_head=False)
-    app.router.add_get(
-        "/api/series/{series_name}/anomalies",
-        ApiHandlers.get_series_anomalies,
-        allow_head=False)
-    app.router.add_get(
-        "/api/series/{series_name}/static_rules",
-        ApiHandlers.get_series_static_rules_hits,
         allow_head=False)
 
     app.router.add_delete(
@@ -43,15 +31,6 @@ def setup_routes(app, cors):
     app.router.add_post(
         "/api/series/{series_name}/job",
         ApiHandlers.add_series_job_config)
-    # app.router.add_get(
-    #     "/api/template/job/{job_type}",
-    #     ApiHandlers.get_job_config_templates)
-    # app.router.add_post(
-    #     "/api/template/job",
-    #     ApiHandlers.add_job_config_templates)
-    # app.router.add_delete(
-    #     "/api/template/job/{rid}",
-    #     ApiHandlers.remove_job_config_templates)
     app.router.add_get(
         "/api/template/series",
         ApiHandlers.get_series_config_templates)
@@ -61,6 +40,12 @@ def setup_routes(app, cors):
     app.router.add_delete(
         "/api/template/series/{rid}",
         ApiHandlers.remove_series_config_templates)
+    app.router.add_put(
+        "/api/template/series/{rid}/static",
+        ApiHandlers.update_series_config_templates_static)
+    app.router.add_put(
+        "/api/template/series/{rid}",
+        ApiHandlers.update_series_config_templates)
     app.router.add_get(
         "/api/enodo/module", ApiHandlers.get_possible_analyser_modules,
         allow_head=False)
