@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+### Added
+- Resolve series per job to re-trigger
+
 ## [0.1.0-beta3.2.17] - 2022-07-07
 
 ### Added
