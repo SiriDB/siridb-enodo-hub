@@ -7,7 +7,7 @@ from siridb.connector.lib.exceptions import QueryError, InsertError, \
     ServerError, PoolError, AuthenticationError, UserAuthError
 
 from aiohttp import web
-from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS
+from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_NONE
 from enodo.model.config.series import SeriesConfigModel
 
 from lib.config import Config
@@ -398,6 +398,17 @@ class BaseHandler:
         return {
             'data': await EnodoJobManager.remove_failed_jobs_for_series(
                 series_name)}
+
+    @classmethod
+    async def resp_resolve_series_job_status(cls, series_name,
+                                             job_config_name):
+        await EnodoJobManager.remove_failed_jobs_for_series(series_name,
+                                                            job_config_name)
+        async with SeriesManager.get_series(series_name) as series:
+            series.set_job_status(job_config_name, JOB_STATUS_NONE)
+            series.schedule_job(job_config_name, initial=True)
+            ServerState.index_series_schedules(series)
+        return {'data': "OK"}
 
     @classmethod
     @sync_simple_fields_filter()

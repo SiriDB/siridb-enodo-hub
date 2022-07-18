@@ -32,6 +32,9 @@ def setup_routes(app, cors):
         "/api/series/{series_name}/job",
         ApiHandlers.add_series_job_config)
     app.router.add_get(
+        "/api/series/{series_name}/resolve/{job_config_name}",
+        ApiHandlers.resolve_series_job_status)
+    app.router.add_get(
         "/api/template/series",
         ApiHandlers.get_series_config_templates)
     app.router.add_post(

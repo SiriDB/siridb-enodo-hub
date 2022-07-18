@@ -189,10 +189,14 @@ class EnodoJobManager:
         return jobs
 
     @classmethod
-    async def remove_failed_jobs_for_series(cls, series_name: str):
+    async def remove_failed_jobs_for_series(cls, series_name: str,
+                                            job_config_name: Optional[str] =
+                                            None):
         for job in cls.get_failed_jobs_for_series(series_name):
-            cls._failed_jobs.remove(job)
-            await job.delete()
+            if job_config_name is None or \
+                    job.job_config.config_name == job_config_name:
+                cls._failed_jobs.remove(job)
+                await job.delete()
 
     @classmethod
     @cls_lock()
