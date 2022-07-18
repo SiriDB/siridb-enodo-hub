@@ -184,10 +184,14 @@ class EnodoJobManager:
         return jobs
 
     @classmethod
-    async def remove_failed_jobs_for_series(cls, series_name: str):
+    async def remove_failed_jobs_for_series(cls, series_name: str,
+                                            job_config_name: Optional[str] =
+                                            None):
         for job in cls.get_failed_jobs_for_series(series_name):
-            cls._failed_jobs.remove(job)
-            await job.delete()
+            if job_config_name is None or \
+                    job.job_config.config_name == job_config_name:
+                cls._failed_jobs.remove(job)
+                await job.delete()
 
     @classmethod
     @cls_lock()
@@ -435,6 +439,10 @@ class EnodoJobManager:
                 series.schedule_job(job.job_config.config_name)
                 series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
+                series.state.job_analysis_meta.set_job_meta(
+                    job.job_config.config_name,
+                    {'analyse_region': job_response.get(
+                        'analyse_region')})
                 await SeriesManager.series_changed(
                     SUBSCRIPTION_CHANGE_TYPE_UPDATE, job_response.get('name'))
             except Exception as e:
@@ -455,6 +463,10 @@ class EnodoJobManager:
                     series.schedule_job(job.job_config.config_name)
                     series.set_job_status(
                         job.job_config.config_name, JOB_STATUS_DONE)
+                    series.state.job_analysis_meta.set_job_meta(
+                        job.job_config.config_name,
+                        {'analyse_region': job_response.get(
+                            'analyse_region')})
                     await SeriesManager.series_changed(
                         SUBSCRIPTION_CHANGE_TYPE_UPDATE,
                         job_response.get('name'))
@@ -487,6 +499,10 @@ class EnodoJobManager:
                 series.schedule_job(job.job_config.config_name)
                 series.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
+                series.state.job_analysis_meta.set_job_meta(
+                    job.job_config.config_name,
+                    {'analyse_region': job_response.get(
+                        'analyse_region')})
                 await SeriesManager.add_static_rule_hits_to_series(
                     job_response.get('name'),
                     job.job_config.config_name,

@@ -170,10 +170,13 @@ class ResourceManager:
         resp = self._resource_class(**data)
         return resp
 
-    async def get_resource(self, rid: str) -> StoredResource:
+    async def get_resource(self, rid: str,
+                           use_cache: bool = True) -> StoredResource:
         if rid not in self._resources:
             return None
-        resp = self._lruqueue.get(rid)
+        resp = None
+        if use_cache:
+            resp = self._lruqueue.get(rid)
         if resp is None:
             resp = \
                 self._resource_class(**(
@@ -194,8 +197,8 @@ class ResourceManager:
     def get_resource_count(self) -> int:
         return len(self._resources)
 
-    async def itter(self):
+    async def itter(self, update=False):
         rids = self.get_resource_rids()
         for rid in rids:
-            resp = await self.get_resource(rid)
+            resp = await self.get_resource(rid, use_cache=not update)
             yield resp
