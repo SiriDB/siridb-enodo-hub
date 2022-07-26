@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 - Resolve series endpoint, per job to re-trigger
 - Implemented upgrade system for ThingsDB collection
+- Working TS scheduling type, without listener dependency
 
 ### Changed
 - Query single series by rid by default, by name possible by setting `?byName=1/true`
