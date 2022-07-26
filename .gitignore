@@ -5,7 +5,6 @@ dist
 .idea
 .idea/*
 .idea/vcs.xml
-restapi.md
 
 *.pyc
 *.pyo
