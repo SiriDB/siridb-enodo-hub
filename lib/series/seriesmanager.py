@@ -1,7 +1,8 @@
 import asyncio
 import contextlib
-from copy import deepcopy
+import json
 import logging
+import os
 import re
 
 import qpack
@@ -9,6 +10,7 @@ from enodo.protocol.package import create_header, UPDATE_SERIES
 from enodo.jobs import (JOB_TYPE_FORECAST_SERIES,
                         JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES,
                         JOB_TYPE_STATIC_RULES)
+from lib.config import Config
 
 from lib.eventmanager import ENODO_EVENT_ANOMALY_DETECTED,\
     EnodoEventManager, EnodoEvent
@@ -41,14 +43,22 @@ class SeriesManager:
         cls._labels_last_update = None
         cls._srm = ServerState.series_rm
         logging.info("Loading saved series states...")
-        _states = await ServerState.storage.client.query(
-            ".series_states.values().copy(10)")
-        cls._states = {
-            state["name"]: SeriesState.unserialize(state)
-            for state in _states}
+        await cls._load_states()
         async for series in cls._srm.itter():
             async with cls.get_state(series.name) as state:
                 ServerState.index_series_schedules(series, state)
+
+    @classmethod
+    async def _load_states(cls):
+        state_file_path = os.path.join(Config.base_dir, "state.json")
+        if not os.path.exists(state_file_path):
+            cls._states = {}
+            return
+        with open(state_file_path, 'r') as f:
+            _states = json.loads(f.read())
+            cls._states = {
+                state["name"]: SeriesState.unserialize(state)
+                for state in _states.values()}
 
     @classmethod
     async def series_changed(cls, change_type: str, series_name: str):
@@ -340,8 +350,12 @@ class SeriesManager:
         _states = {state.name: state.serialize()
                    for state in cls._states.values()}
         try:
-            await ServerState.storage.client.query(
-                ".series_states = states", states=_states)
+            if not os.path.exists(Config.base_dir):
+                raise Exception("Path does not exist")
+            state_file_path = os.path.join(
+                Config.base_dir, "state.json")
+            with open(state_file_path, 'w') as f:
+                f.write(json.dumps(_states))
         except Exception as e:
-            logging.error("Cannot save state to thingsdb...")
+            logging.error("Cannot save state to disk...")
             logging.debug(f"Corresponding error: {e}")

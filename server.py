@@ -223,7 +223,8 @@ class Server:
             except Exception as e:
                 logging.error('Watching background tasks failed')
 
-    async def _check_for_jobs(self, series, state, series_name):
+    async def _check_for_jobs(self, series, state, series_name,
+                              base_only=False):
         """Private function to check if jobs need to be created
 
         Args:
@@ -233,9 +234,9 @@ class Server:
         # Check if series does have any failed jobs
         if len(EnodoJobManager.get_failed_jobs_for_series(series_name)) > 0:
             return
-        # Check if base analysis has already run
-        if state.get_job_status(
-                series.base_analysis_job.config_name) == JOB_STATUS_NONE:
+        # Check if base analysis needs to run
+        if state.is_job_due(
+                series.base_analysis_job.config_name, series):
             base_analysis_job = series.base_analysis_job
             module = ClientManager.get_module(
                 base_analysis_job.module)
@@ -247,6 +248,9 @@ class Server:
                 return
             await EnodoJobManager.create_job(
                 base_analysis_job.config_name, series_name)
+
+        if base_only:
+            return
         # Only continue if base analysis has finished
         if state.get_job_status(
                 series.base_analysis_job.config_name) != JOB_STATUS_DONE:
@@ -264,6 +268,24 @@ class Server:
                 c = await SeriesManager.get_config_read_only(series_name)
                 async with SeriesManager.get_state(series_name) as s:
                     c.schedule_job(job_config_name, s, initial=True)
+
+    async def _handle_low_datapoints(self, series, state):
+        dp_too_low = False
+        min_dp = 0
+        if series.config.min_data_points is not None:
+            if state.get_datapoints_count() < \
+                    series.config.min_data_points:
+                dp_too_low = True
+                min_dp = series.config.min_data_points
+        elif state.get_datapoints_count() < \
+                Config.min_data_points:
+            dp_too_low = True
+            min_dp = Config.min_data_points
+        if dp_too_low:
+            await self._check_for_jobs(series, state, series.name,
+                                       base_only=True)
+            await state.update_datapoints_count(min_dp)
+        return dp_too_low
 
     async def watch_series(self):
         """Background task to check each series if
@@ -286,12 +308,7 @@ class Server:
                 # Check if requirement of min amount of datapoints is met
                 if state.get_datapoints_count() is None:
                     continue
-                if series.config.min_data_points is not None:
-                    if state.get_datapoints_count() < \
-                            series.config.min_data_points:
-                        continue
-                elif state.get_datapoints_count() < \
-                        Config.min_data_points:
+                if await self._handle_low_datapoints(series, state):
                     continue
 
                 try:

@@ -142,27 +142,9 @@ class Config:
         This method can only be called after the configfile is parsed
         :return:
         """
-
-        if cls.disable_safe_mode is True:
-            logging.info(
-                'Safe mode disabled for internal communication')
-            return
-
-        if cls._config is None:
-            raise EnodoException(
-                'Can only setup token when config is parsed')
-
-        if os.path.exists(
-                os.path.join(cls.base_dir, 'internal_token.cred')):
-            f = open(os.path.join(cls.base_dir,
-                                  'internal_token.cred'), "r")
-            cls.internal_security_token = f.read()
-        else:
-            f = open(os.path.join(cls.base_dir,
-                                  'internal_token.cred'), "w+")
+        cls.internal_security_token = None
+        if cls.disable_safe_mode is False:
             cls.internal_security_token = token_urlsafe(16)
-            f.write(cls.internal_security_token)
-        f.close()
 
     @classmethod
     def read_config(cls, path):
@@ -253,14 +235,6 @@ class Config:
             'hub', 'base_path')
         cls.disable_safe_mode = cls.to_bool(
             cls._config.get_r('hub', 'disable_safe_mode'), False)
-        cls.series_save_path = os.path.join(
-            cls.base_dir, 'data/series.json')
-        cls.clients_save_path = os.path.join(
-            cls.base_dir, 'data/clients.json')
-        cls.jobs_save_path = os.path.join(
-            cls.base_dir, 'data/jobs.json')
-        cls.event_outputs_save_path = os.path.join(
-            cls.base_dir, 'data/outputs.json')
 
         # ThingsDB
         cls.thingsdb_host = cls._config.get_r(
@@ -297,9 +271,6 @@ class Config:
         cls.siridb_output_database = cls._config.get_r(
             'siridb_output',
             'database')
-
-        if not os.path.exists(os.path.join(cls.base_dir, 'data')):
-            os.makedirs(os.path.join(cls.base_dir, 'data'))
 
     @staticmethod
     def to_int(val):

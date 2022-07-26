@@ -5,6 +5,8 @@ from typing import Any
 
 from recordclass import dataobject
 from enodo.jobs import JOB_STATUS_NONE, JOB_STATUS_DONE, JOB_STATUS_FAILED
+from lib.serverstate import ServerState
+from lib.siridb.siridb import query_series_datapoint_count
 
 from lib.socket.clientmanager import ClientManager
 
@@ -36,6 +38,8 @@ class SeriesState(dataobject):
     characteristics: str = None
     job_data: list = []
     lock = asyncio.Lock()
+    last_checked_dp: int = None
+    _update_dp_at: int = None
 
     @classmethod
     def unserialize(cls, data):
@@ -118,7 +122,27 @@ class SeriesState(dataobject):
         :return:
         """
         async with self.lock:
+            self.last_checked_dp = int(time.time())
             self.datapoint_count += add_to_count
+
+    async def set_datapoints_count(self, new_count: int):
+        async with self.lock:
+            self.last_checked_dp = int(time.time())
+            self.datapoint_count = new_count
+
+    async def update_datapoints_count(self, at: int):
+        if self.datapoint_count >= at:
+            return
+        if self.last_checked_dp is None:
+            self.last_checked_dp = int(time.time())
+        if self._update_dp_at is None:
+            diff = at - self.datapoint_count
+            self._update_dp_at = diff * self.interval + self.last_checked_dp
+        if self._update_dp_at <= int(time.time()):
+            print("HERER", self._update_dp_at)
+            collected_datapoints = await query_series_datapoint_count(
+                ServerState.get_siridb_data_conn(), self.name)
+            await self.set_datapoints_count(collected_datapoints)
 
     def is_job_due(self, job_config_name: str,
                    series) -> bool:
@@ -146,7 +170,7 @@ class SeriesState(dataobject):
                     job_config_name,
                     f"Waiting for required job {r_job}")
                 return False
-        if job_schedule["value"] is None:
+        if job_schedule is None or job_schedule["value"] is None:
             return True
         if job_schedule["type"] == "TS" and \
                 job_schedule["value"] <= int(time.time()):
