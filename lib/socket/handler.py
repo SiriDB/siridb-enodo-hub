@@ -6,10 +6,9 @@ from lib.socket import ClientManager
 async def receive_new_series_points(writer, packet_type,
                                     packet_id, data, client_id):
     for series_name in data.keys():
-        async with SeriesManager.get_series(series_name) as series:
-            if series is not None:
-                await SeriesManager.add_to_datapoint_counter(
-                    series_name, data.get(series_name))
+        async with SeriesManager.get_state(series_name) as state:
+            if state is not None:
+                await state.add_to_datapoints_count(data.get(series_name))
     response = create_header(0, RESPONSE_OK, packet_id)
     writer.write(response)
 

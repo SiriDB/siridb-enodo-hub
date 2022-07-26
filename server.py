@@ -14,10 +14,9 @@ from enodo.protocol.package import LISTENER_NEW_SERIES_POINTS, \
     WORKER_UPDATE_BUSY, WORKER_JOB_RESULT, WORKER_REFUSED, \
     WORKER_JOB_CANCELLED
 from enodo.jobs import JOB_STATUS_NONE, JOB_STATUS_DONE
-from lib.series.jobtemplate import SeriesJobConfigTemplate
 from lib.series.seriestemplate import SeriesConfigTemplate
-from lib.state.diskstorage import DiskStorage
 from lib.state.thingsdbstorage import ThingsDBStorage
+from lib.util.upgrade import UpgradeUtil
 
 from lib.webserver.apihandlers import ApiHandlers, auth
 from lib.config import Config
@@ -72,14 +71,24 @@ class Server:
                 getattr(signal, signame),
                 lambda: asyncio.ensure_future(self.stop_server()))
 
+        storage = ThingsDBStorage()
+        try:
+            await storage.startup()
+        except Exception as e:
+            logging.error(
+                "Cannot startup, not able to connect to ThingsDB")
+            logging.debug(f"Corresponding error: {e}")
+            raise e
+
         # Setup server state object
-        if Config.storage_type == "thingsdb":
-            storage = ThingsDBStorage()
-        else:
-            storage = DiskStorage(Config.base_dir)
-        await storage.startup()
         await ServerState.async_setup(sio=self.sio,
                                       storage=storage)
+        try:
+            await UpgradeUtil.upgrade_thingsdb()
+        except Exception as e:
+            logging.error("Upgrade of thingsdb collection failed")
+            logging.debug(f"Corresponding error: {e}")
+            raise e
 
         # Setup internal security token for authenticating
         # backend socket connections
@@ -106,7 +115,8 @@ class Server:
             SocketIoRouter(self.sio)
 
         ServerState.series_rm = ResourceManager(
-            'series', Series, extra_index_field="name")
+            'series', Series, extra_index_field="name",
+            keep_in_memory=-1)
         await ServerState.series_rm.load()
         ServerState.series_config_template_rm = ResourceManager(
             'series_config_templates', SeriesConfigTemplate, cache_only=True)
@@ -211,7 +221,7 @@ class Server:
             except Exception as e:
                 logging.error('Watching background tasks failed')
 
-    async def _check_for_jobs(self, series, series_name):
+    async def _check_for_jobs(self, series, state, series_name):
         """Private function to check if jobs need to be created
 
         Args:
@@ -222,33 +232,36 @@ class Server:
         if len(EnodoJobManager.get_failed_jobs_for_series(series_name)) > 0:
             return
         # Check if base analysis has already run
-        if series.base_analysis_status() == JOB_STATUS_NONE:
+        if state.get_job_status(
+                series.base_analysis_job.config_name) == JOB_STATUS_NONE:
             base_analysis_job = series.base_analysis_job
             module = ClientManager.get_module(
                 base_analysis_job.module)
             if module is None:
-                async with SeriesManager.get_series(series_name) as s:
-                    s.state.set_job_check_status(
+                async with SeriesManager.get_state(series_name) as s:
+                    s.set_job_check_status(
                         base_analysis_job.config_name,
                         "Unknown module")
                 return
             await EnodoJobManager.create_job(
                 base_analysis_job.config_name, series_name)
         # Only continue if base analysis has finished
-        if series.base_analysis_status() != JOB_STATUS_DONE:
+        if state.get_job_status(
+                series.base_analysis_job.config_name) != JOB_STATUS_DONE:
             return
 
         # loop through scheduled jobs:
-        job_schedules = series.state.get_all_job_schedules()
+        job_schedules = state.get_all_job_schedules()
         for job_config_name in series.config.job_config:
             if job_config_name in job_schedules and \
-                    series.is_job_due(job_config_name):
+                    state.is_job_due(job_config_name, series):
                 await EnodoJobManager.create_job(job_config_name, series_name)
                 continue
             if job_config_name not in job_schedules:
                 # Job has not been schedules yet, let's add it
-                async with SeriesManager.get_series(series_name) as s:
-                    s.schedule_job(job_config_name, initial=True)
+                c = await SeriesManager.get_config_read_only(series_name)
+                async with SeriesManager.get_state(series_name) as s:
+                    c.schedule_job(job_config_name, s, initial=True)
 
     async def watch_series(self):
         """Background task to check each series if
@@ -258,27 +271,29 @@ class Server:
             ServerState.tasks_last_runs['watch_series'] = \
                 datetime.datetime.now()
             current_time = time()
-            for series_name, ts in ServerState.job_schedule_index.items():
+            for series_name, ts in dict(
+                    ServerState.job_schedule_index).items():
                 if ts > current_time:
                     continue
-                series = await SeriesManager.get_series_read_only(series_name)
+                series, state = \
+                    await SeriesManager.get_series_read_only(series_name)
                 # Check if series is valid and not ignored
                 if series is None or series.is_ignored():
                     continue
 
                 # Check if requirement of min amount of datapoints is met
-                if series.get_datapoints_count() is None:
+                if state.get_datapoints_count() is None:
                     continue
                 if series.config.min_data_points is not None:
-                    if series.get_datapoints_count() < \
+                    if state.get_datapoints_count() < \
                             series.config.min_data_points:
                         continue
-                elif series.get_datapoints_count() < \
+                elif state.get_datapoints_count() < \
                         Config.min_data_points:
                     continue
 
                 try:
-                    await self._check_for_jobs(series, series_name)
+                    await self._check_for_jobs(series, state, series_name)
                 except Exception as e:
                     logging.error(
                         f"Something went wrong when "
@@ -317,6 +332,7 @@ class Server:
             del self.sio
             self.sio = None
 
+        await SeriesManager.close()
         ServerState.running = False
         await self.wait_for_queue()
         logging.info('...Doing clean up')

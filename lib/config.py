@@ -18,8 +18,7 @@ EMPTY_CONFIG_FILE = {
         'save_to_disk_interval': '20',
         'enable_rest_api': 'true',
         'enable_socket_io_api': 'false',
-        'disable_safe_mode': 'false',
-        'storage_type': 'disk'
+        'disable_safe_mode': 'false'
     },
     'analyser': {
         'watcher_interval': '2',
@@ -114,7 +113,6 @@ class Config:
     internal_security_token = None
     jobs_save_path = None
     disable_safe_mode = None
-    storage_type = None
 
     # ThingsDB
     thingsdb_host = None
@@ -276,19 +274,15 @@ class Config:
         cls.event_outputs_save_path = os.path.join(
             cls.base_dir, 'data/outputs.json')
 
-        cls.storage_type = cls._config.get_r(
-            'hub', 'storage_type').lower()
-
         # ThingsDB
-        thingsdb_enabled = cls.storage_type == "thingsdb"
         cls.thingsdb_host = cls._config.get_r(
-            'thingsdb', 'host', thingsdb_enabled)
+            'thingsdb', 'host', True)
         cls.thingsdb_port = cls.to_int(
-            cls._config.get_r('thingsdb', 'port', thingsdb_enabled))
+            cls._config.get_r('thingsdb', 'port', True))
         cls.thingsdb_auth_token = cls._config.get_r(
-            'thingsdb', 'auth_token', thingsdb_enabled)
+            'thingsdb', 'auth_token', True)
         cls.thingsdb_scope = cls._config.get_r(
-            'thingsdb', 'scope', thingsdb_enabled)
+            'thingsdb', 'scope', True)
 
         # SiriDB
         cls.siridb_host = cls._config.get_r('siridb_data', 'host')

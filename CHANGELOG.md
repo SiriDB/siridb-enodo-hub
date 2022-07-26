@@ -7,9 +7,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
-### Added
-- Resolve series per job to re-trigger
+## [0.1.0-beta4.0.0] - 2022-07-26
 
+### Added
+- Resolve series endpoint, per job to re-trigger
+- Implemented upgrade system for ThingsDB collection
+
+### Changed
+- Query single series by rid by default, by name possible by setting `?byName=1/true`
+- Use ThingsDB things ID's as rid's
+- Moved series state to hub memory. Only save to thingsdb on shutdown. Load them from thingsdb at startup
+
+### Removed
+- Removed disk storage
 
 ## [0.1.0-beta3.2.20] - 2022-07-14
 

@@ -375,8 +375,8 @@ class ClientManager:
         if len(pending_jobs) > 0:
             for job in pending_jobs:
                 await EnodoJobManager.cancel_job(job)
-                async with SeriesManager.get_series(job.series_name) as series:
-                    series.set_job_status(
+                async with SeriesManager.get_state(job.series_name) as state:
+                    state.set_job_status(
                         job.job_config.config_name, JOB_STATUS_OPEN)
                     logging.info(
                         f'Setting for series job status pending to false...')

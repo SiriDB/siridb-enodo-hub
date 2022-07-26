@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+from copy import deepcopy
 import logging
 import re
 
@@ -14,7 +15,7 @@ from lib.eventmanager import ENODO_EVENT_ANOMALY_DETECTED,\
 from enodo.protocol.package import UPDATE_SERIES, create_header
 from lib.eventmanager import (ENODO_EVENT_ANOMALY_DETECTED, EnodoEvent,
                               EnodoEventManager)
-from lib.series.series import Series
+from lib.series.seriesstate import SeriesState
 from lib.serverstate import ServerState
 from lib.siridb.siridb import (
     drop_series, insert_points, query_group_expression_by_name,
@@ -24,7 +25,6 @@ from lib.siridb.siridb import (
 from lib.socket import ClientManager
 from lib.socketio import (SUBSCRIPTION_CHANGE_TYPE_ADD,
                           SUBSCRIPTION_CHANGE_TYPE_DELETE)
-from lib.state.resource import ResourceManager
 
 
 class SeriesManager:
@@ -33,14 +33,22 @@ class SeriesManager:
     _update_cb = None
     _srm = None  # Series Resource Manager
     _schedule = {}
+    _states = {}
 
     @classmethod
     async def prepare(cls, update_cb=None):
         cls._update_cb = update_cb
         cls._labels_last_update = None
         cls._srm = ServerState.series_rm
+        logging.info("Loading saved series states...")
+        _states = await ServerState.storage.client.query(
+            ".series_states.values().copy(10)")
+        cls._states = {
+            state["name"]: SeriesState.unserialize(state)
+            for state in _states}
         async for series in cls._srm.itter():
-            ServerState.index_series_schedules(series)
+            async with cls.get_state(series.name) as state:
+                ServerState.index_series_schedules(series, state)
 
     @classmethod
     async def series_changed(cls, change_type: str, series_name: str):
@@ -73,7 +81,11 @@ class SeriesManager:
         # If collected_datapoints is None, the series does not exist.
         if collected_datapoints is not None:
             async with cls._srm.create_resource(series) as resp:
-                resp.state.datapoint_count = collected_datapoints
+                if series.get('name') not in cls._states:
+                    cls._states[series.get('name')] = SeriesState(
+                        series.get('name'))
+                cls._states[series.get('name')].datapoint_count = \
+                    collected_datapoints
             asyncio.ensure_future(cls.series_changed(
                 SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name')))
             asyncio.ensure_future(
@@ -84,6 +96,19 @@ class SeriesManager:
     @classmethod
     @contextlib.asynccontextmanager
     async def get_series(cls, series_name):
+        config = await cls._srm.get_resource_by_key("name", series_name)
+        state = cls._states.get(series_name)
+        if config is None or state is None:
+            yield None, None
+            return
+        async with config.lock:
+            async with state.lock:
+                yield config, state
+                await config.store()
+
+    @classmethod
+    @contextlib.asynccontextmanager
+    async def get_config(cls, series_name):
         series = await cls._srm.get_resource_by_key("name", series_name)
         if series is None:
             yield None
@@ -93,7 +118,30 @@ class SeriesManager:
             await series.store()
 
     @classmethod
+    @contextlib.asynccontextmanager
+    async def get_state(cls, series_name) -> SeriesState:
+        state = cls._states.get(series_name)
+        if state is None:
+            cls._states[series_name] = SeriesState(series_name)
+            yield cls._states[series_name]
+            return
+        async with state.lock:
+            yield state
+
+    @classmethod
+    def get_state_read_only(cls, series_name):
+        return cls._states.get(series_name, SeriesState(series_name))
+
+    @classmethod
     async def get_series_read_only(cls, series_name):
+        state = cls._states.get(series_name)
+        if state is None:
+            state = SeriesState(series_name)
+            cls._states[series_name] = state
+        return await cls._srm.get_resource_by_key("name", series_name), state
+
+    @classmethod
+    async def get_config_read_only(cls, series_name):
         return await cls._srm.get_resource_by_key("name", series_name)
 
     # @classmethod
@@ -170,6 +218,7 @@ class SeriesManager:
         series = await cls._srm.get_resource_by_key("name", series_name)
         if series is not None:
             await cls._srm.delete_resource(series)
+            del cls._states[series_name]
             await cls.cleanup_series(series_name)
             asyncio.ensure_future(
                 cls.series_changed(
@@ -285,3 +334,14 @@ class SeriesManager:
             update = qpack.packb(series)
             series_update = create_header(len(update), UPDATE_SERIES, 0)
             listener.writer.write(series_update + update)
+
+    @classmethod
+    async def close(cls):
+        _states = {state.name: state.serialize()
+                   for state in cls._states.values()}
+        try:
+            await ServerState.storage.client.query(
+                ".series_states = states", states=_states)
+        except Exception as e:
+            logging.error("Cannot save state to thingsdb...")
+            logging.debug(f"Corresponding error: {e}")

@@ -62,8 +62,13 @@ class ApiHandlers:
             fields (String, comma seperated): list of fields to return
         """
         series_name = unquote(request.match_info['series_name'])
+        by_name = False
+        if 'byName' in request.rel_url.query:
+            q_by_name = request.rel_url.query['byName']
+            if q_by_name == "1" or q_by_name.lower() == "true":
+                by_name = True
         data, status = await BaseHandler.resp_get_single_monitored_series(
-            series_name, fields=fields)
+            series_name, fields=fields, by_rid=not by_name)
         return web.json_response(
             data, dumps=safe_json_dumps, status=status)
 

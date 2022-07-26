@@ -1,0 +1,8 @@
+{
+    "0.1.0-beta3.2.20": {
+        "upgrade": ".failed_jobs = []; .outputs = []; .series = []; .series_config_templates = []; .workers = []; .hub_version = \"0.1.0-beta3.2.20\""
+    },
+    "0.1.0-beta3.2.21": {
+        "upgrade": ".series_states = {}.restrict('thing'); .hub_version = \"0.1.0-beta3.2.21\""
+    }
+}

@@ -1,12 +1,12 @@
 import logging
 from typing import Any
 from lib.config import Config
-from lib.state import StoredResource, StorageBase
+from lib.state import StoredResource
 
 from thingsdb.client import Client
 
 
-class ThingsDBStorage(StorageBase):
+class ThingsDBStorage:
 
     def __init__(self):
         self.load_as_needed = False
@@ -18,6 +18,12 @@ class ThingsDBStorage(StorageBase):
                                   port=Config.thingsdb_port)
         await self.client.authenticate(Config.thingsdb_auth_token)
         self.client.set_default_scope(self._scope)
+
+    async def get_registered_hub_version(self):
+        try:
+            return await self.client.query(".hub_version")
+        except Exception:
+            return None
 
     async def delete(self, resource: StoredResource):
         rid = resource.rid
@@ -84,6 +90,9 @@ class ThingsDBStorage(StorageBase):
         q = ".get(resource_type).map(|item| str(item.id()))"
         resp = await self.client.query(q, resource_type=resource_type)
         return resp
+
+    async def run_code(self, code):
+        return await self.client.query(code)
 
     async def close(self):
         self.client.close()
