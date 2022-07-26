@@ -399,7 +399,7 @@ class EnodoJobManager:
                 await cls.clean_jobs()
                 await asyncio.sleep(Config.watcher_interval)
                 continue
-            
+
             for next_job in cls._open_jobs:
                 await cls._try_activate_job(next_job)
 
