@@ -139,10 +139,11 @@ class SeriesState(dataobject):
             diff = at - self.datapoint_count
             self._update_dp_at = diff * self.interval + self.last_checked_dp
         if self._update_dp_at <= int(time.time()):
-            print("HERER", self._update_dp_at)
             collected_datapoints = await query_series_datapoint_count(
                 ServerState.get_siridb_data_conn(), self.name)
             await self.set_datapoints_count(collected_datapoints)
+            if collected_datapoints < at:
+                self._update_dp_at = None
 
     def is_job_due(self, job_config_name: str,
                    series) -> bool:
