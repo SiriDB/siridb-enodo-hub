@@ -15,8 +15,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Changed
 - Query single series by rid by default, by name possible by setting `?byName=1/true`
+- All other series endpoints now only accept rid's
 - Use ThingsDB things ID's as rid's
 - Moved series state to hub memory. Only save to thingsdb on shutdown. Load them from thingsdb at startup
+- Moved settings (runtime changable) to thingsdb, hub can be run as stateless
 
 ### Removed
 - Removed disk storage

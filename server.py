@@ -90,6 +90,8 @@ class Server:
             logging.debug(f"Corresponding error: {e}")
             raise e
 
+        await Config.read_settings(ServerState.storage.client)
+
         # Setup internal security token for authenticating
         # backend socket connections
         logging.info('Setting up internal communications token...')
@@ -114,13 +116,13 @@ class Server:
             SocketIoHandler.prepare(self.sio)
             SocketIoRouter(self.sio)
 
+        ServerState.series_config_template_rm = ResourceManager(
+            'series_config_templates', SeriesConfigTemplate, cache_only=True)
+        await ServerState.series_config_template_rm.load()
         ServerState.series_rm = ResourceManager(
             'series', Series, extra_index_field="name",
             keep_in_memory=-1)
         await ServerState.series_rm.load()
-        ServerState.series_config_template_rm = ResourceManager(
-            'series_config_templates', SeriesConfigTemplate, cache_only=True)
-        await ServerState.series_config_template_rm.load()
 
         # Setup internal managers for handling and managing series,
         # clients, jobs, events and modules

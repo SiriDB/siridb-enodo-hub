@@ -37,15 +37,19 @@ class UpgradeUtil:
         if index_of_current_version is None:
             return
         found_first = False
+        updates_ran = 0
         if index_of_thingsdb_hub_version == 0:
             found_first = True
         for idx, upgrade_data in enumerate(upgrade_dict.values()):
             if found_first is True:
-                logging.info(
-                    "Running upgrade to thingsdb collection...")
+                updates_ran += 1
                 await ServerState.storage.run_code(
                     upgrade_data.get("upgrade"))
                 if idx == index_of_current_version:
+                    logging.info(
+                        f"Ran {updates_ran} updates to ThingsDB collection...")
                     return
             elif idx == index_of_thingsdb_hub_version:
                 found_first = True
+        logging.info(
+            f"Ran {updates_ran} updates to ThingsDB collection...")

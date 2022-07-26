@@ -40,12 +40,8 @@ EMPTY_CONFIG_FILE = {
 }
 
 EMPTY_SETTINGS_FILE = {
-    'events': {
-        'max_in_queue_before_warning': '25'
-    },
-    'analyser': {
-        'min_data_points': '100'
-    }
+    'max_in_queue_before_warning': '25',
+    'min_data_points': '100'
 }
 
 
@@ -79,7 +75,6 @@ class EnodoConfigParser(RawConfigParser):
 class Config:
     _config = None
     _path = None
-    _settings = None
     min_data_points = None
     watcher_interval = None
 
@@ -183,23 +178,22 @@ class Config:
 
         cls.setup_config_variables()
 
-        settings_path = os.path.join(cls.base_dir, 'enodo.settings')
-        if not os.path.exists(settings_path):
-            tmp_settings_parser = ConfigParser()
-
-            for section in EMPTY_SETTINGS_FILE:
-                tmp_settings_parser.add_section(section)
-                for option in EMPTY_SETTINGS_FILE[section]:
-                    tmp_settings_parser.set(
-                        section, option,
-                        EMPTY_SETTINGS_FILE[section][option])
-
-            with open(settings_path, "w") as fh:
-                tmp_settings_parser.write(fh)
-
-        cls._settings = EnodoConfigParser(env_support=False)
-        cls._settings.read(settings_path)
-        cls.setup_settings_variables()
+    @classmethod
+    async def read_settings(cls, client):
+        convert_to = {
+            'max_in_queue_before_warning': int,
+            'min_data_points': int
+        }
+        for option in EMPTY_SETTINGS_FILE:
+            resp = await client.query("""
+                if (.settings.has(option) == false) {
+                    .settings.set(option, default)
+                }
+                .settings.get(option)
+            """, option=option, default=EMPTY_SETTINGS_FILE[option])
+            if option in convert_to:
+                resp = convert_to[option](resp)
+            setattr(cls, option, resp)
 
     @classmethod
     def get_siridb_settings(cls):
@@ -216,17 +210,11 @@ class Config:
         }
 
     @classmethod
-    def update_settings(cls, section, key, value):
-        if cls._settings[section][key] == value:
-            return True
-        cls._settings[section][key] = value
-        return False
-
-    @classmethod
-    def write_settings(cls):
-        with open(os.path.join(
-                cls.base_dir, 'enodo.settings'), 'w') as settingsfile:
-            cls._settings.write(settingsfile)
+    async def update_settings(cls, client, option, value):
+        setattr(cls, option, value)
+        await client.query("""
+        .settings.set(option, value)
+        """, option=option, value=value)
 
     @classmethod
     def setup_config_variables(cls):
@@ -313,17 +301,6 @@ class Config:
         if not os.path.exists(os.path.join(cls.base_dir, 'data')):
             os.makedirs(os.path.join(cls.base_dir, 'data'))
 
-    @classmethod
-    def setup_settings_variables(cls):
-        # TODO set default in one place/overview
-        cls.max_in_queue_before_warning = cls.to_int(cls._settings.get_r(
-            'events', 'max_in_queue_before_warning',
-            required=False, default=25))
-        cls.min_data_points = cls.to_int(
-            cls._settings.get_r(
-                'analyser', 'min_data_points', required=False,
-                default=100))
-
     @staticmethod
     def to_int(val):
         return_val = None
@@ -354,24 +331,14 @@ class Config:
 
     @classmethod
     def get_settings(cls, include_secrets=True):
-        if not include_secrets:
-            secret_paths = []
-            data = cls._settings._sections
-        for secret in secret_paths:
-            cls._remove_dict_key_recursive(data, secret)
-
-        return data
-
-    @staticmethod
-    def is_runtime_configurable(section, key):
-        _is_runtime_configurable = {
-            "events": [
-                "max_in_queue_before_warning"
-            ],
-            "analyser": [
-                "min_data_points"
-            ]
+        return {
+            'max_in_queue_before_warning': cls.max_in_queue_before_warning,
+            'min_data_points': cls.min_data_points
         }
 
-        return section in _is_runtime_configurable and \
-            key in _is_runtime_configurable[section]
+    @staticmethod
+    def is_runtime_configurable(key):
+        _is_runtime_configurable = [
+            "max_in_queue_before_warning", "min_data_points"]
+
+        return key in _is_runtime_configurable

@@ -199,6 +199,9 @@ class ResourceManager:
     def get_resource_rid_values(self) -> list:
         return list(self._resources.values())
 
+    def get_resource_rid_value(self, rid) -> list:
+        return self._resources.get(rid)
+
     def rid_exists(self, rid: str) -> bool:
         return rid in self._resources
 

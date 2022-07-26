@@ -87,7 +87,7 @@ class ApiHandlers:
         Query args:
             fields (String, comma seperated): list of fields to return
         """
-        series_name = unquote(request.match_info['series_name'])
+        rid = unquote(request.match_info['rid'])
         only_future = False
         if "forecastFutureOnly" in request.rel_url.query:
             val = request.rel_url.query['forecastFutureOnly']
@@ -102,7 +102,7 @@ class ApiHandlers:
                     types = None
         return web.json_response(
             data=await BaseHandler.resp_get_all_series_output(
-                series_name, fields=fields, forecast_future_only=only_future,
+                rid, fields=fields, forecast_future_only=only_future,
                 types=types),
             dumps=safe_json_dumps)
 
@@ -114,9 +114,9 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        series_name = unquote(request.match_info['series_name'])
+        rid = request.match_info['rid']
         job_name = unquote(request.match_info['job_config_name'])
-        await BaseHandler.resp_resolve_series_job_status(series_name, job_name)
+        await BaseHandler.resp_resolve_series_job_status(rid, job_name)
         return web.json_response(
             {}, dumps=safe_json_dumps, status=200)
 
@@ -171,10 +171,9 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        series_name = urllib.parse.unquote(
-            request.match_info['series_name'])
+        rid = request.match_info['rid']
         return web.json_response(
-            data={}, status=await BaseHandler.resp_remove_series(series_name))
+            data={}, status=await BaseHandler.resp_remove_series(rid))
 
     @classmethod
     @EnodoAuth.auth.required
@@ -187,15 +186,14 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        series_name = urllib.parse.unquote(
-            request.match_info['series_name'])
+        rid = request.match_info['series_name']
         try:
             data = await request.json()
         except JSONDecodeError as e:
             resp, status = {'error': 'Invalid JSON'}, 400
         else:
             resp, status = await BaseHandler.resp_add_job_config(
-                series_name, data)
+                rid, data)
         return web.json_response(
             data=resp, status=status)
 
@@ -210,12 +208,11 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        series_name = urllib.parse.unquote(
-            request.match_info['series_name'])
+        rid = request.match_info['rid']
         job_config_name = urllib.parse.unquote(
             request.match_info['job_config_name'])
         data, status = await BaseHandler.resp_remove_job_config(
-            series_name, job_config_name)
+            rid, job_config_name)
         return web.json_response(
             data=data, status=status)
 

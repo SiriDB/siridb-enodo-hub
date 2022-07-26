@@ -70,7 +70,7 @@ class BaseHandler:
         return {'data': series_data}, 200
 
     @classmethod
-    async def resp_get_all_series_output(cls, series_name,
+    async def resp_get_all_series_output(cls, rid,
                                          fields=None,
                                          forecast_future_only=False,
                                          types=None):
@@ -82,6 +82,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
+        series_name = ServerState.series_rm.get_resource_rid_value(rid)
         series, state = await SeriesManager.get_series_read_only(series_name)
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
@@ -231,7 +232,7 @@ class BaseHandler:
         return {'data': True}, 201
 
     @classmethod
-    async def resp_remove_series(cls, series_name):
+    async def resp_remove_series(cls, rid):
         """Remove series
 
         Args:
@@ -240,6 +241,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
+        series_name = ServerState.series_rm.get_resource_rid_value(rid)
         if await SeriesManager.remove_series(series_name):
             await EnodoJobManager.cancel_jobs_for_series(series_name)
             await EnodoJobManager.remove_failed_jobs_for_series(series_name)
@@ -247,7 +249,7 @@ class BaseHandler:
         return 404
 
     @classmethod
-    async def resp_add_job_config(cls, series_name, job_config):
+    async def resp_add_job_config(cls, rid, job_config):
         """add job config to series config
 
         Args:
@@ -257,7 +259,7 @@ class BaseHandler:
         Returns:
             dict: dict with data if succeeded and error when necessary
         """
-
+        series_name = ServerState.series_rm.get_resource_rid_value(rid)
         async with SeriesManager.get_config(series_name) as config:
             if config is None:
                 return {"error": "Series does not exist"}, 400
@@ -272,7 +274,7 @@ class BaseHandler:
                 return {"data": {"successful": True}}, 200
 
     @classmethod
-    async def resp_remove_job_config(cls, series_name, job_config_name):
+    async def resp_remove_job_config(cls, rid, job_config_name):
         """Remove job config from series config
 
         Args:
@@ -283,6 +285,7 @@ class BaseHandler:
             dict: dict with data if succeeded and error when necessary
         """
 
+        series_name = ServerState.series_rm.get_resource_rid_value(rid)
         async with SeriesManager.get_series(series_name) as config:
             if config is None:
                 return {"error": "Series does not exist"}, 400
@@ -400,8 +403,9 @@ class BaseHandler:
                 series_name)}
 
     @classmethod
-    async def resp_resolve_series_job_status(cls, series_name,
+    async def resp_resolve_series_job_status(cls, rid,
                                              job_config_name):
+        series_name = ServerState.series_rm.get_resource_rid_value(rid)
         await EnodoJobManager.remove_failed_jobs_for_series(series_name,
                                                             job_config_name)
         async with SeriesManager.get_series(series_name) as (config, state):
@@ -440,14 +444,12 @@ class BaseHandler:
         Returns:
             dict: dict with boolean if succesful
         """
-        section = data.get('section')
         keys_and_values = data.get('entries')
         for key in keys_and_values:
-            if Config.is_runtime_configurable(section, key):
+            if Config.is_runtime_configurable(key):
                 Config.update_settings(
-                    section, key, keys_and_values[key])
-        Config.write_settings()
-        Config.setup_settings_variables()
+                    ServerState.storage.client,
+                    key, keys_and_values[key])
 
         return {'data': True}
 
