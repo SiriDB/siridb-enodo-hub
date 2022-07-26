@@ -76,11 +76,10 @@ class SeriesManager:
         if await cls._srm.get_resource_by_key("name",
                                               series.get('name')) is not None:
             return False
-        # collected_datapoints = await query_series_datapoint_count(
-        #     ServerState.get_siridb_data_conn(), series.get('name'))
-        collected_datapoints = 0
+        collected_datapoints = await query_series_datapoint_count(
+            ServerState.get_siridb_data_conn(), series.get('name'))
         # If collected_datapoints is None, the series does not exist.
-        if True or collected_datapoints is not None:
+        if collected_datapoints is not None:
             async with cls._srm.create_resource(series) as resp:
                 if series.get('name') not in cls._states:
                     cls._states[series.get('name')] = SeriesState(
