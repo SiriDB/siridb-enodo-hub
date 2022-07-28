@@ -8,5 +8,5 @@ python-socketio==5.6.0
 qpack==0.0.19
 siridb-connector==2.0.8
 packaging==21.3
-python-thingsdb==1.0.3
+python-thingsdb==1.0.4
 recordclass==0.17.2
