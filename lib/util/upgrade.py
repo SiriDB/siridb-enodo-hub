@@ -34,8 +34,8 @@ class UpgradeUtil:
             if version == thingsdb_hub_version:
                 index_of_thingsdb_hub_version = idx
 
-        if index_of_current_version is None:
-            return
+        # if index_of_current_version is None:
+        #     return
         found_first = False
         updates_ran = 0
         if index_of_thingsdb_hub_version == 0:
