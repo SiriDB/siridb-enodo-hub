@@ -1,5 +1,4 @@
 import logging
-from typing import Any
 from uuid import uuid4
 from aiohttp import web
 
@@ -7,21 +6,17 @@ from siridb.connector.lib.exceptions import QueryError, InsertError, \
     ServerError, PoolError, AuthenticationError, UserAuthError
 
 from aiohttp import web
-from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS
+from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_NONE
 from enodo.model.config.series import SeriesConfigModel
 
 from lib.config import Config
 from lib.eventmanager import EnodoEventManager
 from lib.jobmanager import EnodoJob, EnodoJobManager
-from lib.series.jobtemplate import SeriesJobConfigTemplate
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
-from lib.siridb.siridb import (
-    query_series_anomalies, query_series_forecasts,
-    query_series_static_rules_hits, query_all_series_results)
+from lib.siridb.siridb import query_all_series_results
 from lib.socket.clientmanager import ClientManager
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
-from lib.state.resource import ResourceManager
 from lib.util import regex_valid
 from siridb.connector.lib.exceptions import (
     AuthenticationError, InsertError, PoolError, QueryError,
@@ -53,7 +48,8 @@ class BaseHandler:
 
     @classmethod
     @async_simple_fields_filter(is_list=False, return_index=0)
-    async def resp_get_single_monitored_series(cls, series_name):
+    async def resp_get_single_monitored_series(cls, series_name_rid,
+                                               by_rid=True):
         """Get monitored series details
 
         Args:
@@ -62,17 +58,23 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = await SeriesManager.get_series_read_only(series_name)
+        if by_rid:
+            series = await ServerState.series_rm.get_resource(series_name_rid)
+        else:
+            series = await SeriesManager.get_config_read_only(series_name_rid)
         if series is None:
             return {'data': {}}, 404
         series_data = series.to_dict()
+        series_data["state"] = SeriesManager.get_state_read_only(
+            series.name).to_dict()
         return {'data': series_data}, 200
 
     @classmethod
-    async def resp_get_all_series_output(cls, series_name,
+    async def resp_get_all_series_output(cls, rid,
                                          fields=None,
                                          forecast_future_only=False,
-                                         types=None):
+                                         types=None,
+                                         by_name=False):
         """Get all series results
 
         Args:
@@ -81,7 +83,12 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        series = await SeriesManager.get_series_read_only(series_name)
+        if by_name:
+            series_name = rid
+        else:
+            series_name = ServerState.series_rm.get_resource_rid_value(
+                rid)
+        series, state = await SeriesManager.get_series_read_only(series_name)
         if series is None:
             return web.json_response(data={'data': ''}, status=404)
 
@@ -113,8 +120,7 @@ class BaseHandler:
                 "output_series_name": output_series_name,
                 "config_name": job_config.config_name,
                 "job_type": job_config.job_type,
-                "job_meta": series.state.job_analysis_meta.get_job_meta(
-                    job_config.config_name),
+                "job_meta": state.get_job_meta(job_config.config_name),
                 "data": points
             })
         if fields is not None:
@@ -231,7 +237,7 @@ class BaseHandler:
         return {'data': True}, 201
 
     @classmethod
-    async def resp_remove_series(cls, series_name):
+    async def resp_remove_series(cls, rid, by_name=False):
         """Remove series
 
         Args:
@@ -240,6 +246,11 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
+        if by_name:
+            series_name = rid
+        else:
+            series_name = ServerState.series_rm.get_resource_rid_value(
+                rid)
         if await SeriesManager.remove_series(series_name):
             await EnodoJobManager.cancel_jobs_for_series(series_name)
             await EnodoJobManager.remove_failed_jobs_for_series(series_name)
@@ -247,7 +258,7 @@ class BaseHandler:
         return 404
 
     @classmethod
-    async def resp_add_job_config(cls, series_name, job_config):
+    async def resp_add_job_config(cls, rid, job_config):
         """add job config to series config
 
         Args:
@@ -257,13 +268,13 @@ class BaseHandler:
         Returns:
             dict: dict with data if succeeded and error when necessary
         """
-
-        async with SeriesManager.get_series(series_name) as series:
-            if series is None:
+        series_name = ServerState.series_rm.get_resource_rid_value(rid)
+        async with SeriesManager.get_config(series_name) as config:
+            if config is None:
                 return {"error": "Series does not exist"}, 400
 
             try:
-                series.add_job_config(job_config)
+                config.add_job_config(job_config)
             except Exception as e:
                 return {"error": str(e)}, 400
             else:
@@ -272,7 +283,7 @@ class BaseHandler:
                 return {"data": {"successful": True}}, 200
 
     @classmethod
-    async def resp_remove_job_config(cls, series_name, job_config_name):
+    async def resp_remove_job_config(cls, rid, job_config_name, by_name=False):
         """Remove job config from series config
 
         Args:
@@ -282,13 +293,17 @@ class BaseHandler:
         Returns:
             dict: dict with data if succeeded and error when necessary
         """
-
-        async with SeriesManager.get_series(series_name) as series:
-            if series is None:
+        if by_name:
+            series_name = rid
+        else:
+            series_name = ServerState.series_rm.get_resource_rid_value(
+                rid)
+        async with SeriesManager.get_series(series_name) as config:
+            if config is None:
                 return {"error": "Series does not exist"}, 400
 
             try:
-                removed = series.remove_job_config(job_config_name)
+                removed = config.remove_job_config(job_config_name)
             except Exception as e:
                 return {"error": str(e)}, 400
             else:
@@ -324,7 +339,6 @@ class BaseHandler:
 
     @classmethod
     async def resp_remove_series_config_templates(cls, rid: str):
-        # TODO: check if series are using this template
         scrm = ServerState.series_config_template_rm
 
         if not scrm.rid_exists(rid):
@@ -372,7 +386,8 @@ class BaseHandler:
         await template.store()
         async for series in ServerState.series_rm.itter(update=True):
             if series._config_from_template:
-                ServerState.index_series_schedules(series)
+                async with SeriesManager.get_state(series.name) as state:
+                    ServerState.index_series_schedules(series, state)
 
         return {'data': template}, 201
 
@@ -398,6 +413,22 @@ class BaseHandler:
         return {
             'data': await EnodoJobManager.remove_failed_jobs_for_series(
                 series_name)}
+
+    @classmethod
+    async def resp_resolve_series_job_status(cls, rid,
+                                             job_config_name, by_name=False):
+        if by_name:
+            series_name = rid
+        else:
+            series_name = ServerState.series_rm.get_resource_rid_value(
+                rid)
+        await EnodoJobManager.remove_failed_jobs_for_series(series_name,
+                                                            job_config_name)
+        async with SeriesManager.get_series(series_name) as (config, state):
+            state.set_job_status(job_config_name, JOB_STATUS_NONE)
+            config.schedule_job(job_config_name, state, initial=True)
+            ServerState.index_series_schedules(config, state)
+        return {'data': "OK"}
 
     @classmethod
     @sync_simple_fields_filter()
@@ -429,14 +460,12 @@ class BaseHandler:
         Returns:
             dict: dict with boolean if succesful
         """
-        section = data.get('section')
         keys_and_values = data.get('entries')
         for key in keys_and_values:
-            if Config.is_runtime_configurable(section, key):
+            if Config.is_runtime_configurable(key):
                 Config.update_settings(
-                    section, key, keys_and_values[key])
-        Config.write_settings()
-        Config.setup_settings_variables()
+                    ServerState.storage.client,
+                    key, keys_and_values[key])
 
         return {'data': True}
 

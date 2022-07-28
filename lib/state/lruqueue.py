@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import Any
+from typing import Any, Optional
 
 
 class LRUQueue:
@@ -11,6 +11,9 @@ class LRUQueue:
 
     def all(self) -> list:
         return list(self.cache.values())
+
+    def remove(self, key: str):
+        self.cache.pop(key)
 
     def get(self, key: str) -> Any:
         if key not in self.cache:

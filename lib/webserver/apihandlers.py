@@ -57,10 +57,19 @@ class ApiHandlers:
 
         Returns:
             _type_: _description_
+
+        Query args:
+            fields (String, comma seperated): list of fields to return
+            byName (string): 1, 0 or true, false
         """
         series_name = unquote(request.match_info['series_name'])
+        by_name = False
+        if 'byName' in request.rel_url.query:
+            q_by_name = request.rel_url.query['byName']
+            if q_by_name == "1" or q_by_name.lower() == "true":
+                by_name = True
         data, status = await BaseHandler.resp_get_single_monitored_series(
-            series_name, fields=fields)
+            series_name, fields=fields, by_rid=not by_name)
         return web.json_response(
             data, dumps=safe_json_dumps, status=status)
 
@@ -75,8 +84,17 @@ class ApiHandlers:
 
         Returns:
             _type_: _description_
+
+        Query args:
+            fields (String, comma seperated): list of fields to return
+            byName (string): 1, 0 or true, false
         """
-        series_name = unquote(request.match_info['series_name'])
+        rid = unquote(request.match_info['rid'])
+        by_name = False
+        if 'byName' in request.rel_url.query:
+            q_by_name = request.rel_url.query['byName']
+            if q_by_name == "1" or q_by_name.lower() == "true":
+                by_name = True
         only_future = False
         if "forecastFutureOnly" in request.rel_url.query:
             val = request.rel_url.query['forecastFutureOnly']
@@ -91,9 +109,32 @@ class ApiHandlers:
                     types = None
         return web.json_response(
             data=await BaseHandler.resp_get_all_series_output(
-                series_name, fields=fields, forecast_future_only=only_future,
-                types=types),
+                rid, fields=fields, forecast_future_only=only_future,
+                types=types, by_name=by_name),
             dumps=safe_json_dumps)
+
+    @classmethod
+    @EnodoAuth.auth.required
+    async def resolve_series_job_status(cls, request):
+        """Resolve a job from a series
+
+        Returns:
+            _type_: _description_
+
+        Query args:
+            byName (string): 1, 0 or true, false
+        """
+        rid = unquote(request.match_info['rid'])
+        by_name = False
+        if 'byName' in request.rel_url.query:
+            q_by_name = request.rel_url.query['byName']
+            if q_by_name == "1" or q_by_name.lower() == "true":
+                by_name = True
+        job_name = unquote(request.match_info['job_config_name'])
+        await BaseHandler.resp_resolve_series_job_status(rid, job_name,
+                                                         by_name=by_name)
+        return web.json_response(
+            {}, dumps=safe_json_dumps, status=200)
 
     @classmethod
     @EnodoAuth.auth.required
@@ -145,11 +186,20 @@ class ApiHandlers:
 
         Returns:
             _type_: _description_
+
+        Query args:
+            byName (string): 1, 0 or true, false
         """
-        series_name = urllib.parse.unquote(
-            request.match_info['series_name'])
+        rid = unquote(request.match_info['rid'])
+        by_name = False
+        if 'byName' in request.rel_url.query:
+            q_by_name = request.rel_url.query['byName']
+            if q_by_name == "1" or q_by_name.lower() == "true":
+                by_name = True
         return web.json_response(
-            data={}, status=await BaseHandler.resp_remove_series(series_name))
+            data={}, status=await BaseHandler.resp_remove_series(
+                rid,
+                by_name=by_name))
 
     @classmethod
     @EnodoAuth.auth.required
@@ -162,15 +212,14 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
-        series_name = urllib.parse.unquote(
-            request.match_info['series_name'])
+        rid = request.match_info['series_name']
         try:
             data = await request.json()
         except JSONDecodeError as e:
             resp, status = {'error': 'Invalid JSON'}, 400
         else:
             resp, status = await BaseHandler.resp_add_job_config(
-                series_name, data)
+                rid, data)
         return web.json_response(
             data=resp, status=status)
 
@@ -184,13 +233,20 @@ class ApiHandlers:
 
         Returns:
             _type_: _description_
+
+        Query args:
+            byName (string): 1, 0 or true, false
         """
-        series_name = urllib.parse.unquote(
-            request.match_info['series_name'])
+        rid = unquote(request.match_info['rid'])
+        by_name = False
+        if 'byName' in request.rel_url.query:
+            q_by_name = request.rel_url.query['byName']
+            if q_by_name == "1" or q_by_name.lower() == "true":
+                by_name = True
         job_config_name = urllib.parse.unquote(
             request.match_info['job_config_name'])
         data, status = await BaseHandler.resp_remove_job_config(
-            series_name, job_config_name)
+            rid, job_config_name, by_name=by_name)
         return web.json_response(
             data=data, status=status)
 
@@ -205,6 +261,9 @@ class ApiHandlers:
 
         Returns:
             _type_: _description_
+
+        Query args:
+            fields (String, comma seperated): list of fields to return
         """
         data, status = BaseHandler.resp_get_series_config_templates(
             fields=fields)
@@ -306,6 +365,9 @@ class ApiHandlers:
 
         Returns:
             _type_: _description_
+
+        Query args:
+            fields (String, comma seperated): list of fields to return
         """
         resp, status = await BaseHandler.resp_get_event_outputs(fields=fields)
         return web.json_response(data=resp, status=status)
@@ -364,6 +426,9 @@ class ApiHandlers:
 
         Returns:
             _type_: _description_
+
+        Query args:
+            fields (String, comma seperated): list of fields to return
         """
 
         return web.json_response(
@@ -382,6 +447,9 @@ class ApiHandlers:
 
         Returns:
             _type_: _description_
+
+        Query args:
+            fields (String, comma seperated): list of fields to return
         """
         resp = BaseHandler.resp_get_enodo_hub_status(fields=fields)
         return web.json_response(data=resp, status=200)
@@ -439,6 +507,9 @@ class ApiHandlers:
 
         Returns:
             _type_: _description_
+
+        Query args:
+            fields (String, comma seperated): list of fields to return
         """
         resp = BaseHandler.resp_get_enodo_config(fields=fields)
         return web.json_response(data=resp, status=200)
@@ -494,6 +565,9 @@ class ApiHandlers:
 
         Returns:
             _type_: _description_
+
+        Query args:
+            fields (String, comma seperated): list of fields to return
         """
         resp = await BaseHandler.resp_get_enodo_stats(fields=fields)
         return web.json_response(data=resp, status=200)

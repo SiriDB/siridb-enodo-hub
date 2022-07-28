@@ -5,6 +5,7 @@ from abc import abstractproperty
 import functools
 from lib.serverstate import ServerState
 from lib.state.lruqueue import LRUQueue
+from lib.state.queue import SimpleQueue
 
 
 resource_manager_index = {}
@@ -17,6 +18,7 @@ class StoredResource:
 
     @staticmethod
     def async_changed(func):
+        # TODO: remove
         @functools.wraps(func)
         async def wrapped(self, *args, **kwargs):
             resp = await func(self, *args, **kwargs)
@@ -27,6 +29,7 @@ class StoredResource:
 
     @staticmethod
     def changed(func):
+        # TODO: remove
         @functools.wraps(func)
         def wrapped(self, *args, **kwargs):
             resp = func(self, *args, **kwargs)
@@ -34,10 +37,15 @@ class StoredResource:
             return resp
         return wrapped
 
+    async def create_save(self):
+        if self.should_be_stored and not self._is_deleted:
+            await ServerState.storage.create(self)
+            resource_manager_index[self.resource_type].set_cache(self)
+
     async def store(self):
         if self.should_be_stored and not self._is_deleted:
-            resource_manager_index[self.resource_type].set_cache(self)
             await ServerState.storage.store(self)
+            resource_manager_index[self.resource_type].set_cache(self)
 
     @classmethod
     async def create(cls, data):
@@ -93,14 +101,19 @@ class ResourceManager:
 
     def __init__(
             self, resource_type: str, resource_class: Any,
-            keep_in_memory=120, cache_only=False):
+            keep_in_memory=120, cache_only=False,
+            extra_index_field=None):
         self._resource_type = resource_type
         self._resource_class = resource_class
         self._resources = {}
-        self._lruqueue = LRUQueue(keep_in_memory)
+        if keep_in_memory < 0:
+            self._queue = SimpleQueue()
+        else:
+            self._queue = LRUQueue(keep_in_memory)
         resource_manager_index[resource_type] = self
         self._loaded = False
         self._cache_only = cache_only
+        self._extra_index_field = extra_index_field
 
     def cleanup(self):
         pass
@@ -109,12 +122,18 @@ class ResourceManager:
         if not self._loaded:
             rids = await ServerState.storage.get_all_rids_for_type(
                 self._resource_type)
-            self._resources = {rid: None for rid in rids}
+            self._resources = {
+                rid: None
+                for rid in rids}
+            if self._extra_index_field is not None:
+                async for resource in self.itter():
+                    self._resources[resource.rid] = getattr(
+                        resource, self._extra_index_field, None)
 
             if self._cache_only:
                 for rid in rids:
                     resp = await self.get_resource(rid)
-                    self._lruqueue.put(rid, resp)
+                    self._queue.put(rid, resp)
 
             self._loaded = True
 
@@ -122,23 +141,42 @@ class ResourceManager:
     async def create_resource(self, resource: dict):
         rc = self._resource_class(**resource)
         yield rc
-        await rc.store()
-        self._resources[rc.rid] = None
+        await rc.create_save()
+        self._resources[rc.rid] = self.get_resource_index_value(
+            resource)
         if self._resource_type == "series":
-            ServerState.index_series_schedules(rc)
+            from lib.series.seriesmanager import SeriesManager
+            async with SeriesManager.get_state(rc.name) as state:
+                ServerState.index_series_schedules(rc, state)
+
+    def get_resource_index_value(self, resource: dict):
+        if self._extra_index_field is None:
+            return None
+        else:
+            return resource.get(self._extra_index_field)
 
     async def delete_resource(self, resource: StoredResource):
-        del self._resources[resource.rid]
+        if resource.rid in self._resources:
+            del self._resources[resource.rid]
         await resource.delete()
+        self._queue.remove(resource.rid)
 
     def set_cache(self, resource):
-        self._lruqueue.put(resource.rid, resource)
+        self._queue.put(resource.rid, resource)
 
     def get_cached_resource(self, rid: str) -> StoredResource:
-        return self._lruqueue.get(rid)
+        return self._queue.get(rid)
 
     def get_cached_resources(self) -> list:
-        return list(self._lruqueue.all())
+        return list(self._queue.all())
+
+    async def get_resource_by_key(self, key, value) -> StoredResource:
+        data = await ServerState.storage.load_by_type_and_key(
+            self._resource_type, key, value)
+        if data is None:
+            return None
+        resp = self._resource_class(**data)
+        return resp
 
     async def get_resource(self, rid: str,
                            use_cache: bool = True) -> StoredResource:
@@ -146,17 +184,23 @@ class ResourceManager:
             return None
         resp = None
         if use_cache:
-            resp = self._lruqueue.get(rid)
+            resp = self._queue.get(rid)
         if resp is None:
             resp = \
                 self._resource_class(**(
                     await ServerState.storage.load_by_type_and_rid(
                         self._resource_type, rid)))
-            self._lruqueue.put(rid, resp)
+            self._queue.put(rid, resp)
         return resp
 
     def get_resource_rids(self) -> list:
         return list(self._resources.keys())
+
+    def get_resource_rid_values(self) -> list:
+        return list(self._resources.values())
+
+    def get_resource_rid_value(self, rid) -> list:
+        return self._resources.get(rid)
 
     def rid_exists(self, rid: str) -> bool:
         return rid in self._resources

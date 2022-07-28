@@ -140,8 +140,8 @@ class ServerState:
         return cls.siridb_output_client.connected
 
     @classmethod
-    def index_series_schedules(cls, series):
-        job_schedules = series.state.get_all_job_schedules()
+    def index_series_schedules(cls, series, state):
+        job_schedules = state.get_all_job_schedules()
         earliest = None
         for job_config_name in series.config.job_config:
             schedule = job_schedules.get(job_config_name)
@@ -150,20 +150,22 @@ class ServerState:
                 next_ts = int(time.time())
             else:
                 if schedule["type"] == "N":
-                    if series.state.interval is not None:
+                    if state.interval is not None:
                         points_left = int(schedule["value"] -
-                                          series.get_datapoints_count())
+                                          state.get_datapoints_count())
                         if points_left < 0:
                             points_left = 0
                         next_ts = int(
-                            time.time() + int(series.state.interval) *
+                            time.time() + int(state.interval) *
                             points_left)
                 elif schedule["type"] == "TS":
                     next_ts = int(schedule["value"])
             if next_ts is not None:
                 if earliest is None or next_ts < earliest:
                     earliest = next_ts
-        cls.job_schedule_index[series.rid] = earliest
+        cls.job_schedule_index[series.name] = earliest
+        if earliest is None:
+            del cls.job_schedule_index[series.name]
 
     @classmethod
     async def refresh_siridb_status(cls):

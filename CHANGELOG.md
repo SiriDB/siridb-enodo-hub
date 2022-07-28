@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta4.0.0] - 2022-07-28
+
+### Added
+- Resolve series endpoint, per job to re-trigger
+- Implemented upgrade system for ThingsDB collection
+- Working TS scheduling type, without listener dependency
+- `byName` query param to all series endpoints
+
+### Changed
+- Query single series by rid by default, by name possible by setting `?byName=1/true`
+- All other series endpoints now only accept rid's
+- Use ThingsDB things ID's as rid's
+- Moved series state to hub memory. Only save to thingsdb on shutdown. Load them from thingsdb at startup
+- Moved settings (runtime changable) to thingsdb, hub can be run as stateless
+
+### Removed
+- Removed disk storage
+
 ## [0.1.0-beta3.2.20] - 2022-07-14
 
 ### Removed

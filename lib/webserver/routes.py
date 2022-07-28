@@ -19,18 +19,21 @@ def setup_routes(app, cors):
         allow_head=False)
 
     app.router.add_get(
-        "/api/series/{series_name}/output",
+        "/api/series/{rid}/output",
         ApiHandlers.get_all_series_output,
         allow_head=False)
 
     app.router.add_delete(
-        "/api/series/{series_name}", ApiHandlers.remove_series)
+        "/api/series/{rid}", ApiHandlers.remove_series)
     app.router.add_delete(
-        "/api/series/{series_name}/job/{job_config_name}",
+        "/api/series/{rid}/job/{job_config_name}",
         ApiHandlers.remove_series_job_config)
     app.router.add_post(
-        "/api/series/{series_name}/job",
+        "/api/series/{rid}/job",
         ApiHandlers.add_series_job_config)
+    app.router.add_get(
+        "/api/series/{rid}/resolve/{job_config_name}",
+        ApiHandlers.resolve_series_job_status)
     app.router.add_get(
         "/api/template/series",
         ApiHandlers.get_series_config_templates)

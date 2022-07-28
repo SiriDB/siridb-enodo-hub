@@ -18,8 +18,7 @@ EMPTY_CONFIG_FILE = {
         'save_to_disk_interval': '20',
         'enable_rest_api': 'true',
         'enable_socket_io_api': 'false',
-        'disable_safe_mode': 'false',
-        'storage_type': 'disk'
+        'disable_safe_mode': 'false'
     },
     'analyser': {
         'watcher_interval': '2',
@@ -41,12 +40,8 @@ EMPTY_CONFIG_FILE = {
 }
 
 EMPTY_SETTINGS_FILE = {
-    'events': {
-        'max_in_queue_before_warning': '25'
-    },
-    'analyser': {
-        'min_data_points': '100'
-    }
+    'max_in_queue_before_warning': '25',
+    'min_data_points': '100'
 }
 
 
@@ -80,7 +75,6 @@ class EnodoConfigParser(RawConfigParser):
 class Config:
     _config = None
     _path = None
-    _settings = None
     min_data_points = None
     watcher_interval = None
 
@@ -114,7 +108,6 @@ class Config:
     internal_security_token = None
     jobs_save_path = None
     disable_safe_mode = None
-    storage_type = None
 
     # ThingsDB
     thingsdb_host = None
@@ -149,27 +142,9 @@ class Config:
         This method can only be called after the configfile is parsed
         :return:
         """
-
-        if cls.disable_safe_mode is True:
-            logging.info(
-                'Safe mode disabled for internal communication')
-            return
-
-        if cls._config is None:
-            raise EnodoException(
-                'Can only setup token when config is parsed')
-
-        if os.path.exists(
-                os.path.join(cls.base_dir, 'internal_token.cred')):
-            f = open(os.path.join(cls.base_dir,
-                                  'internal_token.cred'), "r")
-            cls.internal_security_token = f.read()
-        else:
-            f = open(os.path.join(cls.base_dir,
-                                  'internal_token.cred'), "w+")
+        cls.internal_security_token = None
+        if cls.disable_safe_mode is False:
             cls.internal_security_token = token_urlsafe(16)
-            f.write(cls.internal_security_token)
-        f.close()
 
     @classmethod
     def read_config(cls, path):
@@ -185,23 +160,22 @@ class Config:
 
         cls.setup_config_variables()
 
-        settings_path = os.path.join(cls.base_dir, 'enodo.settings')
-        if not os.path.exists(settings_path):
-            tmp_settings_parser = ConfigParser()
-
-            for section in EMPTY_SETTINGS_FILE:
-                tmp_settings_parser.add_section(section)
-                for option in EMPTY_SETTINGS_FILE[section]:
-                    tmp_settings_parser.set(
-                        section, option,
-                        EMPTY_SETTINGS_FILE[section][option])
-
-            with open(settings_path, "w") as fh:
-                tmp_settings_parser.write(fh)
-
-        cls._settings = EnodoConfigParser(env_support=False)
-        cls._settings.read(settings_path)
-        cls.setup_settings_variables()
+    @classmethod
+    async def read_settings(cls, client):
+        convert_to = {
+            'max_in_queue_before_warning': int,
+            'min_data_points': int
+        }
+        for option in EMPTY_SETTINGS_FILE:
+            resp = await client.query("""
+                if (.settings.has(option) == false) {
+                    .settings.set(option, default)
+                }
+                .settings.get(option)
+            """, option=option, default=EMPTY_SETTINGS_FILE[option])
+            if option in convert_to:
+                resp = convert_to[option](resp)
+            setattr(cls, option, resp)
 
     @classmethod
     def get_siridb_settings(cls):
@@ -218,17 +192,11 @@ class Config:
         }
 
     @classmethod
-    def update_settings(cls, section, key, value):
-        if cls._settings[section][key] == value:
-            return True
-        cls._settings[section][key] = value
-        return False
-
-    @classmethod
-    def write_settings(cls):
-        with open(os.path.join(
-                cls.base_dir, 'enodo.settings'), 'w') as settingsfile:
-            cls._settings.write(settingsfile)
+    async def update_settings(cls, client, option, value):
+        setattr(cls, option, value)
+        await client.query("""
+        .settings.set(option, value)
+        """, option=option, value=value)
 
     @classmethod
     def setup_config_variables(cls):
@@ -267,28 +235,16 @@ class Config:
             'hub', 'base_path')
         cls.disable_safe_mode = cls.to_bool(
             cls._config.get_r('hub', 'disable_safe_mode'), False)
-        cls.series_save_path = os.path.join(
-            cls.base_dir, 'data/series.json')
-        cls.clients_save_path = os.path.join(
-            cls.base_dir, 'data/clients.json')
-        cls.jobs_save_path = os.path.join(
-            cls.base_dir, 'data/jobs.json')
-        cls.event_outputs_save_path = os.path.join(
-            cls.base_dir, 'data/outputs.json')
-
-        cls.storage_type = cls._config.get_r(
-            'hub', 'storage_type').lower()
 
         # ThingsDB
-        thingsdb_enabled = cls.storage_type == "thingsdb"
         cls.thingsdb_host = cls._config.get_r(
-            'thingsdb', 'host', thingsdb_enabled)
+            'thingsdb', 'host', True)
         cls.thingsdb_port = cls.to_int(
-            cls._config.get_r('thingsdb', 'port', thingsdb_enabled))
+            cls._config.get_r('thingsdb', 'port', True))
         cls.thingsdb_auth_token = cls._config.get_r(
-            'thingsdb', 'auth_token', thingsdb_enabled)
+            'thingsdb', 'auth_token', True)
         cls.thingsdb_scope = cls._config.get_r(
-            'thingsdb', 'scope', thingsdb_enabled)
+            'thingsdb', 'scope', True)
 
         # SiriDB
         cls.siridb_host = cls._config.get_r('siridb_data', 'host')
@@ -315,20 +271,6 @@ class Config:
         cls.siridb_output_database = cls._config.get_r(
             'siridb_output',
             'database')
-
-        if not os.path.exists(os.path.join(cls.base_dir, 'data')):
-            os.makedirs(os.path.join(cls.base_dir, 'data'))
-
-    @classmethod
-    def setup_settings_variables(cls):
-        # TODO set default in one place/overview
-        cls.max_in_queue_before_warning = cls.to_int(cls._settings.get_r(
-            'events', 'max_in_queue_before_warning',
-            required=False, default=25))
-        cls.min_data_points = cls.to_int(
-            cls._settings.get_r(
-                'analyser', 'min_data_points', required=False,
-                default=100))
 
     @staticmethod
     def to_int(val):
@@ -360,24 +302,14 @@ class Config:
 
     @classmethod
     def get_settings(cls, include_secrets=True):
-        if not include_secrets:
-            secret_paths = []
-            data = cls._settings._sections
-        for secret in secret_paths:
-            cls._remove_dict_key_recursive(data, secret)
-
-        return data
-
-    @staticmethod
-    def is_runtime_configurable(section, key):
-        _is_runtime_configurable = {
-            "events": [
-                "max_in_queue_before_warning"
-            ],
-            "analyser": [
-                "min_data_points"
-            ]
+        return {
+            'max_in_queue_before_warning': cls.max_in_queue_before_warning,
+            'min_data_points': cls.min_data_points
         }
 
-        return section in _is_runtime_configurable and \
-            key in _is_runtime_configurable[section]
+    @staticmethod
+    def is_runtime_configurable(key):
+        _is_runtime_configurable = [
+            "max_in_queue_before_warning", "min_data_points"]
+
+        return key in _is_runtime_configurable

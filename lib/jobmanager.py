@@ -1,10 +1,10 @@
 import asyncio
 import datetime
+import json
 import logging
 import time
 from asyncio import StreamWriter
 from typing import Any, Callable, Optional, Union
-import uuid
 
 import qpack
 from enodo.jobs import *
@@ -12,7 +12,6 @@ from enodo.model.config.series import SeriesJobConfigModel
 from enodo.protocol.package import WORKER_JOB, WORKER_JOB_CANCEL, create_header
 from enodo.protocol.packagedata import (EnodoJobDataModel,
                                         EnodoJobRequestDataModel)
-from lib.series.series import Series
 from lib.socket.clientmanager import WorkerClient
 from lib.state.resource import StoredResource
 from lib.util import cls_lock
@@ -102,10 +101,6 @@ class EnodoJobManager:
             cls._active_jobs_index[job.rid] = job
 
     @classmethod
-    def _get_next_job_id(cls) -> int:
-        return str(uuid.uuid4()).replace("-", "")
-
-    @classmethod
     def get_active_jobs(cls) -> list:
         return cls._active_jobs
 
@@ -138,28 +133,28 @@ class EnodoJobManager:
             async with cls._lock:
                 await cls._deactivate_job(job)
             await cls._send_worker_cancel_job(job.worker_id, job.rid)
-            async with SeriesManager.get_series(job.series_name) as series:
-                series.set_job_status(job.job_config.config_name,
-                                      JOB_STATUS_NONE)
+            async with SeriesManager.get_state(job.series_name) as state:
+                state.set_job_status(job.job_config.config_name,
+                                     JOB_STATUS_NONE)
             jobs = []
         for job in cls._open_jobs:
             jobs.append(job)
         for job in jobs:
             cls._open_jobs.remove(job)
-            async with SeriesManager.get_series(job.series_name) as series:
-                series.set_job_status(job.job_config.config_name,
-                                      JOB_STATUS_NONE)
+            async with SeriesManager.get_state(job.series_name) as state:
+                state.set_job_status(job.job_config.config_name,
+                                     JOB_STATUS_NONE)
 
     @classmethod
     async def create_job(cls, job_config_name: str, series_name: str):
-        async with SeriesManager.get_series(series_name) as series:
-            series.set_job_status(job_config_name, JOB_STATUS_OPEN)
-            series.state.set_job_check_status(
+        config = await SeriesManager.get_config_read_only(series_name)
+        async with SeriesManager.get_state(series_name) as state:
+            state.set_job_status(job_config_name, JOB_STATUS_OPEN)
+            state.set_job_check_status(
                 job_config_name,
                 "Job created")
-            job_config = series.get_job(job_config_name)
-            job_id = cls._get_next_job_id()
-            job = EnodoJob(job_id, series.name, job_config,
+            job_config = config.get_job(job_config_name)
+            job = EnodoJob(None, config.name, job_config,
                            job_data=None)  # TODO: Catch exception
             await cls._add_job(job)
 
@@ -189,10 +184,14 @@ class EnodoJobManager:
         return jobs
 
     @classmethod
-    async def remove_failed_jobs_for_series(cls, series_name: str):
+    async def remove_failed_jobs_for_series(cls, series_name: str,
+                                            job_config_name: Optional[str] =
+                                            None):
         for job in cls.get_failed_jobs_for_series(series_name):
-            cls._failed_jobs.remove(job)
-            await job.delete()
+            if job_config_name is None or \
+                    job.job_config.config_name == job_config_name:
+                cls._failed_jobs.remove(job)
+                await job.delete()
 
     @classmethod
     @cls_lock()
@@ -324,9 +323,9 @@ class EnodoJobManager:
     async def _set_job_failed(cls, job: EnodoJob, error: str):
         if job is not None:
             job.error = error
-            async with SeriesManager.get_series(job.series_name) as series:
-                if series is not None:
-                    series.set_job_status(
+            async with SeriesManager.get_state(job.series_name) as state:
+                if state is not None:
+                    state.set_job_status(
                         job.job_config.config_name, JOB_STATUS_FAILED)
             await cls._cancel_jobs_for_series(job.series_name)
             if job in cls._active_jobs:
@@ -356,7 +355,7 @@ class EnodoJobManager:
     @cls_lock()
     async def _try_activate_job(cls, next_job: EnodoJob):
         try:
-            series = await SeriesManager.get_series_read_only(
+            series = await SeriesManager.get_config_read_only(
                 next_job.series_name)
             if series is None:
                 return
@@ -371,9 +370,9 @@ class EnodoJobManager:
             if not worker.conform_params(
                     next_job.job_config.module, next_job.job_config.
                     job_type, next_job.job_config.module_params):
-                async with SeriesManager.get_series(
-                        next_job.series_name) as series:
-                    series.state.set_job_check_status(
+                async with SeriesManager.get_state(
+                        next_job.series_name) as state:
+                    state.set_job_check_status(
                         next_job.job_config.config_name,
                         "Module params not conform")
                 return
@@ -425,22 +424,25 @@ class EnodoJobManager:
             logging.error("Received a result for a non-existing job")
             return
         await cls.deactivate_job(job_id)
-        async with SeriesManager.get_series(
-                job_response.get('name')) as series:
-            await cls.handle_job_result(job_response, job_type, job, series)
+        config = await SeriesManager.get_config_read_only(
+            job_response.get('name'))
+        async with SeriesManager.get_state(job_response.get('name')) as state:
+            await cls.handle_job_result(job_response, job_type,
+                                        job, config, state)
 
     @classmethod
-    async def handle_job_result(cls, job_response, job_type, job, series):
+    async def handle_job_result(cls, job_response, job_type,
+                                job, series, state):
         if job_type == JOB_TYPE_FORECAST_SERIES:
             try:
                 await SeriesManager.add_forecast_to_series(
                     job_response.get('name'),
                     job.job_config.config_name,
                     job_response.get('data'))
-                series.schedule_job(job.job_config.config_name)
-                series.set_job_status(
+                series.schedule_job(job.job_config.config_name, state)
+                state.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
-                series.state.job_analysis_meta.set_job_meta(
+                state.set_job_meta(
                     job.job_config.config_name,
                     {'analyse_region': job_response.get(
                         'analyse_region')})
@@ -461,10 +463,11 @@ class EnodoJobManager:
                         job_response.get('name'),
                         job.job_config.config_name,
                         job_response.get('data'))
-                    series.schedule_job(job.job_config.config_name)
-                    series.set_job_status(
+                    series.schedule_job(
+                        job.job_config.config_name, state)
+                    state.set_job_status(
                         job.job_config.config_name, JOB_STATUS_DONE)
-                    series.state.job_analysis_meta.set_job_meta(
+                    state.set_job_meta(
                         job.job_config.config_name,
                         {'analyse_region': job_response.get(
                             'analyse_region')})
@@ -480,12 +483,12 @@ class EnodoJobManager:
                         f'exception class: {e.__class__.__name__}')
         elif job_type == JOB_TYPE_BASE_SERIES_ANALYSIS:
             try:
-                series.state.characteristics = \
-                    job_response.get('characteristics')
-                series.state.health = job_response.get('health')
-                series.state.interval = job_response.get('interval')
-                series.schedule_job(job.job_config.config_name)
-                series.set_job_status(
+                state.characteristics = \
+                    json.dumps(job_response.get('characteristics'))
+                state.health = job_response.get('health')
+                state.interval = job_response.get('interval')
+                series.schedule_job(job.job_config.config_name, state)
+                state.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
                 await SeriesManager.series_changed(
                     SUBSCRIPTION_CHANGE_TYPE_UPDATE, job_response.get('name'))
@@ -497,10 +500,10 @@ class EnodoJobManager:
                     f'exception class: {e.__class__.__name__}')
         elif job_type == JOB_TYPE_STATIC_RULES:
             try:
-                series.schedule_job(job.job_config.config_name)
-                series.set_job_status(
+                series.schedule_job(job.job_config.config_name, state)
+                state.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
-                series.state.job_analysis_meta.set_job_meta(
+                state.set_job_meta(
                     job.job_config.config_name,
                     {'analyse_region': job_response.get(
                         'analyse_region')})
@@ -534,12 +537,13 @@ class EnodoJobManager:
     async def _send_worker_job_request(cls, worker: WorkerClient,
                                        job: EnodoJob):
         try:
-            series = await SeriesManager.get_series_read_only(job.series_name)
+            series, state = \
+                await SeriesManager.get_series_read_only(job.series_name)
             job_data = EnodoJobRequestDataModel(
                 job_id=job.rid, job_config=job.job_config,
                 series_name=job.series_name,
                 series_config=series.config,
-                series_state=series.state,
+                series_state=state.to_dict(),
                 siridb_ts_units=ServerState.siridb_ts_unit)
             data = qpack.packb(job_data.serialize())
             header = create_header(len(data), WORKER_JOB, 0)
