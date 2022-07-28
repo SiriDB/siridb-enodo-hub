@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta4.0.2] - 2022-07-28
+
+### Fixed
+- Ensure thingsdb upgrades run even when hub version has none set
+
 ## [0.1.0-beta4.0.1] - 2022-07-28
 
 ### Fixed
