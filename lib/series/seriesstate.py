@@ -36,10 +36,16 @@ class SeriesState(dataobject):
     health: float = None
     interval: int = None
     characteristics: str = None
-    job_data: list = []
-    lock = asyncio.Lock()
+    job_data: list = None
+    lock: asyncio.Lock = None
     last_checked_dp: int = None
     _update_dp_at: int = None
+
+    def defaults(self):
+        if self.job_data is None:
+            self.job_data = []
+        if self.lock is None:
+            self.lock = asyncio.Lock()
 
     @classmethod
     def unserialize(cls, data):
@@ -49,6 +55,7 @@ class SeriesState(dataobject):
             state.job_data = job_data
         except Exception:
             return None
+        state.lock = asyncio.Lock()
         return state
 
     def serialize(self):
@@ -105,8 +112,10 @@ class SeriesState(dataobject):
     def set_job_check_status(self, config_name: str, status: str):
         self._get_job(config_name).check_status = status
 
-    def get_job_meta(self, job_config_name: str) -> int:
-        return self._get_job(job_config_name).analysis_meta
+    def get_job_meta(self, job_config_name: str) -> str:
+        job = self._get_job(job_config_name)
+        return json.loads(
+            job.analysis_meta) if job.analysis_meta else ""
 
     def set_job_meta(self, config_name: str, analysis_meta: Any):
         self._get_job(config_name).analysis_meta = json.dumps(
