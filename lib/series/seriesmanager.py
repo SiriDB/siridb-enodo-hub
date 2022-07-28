@@ -94,6 +94,7 @@ class SeriesManager:
                 if series.get('name') not in cls._states:
                     cls._states[series.get('name')] = SeriesState(
                         series.get('name'))
+                    cls._states[series.get('name')].defaults()
                 cls._states[series.get('name')].datapoint_count = \
                     collected_datapoints
             asyncio.ensure_future(cls.series_changed(
@@ -133,6 +134,7 @@ class SeriesManager:
         state = cls._states.get(series_name)
         if state is None:
             cls._states[series_name] = SeriesState(series_name)
+            cls._states[series_name].defaults()
             yield cls._states[series_name]
             return
         async with state.lock:
@@ -140,14 +142,18 @@ class SeriesManager:
 
     @classmethod
     def get_state_read_only(cls, series_name):
-        return cls._states.get(series_name, SeriesState(series_name))
+        if cls._states.get(series_name) is not None:
+            return cls._states[series_name]
+        s = SeriesState(series_name)
+        s.defaults()
+        return s
 
     @classmethod
     async def get_series_read_only(cls, series_name):
         state = cls._states.get(series_name)
         if state is None:
-            state = SeriesState(series_name)
-            cls._states[series_name] = state
+            cls._states[series_name] = SeriesState(series_name)
+            cls._states[series_name].defaults()
         return await cls._srm.get_resource_by_key("name", series_name), state
 
     @classmethod
