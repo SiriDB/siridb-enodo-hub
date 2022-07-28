@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta4.0.1] - 2022-07-28
+
+### Fixed
+- Added missing depencency to requirements.txt
+
 ## [0.1.0-beta4.0.0] - 2022-07-28
 
 ### Added
