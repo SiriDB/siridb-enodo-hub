@@ -4,10 +4,10 @@
 |/api/series|POST|Add new series to monitor.||
 |/api/series/{series_name}|GET|Returns all details|        Query args:            fields (String, comma seperated): list of fields to return|
 |/api/series/{rid}/output|GET|Returns forecast data of a specific series.|        Query args:            fields (String, comma seperated): list of fields to return|
-|/api/series/{rid}|DELETE|Remove series with specific name||
-|/api/series/{rid}/job/{job_config_name}|DELETE|Remove a job config from a series||
+|/api/series/{rid}|DELETE|Remove series with specific name|        Query args:            byName (string): 1, 0 or true, false|
+|/api/series/{rid}/job/{job_config_name}|DELETE|Remove a job config from a series|        Query args:            byName (string): 1, 0 or true, false|
 |/api/series/{rid}/job|POST|Add a job config to a series||
-|/api/series/{rid}/resolve/{job_config_name}|GET|Resolve a job from a series||
+|/api/series/{rid}/resolve/{job_config_name}|GET|Resolve a job from a series|        Query args:            byName (string): 1, 0 or true, false|
 |/api/template/series|GET|Get all series config templates|        Query args:            fields (String, comma seperated): list of fields to return|
 |/api/template/series|POST|Add a series config template||
 |/api/template/series/{rid}|DELETE|Remove a series config template||
