@@ -61,6 +61,10 @@ class SeriesManager:
                 for state in _states.values()}
 
     @classmethod
+    def get_active_series(cls):
+        return list(cls._states.keys())
+
+    @classmethod
     async def series_changed(cls, change_type: str, series_name: str):
         pass
         # if cls._update_cb is not None:
@@ -235,6 +239,8 @@ class SeriesManager:
         if series is not None:
             await cls._srm.delete_resource(series)
             del cls._states[series_name]
+            asyncio.ensure_future(
+                ServerState.job_schedule_index.remove(series_name))
             await cls.cleanup_series(series_name)
             asyncio.ensure_future(
                 cls.series_changed(
@@ -245,8 +251,6 @@ class SeriesManager:
 
     @classmethod
     async def cleanup_series(cls, series_name):
-        if series_name in ServerState.job_schedule_index:
-            del ServerState.job_schedule_index[series_name]
         await drop_series(
             ServerState.get_siridb_output_conn(),
             f"/enodo_{re.escape(series_name)}.*?.*?$/")

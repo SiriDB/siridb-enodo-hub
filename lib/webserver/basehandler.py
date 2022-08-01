@@ -116,6 +116,8 @@ class BaseHandler:
                     series_name, job_config.job_type,
                     forecast_future_only=forecast_future_only)).get(
                         output_series_name)
+            if points is None:
+                points = []
             resp.append({
                 "output_series_name": output_series_name,
                 "config_name": job_config.config_name,
@@ -443,7 +445,10 @@ class BaseHandler:
     @classmethod
     @sync_simple_fields_filter(is_list=False)
     def resp_get_enodo_hub_status(cls):
-        return {'data': {'version': VERSION}}
+        return {'data': {
+            'version': VERSION,
+            'job_index_queue': ServerState.job_schedule_index.mapping
+        }}
 
     @classmethod
     @sync_simple_fields_filter(is_list=False)
