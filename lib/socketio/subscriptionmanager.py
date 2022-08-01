@@ -5,7 +5,7 @@ class SubscriptionManager:
     _subscribers = []
 
     @classmethod
-    async def add_subscriber(cls, sid, regex):
+    def add_subscriber(cls, sid, regex):
         current_subscribers = [sub.get('sid') for sub in cls._subscribers]
         if sid not in current_subscribers:
             cls._subscribers.append({
@@ -14,7 +14,7 @@ class SubscriptionManager:
             })
 
     @classmethod
-    async def remove_subscriber(cls, sid):
+    def remove_subscriber(cls, sid):
         current_subscribers = [sub.get('sid') for sub in cls._subscribers]
         if sid in current_subscribers:
             sub_to_remove = None
@@ -29,7 +29,7 @@ class SubscriptionManager:
         return [sub for sub in cls._subscribers]
 
     @classmethod
-    async def get_subscriptions_for_series_name(cls, series_name):
+    def get_subscriptions_for_series_name(cls, series_name):
         subs = []
 
         for sub in cls._subscribers:

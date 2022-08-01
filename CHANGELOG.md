@@ -5,13 +5,207 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased] - yyyy-mm-dd
+## [unreleased] - yyyy-mm-dd
 
-## [0.1.0-beta3.2.0] - yyyy-mm-dd
+## [0.1.0-beta4.0.6] - 2022-08-01
+
+### Added
+- Copied python 3.10 bisect function, to be work with python 3.9
+
+## [0.1.0-beta4.0.5] - 2022-08-01
+
+### Changed
+- Disabled strict ssl for event output calls (webhook)
+
+## [0.1.0-beta4.0.4] - 2022-08-01
+
+### Changed
+- Implemented sorted list for schedule checking
+
+### Fixed
+- Scheduling issue fixed
+
+## [0.1.0-beta4.0.3] - 2022-07-28
+
+### Fixed
+- SeriesState: Removed default initialisation away from class attributes
+- Decode job meta when returning job results
+
+## [0.1.0-beta4.0.2] - 2022-07-28
+
+### Fixed
+- Ensure thingsdb upgrades run even when hub version has none set
+
+## [0.1.0-beta4.0.1] - 2022-07-28
+
+### Fixed
+- Added missing depencency to requirements.txt
+
+## [0.1.0-beta4.0.0] - 2022-07-28
+
+### Added
+- Resolve series endpoint, per job to re-trigger
+- Implemented upgrade system for ThingsDB collection
+- Working TS scheduling type, without listener dependency
+- `byName` query param to all series endpoints
+
+### Changed
+- Query single series by rid by default, by name possible by setting `?byName=1/true`
+- All other series endpoints now only accept rid's
+- Use ThingsDB things ID's as rid's
+- Moved series state to hub memory. Only save to thingsdb on shutdown. Load them from thingsdb at startup
+- Moved settings (runtime changable) to thingsdb, hub can be run as stateless
+
+### Removed
+- Removed disk storage
+
+## [0.1.0-beta3.2.20] - 2022-07-14
+
+### Removed
+- Removed old job config template routes and handlers
+
+### Added
+- Analysis region to series state job meta
+- Job meta to output
+
+### Changed
+- Implemented generic fields filter for multiple GET endpoints
+- Merged output routes and handlers into one with query param to filter by job_type
+
+## [0.1.0-beta3.2.19] - 2022-07-12
+
+### Fixed
+- Fixed bug with filtering fields for all output endpoint
+
+## [0.1.0-beta3.2.18] - 2022-07-12
+
+### Added
+- Fields filter function, applied to series output `ALL` GET endpoint
+- Return `job_config_name` and `job_type` when returning all series output
+
+## [0.1.0-beta3.2.17] - 2022-07-07
+
+### Added
+- Series `meta` property for meta data
+- Fields filter function, applied to series templates GET endpoint
+
+## [0.1.0-beta3.2.16] - 2022-06-30
+
+### Added
+- Series templates
+
+### Changed
+- Series can now be added with a written config or by reference to an existing template
+
+## [0.1.0-beta3.2.15] - 2022-06-23
+
+### Changed
+- Changed resource caching by max time since last use to an LRU queue cache
+
+### Added
+- Job config template resource and endpoints
+
+## [0.1.0-beta3.2.14] - 2022-06-21
+
+### Added
+- Endpoint for fetching all analysis results for a series (for all job types)
+- Query param `future` for the `api/series/anomaly_test_series/forecasts` endpoint, to only return points in the future
+- Added thingsdb support for saving hub state
+
+## [0.1.0-beta3.2.13] - 2022-06-08
+
+### Added
+- Added functionality to add and remove job configs to a series
+
+## [0.1.0-beta3.2.12] - 2022-05-23
+
+### Fixed
+- Adding series with an empty SeriesState instead of an dict
+- Checking online status of client on loading clientlist from disk
+
+## [0.1.0-beta3.2.11] - 2022-05-23
+
+### Fixed
+- Ignore `requires_job` when config is not found (invalid job name)
+
+### Changed
+- Using `time.time()` instead of `datetime.datetime.now()` in rest of project
+
+## [0.1.0-beta3.2.10] - 2022-05-19
+
+### Fixed
+- Accept empty anomalies result
+
+### Added
+- Typing
+
+### Changed
+- Using `time.time()` instead of `datetime.datetime.now()` for client timestamps
+
+## [0.1.0-beta3.2.9] - 2022-05-19
+
+### Added
+- Logging hub version on startup
+- Save client data to disk
+- Update worker data on reconnect
+
+## [0.1.0-beta3.2.8] - 2022-05-18
+
+### Added
+- `time_precision` support, send to worker in job request.
+- Implemented new lib for `time_precision` support and `value_type` for `EnodoModuleArgument`
+
+## [0.1.0-beta3.2.7] - 2022-05-17
+
+### Fixed
+- Added exception handling when loading series from disk, ignoring invalid data
+
+## [0.1.0-beta3.2.6] - 2022-05-17
+
+### Changed
+- Removed module manager, using clientmanager to fetch current known modules
+- Implemented new lib version, to check if module version has been specified with the module name `<module_name>@<module_version>`
+- Receive only 1 module data
+
+### Added
+- Implemented new version of lib; Check if a jobs config_name contains any spaces
+
+## [0.1.0-beta3.2.5] - 2022-05-09
+
+### Added
+- Support for adding series with unknown modules
+
+### Changed
+- Known modules in memory only, not saved to disk
+- SiriDB config renamed to `siridb_data`
+
+## [0.1.0-beta3.2.4] - 2022-05-06
+
+### Changed
+- Removed siridb password from get settings base handler output
+- Refactored manager locks
+- Removed legacy code
+- Moved siridb settings to config file, and `max_in_queue_before_warning` and `min_data_points` to the settings file
+
+## [0.1.0-beta3.2.3] - 2022-05-02
+
+### Added
+- Implemented use_max_points property in job configs
+  
+### Fixed
+- Bug with worker is_going_busy status on reconnect
+- Fixed return http status on not found when fetching series details
+- Fixed issue with siridb connect when changing settings
+
+## [0.1.0-beta3.2.2] - 2022-04-29
 
 ### Added
 - Seperate endpoints for fetching analysis result data
 - Cleanup on series removal (siridb analytics results)
+- Endpoint as proxy for querying SiriDB data db
+- Friendly shutdown to clear queue
+- Force shutdown support
+- Online status of clients exposed to API
 
 ### Changed
 - Changed series config and job config. Job config is now a list of jobs. Not categorised by job type. Forecast, anomaly detection jobs can be in the list multiple times. 
@@ -20,9 +214,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - A job can require an other job the be run beforehand by using the `requires_job` property
 - Config section `enodo` renamed to `hub` because of env prefix `ENODO_`
 - Job response handling updated
+- Refactored model to be renamed to module
 
 ### Fixed
 - PEP8 guidelines
+- Fixed socketio serialisation of config classes on emit
+- SiriDB output db selection/config
 
 ## [0.1.0-beta3.0.0] - 2021-08-13
 

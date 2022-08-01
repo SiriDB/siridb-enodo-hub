@@ -23,8 +23,10 @@ def generate_api_docs(app):
             if method != "HEAD":
                 desc = re.search(
                     r"\A(.*?)\n\n", docs, re.MULTILINE | re.DOTALL)
+                # TODO: Multiline query args support
                 matches = re.search(
-                    r"(?:(?:\s{,8}Query args)|(?:\s{,8}JSON POST data)):\n(.*?)(?=(?:\n{2,})|(?:\s{,8}\n))",
+                    r"(?:(?:\s{,8}Query args)|(?:\s{,8}JSON POST data))"
+                    r":\n(.*?)(?=(?:\n{2,})|(?:\s{,8}\n))",
                     docs, re.MULTILINE | re.DOTALL)
                 if desc:
                     desc = desc.group(0)

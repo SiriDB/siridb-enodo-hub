@@ -1,28 +1,49 @@
+from asyncio import Lock, ensure_future
+import logging
+import time
+
+from enodo.jobs import JOB_STATUS_FAILED, JOB_STATUS_OPEN, JOB_STATUS_PENDING
+
+from aiojobs import create_scheduler
 from siridb.connector import SiriDBClient
 from lib.config import Config
+from lib.siridb.siridb import query_time_unit
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_INITIAL
+from lib.state.priorityqueue import SeriesPriorityQueue
 
 
 class ServerState:
     running = None
+    work_queue = None
     sio = None
     siridb_data_client = None
-    siridb_forecast_client = None
+    siridb_output_client = None
+    siridb_data_client_lock = None
+    siridb_output_client_lock = None
     tasks_last_runs = {}
     siridb_conn_status = {}
+    siridb_ts_unit = {}
     readiness = None
+    scheduler = None
+    storage = None
+    job_schedule_index = SeriesPriorityQueue()
+
+    series_rm = None
+    series_config_template_rm = None
+    job_config_template_rm = None
 
     @classmethod
-    async def async_setup(cls, sio):
+    async def async_setup(cls, sio, storage):
         cls.running = True
+        cls.work_queue = True
         cls.readiness = False
         cls.sio = sio
-
-        await cls.setup_siridb_connection()
+        cls.siridb_data_client_lock = Lock()
+        cls.siridb_output_client_lock = Lock()
+        cls.storage = storage
 
         cls.tasks_last_runs = {
             'watch_series': None,
-            'save_to_disk': None,
             'check_jobs': None,
             'manage_connections': None
         }
@@ -32,6 +53,14 @@ class ServerState:
             'analysis_conn': False
         }
 
+        cls.siridb_ts_unit = {
+            'data': 'ms',
+            'analysis': 'ms'
+        }
+
+        await cls.setup_siridb_data_connection()
+        await cls.setup_siridb_output_connection()
+        cls.scheduler = await create_scheduler()
         await cls.refresh_siridb_status()
 
     @classmethod
@@ -40,67 +69,116 @@ class ServerState:
 
     @classmethod
     def _siridb_config_equal(cls, a, b):
-        if a.get('username') != b.get('username'):
+        if a.get('user') != b.get('user'):
             return False
         if a.get('password') != b.get('password'):
             return False
-        if a.get('dbname') != b.get('dbname'):
+        if a.get('database') != b.get('database'):
             return False
-        if a.get('hostlist')[0] != b.get('hostlist')[0]:
+        if a.get('host') != b.get('host'):
             return False
 
         return True
 
     @classmethod
-    async def setup_siridb_connection(cls):
-        data_config, forecast_config = Config.get_siridb_settings()
+    async def setup_siridb_data_connection(cls):
+        data_config, output_config = Config.get_siridb_settings()
 
-        if cls.siridb_data_client is not None:
-            cls.stop()
+        logging.info('Setting up SiriDB data Connection')
+        async with cls.siridb_data_client_lock:
+            if cls.siridb_data_client is not None:
+                cls.siridb_data_client.close()
 
-        cls.siridb_data_client = SiriDBClient(
-            **data_config,
-            keepalive=True)
-        await cls.siridb_data_client.connect()
-        if not cls._siridb_config_equal(
-                data_config, forecast_config):
-            if cls.siridb_forecast_client is not None:
-                cls.siridb_forecast_client.close()
-            cls.siridb_forecast_client = SiriDBClient(
-                **forecast_config,
+            cls.siridb_data_client = SiriDBClient(
+                **data_config,
                 keepalive=True)
-            await cls.siridb_forecast_client.connect()
-        elif cls.siridb_forecast_client is not None:
-            cls.siridb_forecast_client.close()
-            cls.siridb_forecast_client = None
+            await cls.siridb_data_client.connect()
 
         await cls.refresh_siridb_status()
+
+        if cls.siridb_conn_status['data_conn']:
+            cls.siridb_ts_unit['data'] = await query_time_unit(
+                cls.siridb_data_client)
+
+    @classmethod
+    async def setup_siridb_output_connection(cls):
+        data_config, output_config = Config.get_siridb_settings()
+
+        logging.info('Setting up SiriDB output Connection')
+        async with cls.siridb_output_client_lock:
+            if cls.siridb_output_client is not None:
+                cls.siridb_output_client.close()
+                cls.siridb_output_client = None
+
+            if not cls._siridb_config_equal(data_config, output_config):
+                cls.siridb_output_client = SiriDBClient(
+                    **output_config,
+                    keepalive=True)
+                await cls.siridb_output_client.connect()
+
+        await cls.refresh_siridb_status()
+
+        if cls.siridb_conn_status['output_conn']:
+            cls.siridb_ts_unit['output'] = await query_time_unit(
+                cls.get_siridb_output_conn())
 
     @classmethod
     def get_siridb_data_conn(cls):
         return cls.siridb_data_client
 
     @classmethod
-    def get_siridb_forecast_conn(cls):
-        if cls.siridb_forecast_client is None:
+    def get_siridb_output_conn(cls):
+        if cls.siridb_output_client is None:
             return cls.siridb_data_client
-        return cls.siridb_forecast_client
+        return cls.siridb_output_client
 
     @classmethod
     def get_siridb_data_conn_status(cls):
         return cls.siridb_data_client.connected
 
     @classmethod
-    def get_siridb_forecast_conn_status(cls):
-        if cls.siridb_forecast_client is None:
+    def get_siridb_output_conn_status(cls):
+        if cls.siridb_output_client is None:
             return cls.siridb_data_client.connected
-        return cls.siridb_forecast_client.connected
+        return cls.siridb_output_client.connected
+
+    @classmethod
+    def index_series_schedules(cls, series, state):
+        job_schedules = state.get_all_job_schedules()
+        earliest = None
+        for job_config_name in series.config.job_config:
+            schedule = job_schedules.get(job_config_name)
+            next_ts = None
+            if state.get_job_status(job_config_name) in [
+                    JOB_STATUS_FAILED, JOB_STATUS_OPEN, JOB_STATUS_PENDING]:
+                continue
+            if schedule is None:
+                next_ts = int(time.time())
+            else:
+                if schedule["type"] == "N":
+                    if state.interval is not None:
+                        points_left = int(schedule["value"] -
+                                          state.get_datapoints_count())
+                        if points_left < 0:
+                            points_left = 0
+                        next_ts = int(
+                            time.time() + int(state.interval) *
+                            points_left)
+                elif schedule["type"] == "TS":
+                    next_ts = int(schedule["value"])
+            if next_ts is not None:
+                if earliest is None or next_ts < earliest:
+                    earliest = next_ts
+        if earliest is not None:
+            ensure_future(
+                cls.job_schedule_index.insert_schedule(
+                    series.name, earliest))
 
     @classmethod
     async def refresh_siridb_status(cls):
         status = {}
         status['data_conn'] = cls.get_siridb_data_conn_status()
-        status['analysis_conn'] = cls.get_siridb_forecast_conn_status()
+        status['output_conn'] = cls.get_siridb_output_conn_status()
 
         if status != cls.siridb_conn_status:
             cls.siridb_conn_status = status
@@ -115,5 +193,5 @@ class ServerState:
     def stop(cls):
         if cls.siridb_data_client is not None:
             cls.siridb_data_client.close()
-        if cls.siridb_forecast_client is not None:
-            cls.siridb_forecast_client.close()
+        if cls.siridb_output_client is not None:
+            cls.siridb_output_client.close()

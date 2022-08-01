@@ -1,13 +1,16 @@
 import asyncio
-import datetime
 import logging
+import time
 from packaging import version
 
 import qpack
+from enodo.protocol.package import create_header, read_packet, HEARTBEAT, \
+    HANDSHAKE, HANDSHAKE_FAIL, UNKNOWN_CLIENT, CLIENT_SHUTDOWN, \
+    HANDSHAKE_OK, UPDATE_SERIES
 
 from lib.series.seriesmanager import SeriesManager
+from lib.serverstate import ServerState
 from . import ClientManager
-from .package import *
 
 ENODO_HUB_WORKER_MIN_VERSION = "0.1.0-beta3.0"
 
@@ -25,15 +28,12 @@ class SocketServer:
     async def create(self, loop=None):
         loop = loop or asyncio.get_event_loop()
         self._server_running = True
-        coro = asyncio.start_server(
-            self._handle_client_connection, self._hostname, self._port)
-        self._server = loop.create_task(coro)
-        self._server_coro = coro
+        self._server = await ServerState.scheduler.spawn(asyncio.start_server(
+            self._handle_client_connection, self._hostname, self._port))
 
     async def stop(self):
         self._server_running = False
-        await self._server
-        self._server.cancel()
+        await self._server.close()
 
     async def _handle_client_connection(self, reader, writer):
         connected = True
@@ -41,6 +41,9 @@ class SocketServer:
 
         while connected and self._server_running:
             packet_type, packet_id, data = await read_packet(reader)
+            if data is False:
+                connected = False
+                continue
             if len(data):
                 data = qpack.unpackb(data, decode='utf-8')
 
@@ -94,13 +97,13 @@ class SocketServer:
         if l_client is not None:
             logging.debug(
                 f'Heartbeat from listener with id: {client_id}')
-            l_client.last_seen = datetime.datetime.now()
+            l_client.last_seen = time.time()
             response = create_header(0, HEARTBEAT, packet_id)
             writer.write(response)
         elif w_client is not None:
             logging.debug(
                 f'Heartbeat from worker with id: {client_id}')
-            w_client.last_seen = datetime.datetime.now()
+            w_client.last_seen = time.time()
             response = create_header(0, HEARTBEAT, packet_id)
             writer.write(response)
         else:
@@ -134,14 +137,14 @@ class SocketServer:
             logging.info(
                 f'New listener with id: {client_id}')
         elif client_data.get('client_type') == 'worker':
-            supported_models = client_data.get('models')
-            if supported_models is None or len(supported_models) < 1:
+            supported_modules = client_data.get('module')
+            if supported_modules is None:
                 logging.warning(
                     f"New worker connected with id : {client_id}"
                     ", but has no installed modules")
 
             if version.parse(
-                    client_data.get('version')) < version.parse(
+                    client_data.get('lib_version')) < version.parse(
                     ENODO_HUB_WORKER_MIN_VERSION):
                 logging.warning(
                     f"Worker with id : {client_id} tried to connect,"
@@ -152,14 +155,13 @@ class SocketServer:
 
             await ClientManager.worker_connected(
                 writer.get_extra_info('peername'), writer, client_data)
-            logging.info(f'New worker with id: {client_id}')
             response = create_header(0, HANDSHAKE_OK, packet_id)
             writer.write(response)
             return client_id, True
 
         if client_data.get('client_type') == 'listener':
             update = qpack.packb(
-                SeriesManager.get_listener_series_info())
+                await SeriesManager.get_listener_series_info())
             header = create_header(
                 len(update),
                 UPDATE_SERIES, packet_id)
