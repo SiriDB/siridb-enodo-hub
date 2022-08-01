@@ -1,12 +1,15 @@
-from asyncio import Lock
+from asyncio import Lock, ensure_future
 import logging
 import time
+
+from enodo.jobs import JOB_STATUS_FAILED, JOB_STATUS_OPEN, JOB_STATUS_PENDING
 
 from aiojobs import create_scheduler
 from siridb.connector import SiriDBClient
 from lib.config import Config
 from lib.siridb.siridb import query_time_unit
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_INITIAL
+from lib.state.priorityqueue import SeriesPriorityQueue
 
 
 class ServerState:
@@ -23,7 +26,7 @@ class ServerState:
     readiness = None
     scheduler = None
     storage = None
-    job_schedule_index = {}
+    job_schedule_index = SeriesPriorityQueue()
 
     series_rm = None
     series_config_template_rm = None
@@ -146,6 +149,9 @@ class ServerState:
         for job_config_name in series.config.job_config:
             schedule = job_schedules.get(job_config_name)
             next_ts = None
+            if state.get_job_status(job_config_name) in [
+                    JOB_STATUS_FAILED, JOB_STATUS_OPEN, JOB_STATUS_PENDING]:
+                continue
             if schedule is None:
                 next_ts = int(time.time())
             else:
@@ -163,9 +169,10 @@ class ServerState:
             if next_ts is not None:
                 if earliest is None or next_ts < earliest:
                     earliest = next_ts
-        cls.job_schedule_index[series.name] = earliest
-        if earliest is None:
-            del cls.job_schedule_index[series.name]
+        if earliest is not None:
+            ensure_future(
+                cls.job_schedule_index.insert_schedule(
+                    series.name, earliest))
 
     @classmethod
     async def refresh_siridb_status(cls):

@@ -13,7 +13,6 @@ from enodo.protocol.packagedata import *
 from enodo.protocol.package import LISTENER_NEW_SERIES_POINTS, \
     WORKER_UPDATE_BUSY, WORKER_JOB_RESULT, WORKER_REFUSED, \
     WORKER_JOB_CANCELLED
-from enodo.jobs import JOB_STATUS_NONE, JOB_STATUS_DONE
 from lib.series.seriestemplate import SeriesConfigTemplate
 from lib.state.thingsdbstorage import ThingsDBStorage
 from lib.util.upgrade import UpgradeUtil
@@ -220,7 +219,7 @@ class Server:
                             (now - last_run).total_seconds() > 60:
                         logging.error(
                             f"Background task \"{task}\" is unresponsive!")
-            except Exception as e:
+            except Exception as _:
                 logging.error('Watching background tasks failed')
 
     async def _check_for_jobs(self, series, state, series_name,
@@ -231,61 +230,34 @@ class Server:
             series (Series): Series instance
             series_name (string): name of series
         """
-        # Check if series does have any failed jobs
-        if len(EnodoJobManager.get_failed_jobs_for_series(series_name)) > 0:
-            return
-        # Check if base analysis needs to run
-        if state.is_job_due(
-                series.base_analysis_job.config_name, series):
-            base_analysis_job = series.base_analysis_job
-            module = ClientManager.get_module(
-                base_analysis_job.module)
-            if module is None:
-                async with SeriesManager.get_state(series_name) as s:
-                    s.set_job_check_status(
-                        base_analysis_job.config_name,
-                        "Unknown module")
-                return
-            await EnodoJobManager.create_job(
-                base_analysis_job.config_name, series_name)
 
         if base_only:
-            return
-        # Only continue if base analysis has finished
-        if state.get_job_status(
-                series.base_analysis_job.config_name) != JOB_STATUS_DONE:
-            return
+            # Check if base analysis needs to run
+            if state.is_job_due(
+                    series.base_analysis_job.config_name, series):
+                await EnodoJobManager.create_job(
+                    series.base_analysis_job.config_name, series_name)
+            raise Exception("No base job created")
 
         # loop through scheduled jobs:
+        jobs_created = 0
         job_schedules = state.get_all_job_schedules()
         for job_config_name in series.config.job_config:
             if job_config_name in job_schedules and \
                     state.is_job_due(job_config_name, series):
                 await EnodoJobManager.create_job(job_config_name, series_name)
-                continue
-            if job_config_name not in job_schedules:
-                # Job has not been schedules yet, let's add it
-                c = await SeriesManager.get_config_read_only(series_name)
-                async with SeriesManager.get_state(series_name) as s:
-                    c.schedule_job(job_config_name, s, initial=True)
+                jobs_created += 1
+
+        if jobs_created == 0:
+            raise Exception("No job created")
 
     async def _handle_low_datapoints(self, series, state):
-        dp_too_low = False
-        min_dp = 0
-        if series.config.min_data_points is not None:
-            if state.get_datapoints_count() < \
-                    series.config.min_data_points:
-                dp_too_low = True
-                min_dp = series.config.min_data_points
-        elif state.get_datapoints_count() < \
-                Config.min_data_points:
-            dp_too_low = True
-            min_dp = Config.min_data_points
-        if dp_too_low:
-            await self._check_for_jobs(series, state, series.name,
-                                       base_only=True)
-            await state.update_datapoints_count(min_dp)
-        return dp_too_low
+        dp_ok, _ = series.check_datapoint_count(state)
+        if dp_ok:
+            return False
+        await self._check_for_jobs(series, state, series.name,
+                                   base_only=True)
+        return True
 
     async def watch_series(self):
         """Background task to check each series if
@@ -295,31 +267,41 @@ class Server:
             ServerState.tasks_last_runs['watch_series'] = \
                 datetime.datetime.now()
             current_time = time()
-            for series_name, ts in dict(
-                    ServerState.job_schedule_index).items():
-                if ts > current_time:
-                    continue
-                series, state = \
-                    await SeriesManager.get_series_read_only(series_name)
-                # Check if series is valid and not ignored
-                if series is None or series.is_ignored():
-                    continue
-
-                # Check if requirement of min amount of datapoints is met
-                if state.get_datapoints_count() is None:
-                    continue
-                if await self._handle_low_datapoints(series, state):
-                    continue
+            while len(ServerState.job_schedule_index.items) > 0:
+                async with ServerState.job_schedule_index.seek_and_hold() as \
+                        (series_name, next_ts):
+                    if next_ts > current_time:
+                        break
+                    series, state = \
+                        await SeriesManager.get_series_read_only(series_name)
+                    # Check if series is valid and not ignored
+                    if series is None or series.is_ignored():
+                        continue
+                    # Check if series does have any failed jobs
+                    if len(EnodoJobManager.get_failed_jobs_for_series(
+                            series_name)) > 0:
+                        continue
+                    # Check if requirement of min amount of datapoints is met
+                    if state.get_datapoints_count() is None:
+                        continue
+                series_name, next_ts = \
+                    await ServerState.job_schedule_index.pop()
 
                 try:
+                    if await self._handle_low_datapoints(series, state):
+                        continue
                     await self._check_for_jobs(series, state, series_name)
                 except Exception as e:
-                    logging.error(
-                        f"Something went wrong when "
-                        "trying to create new job")
+                    await ServerState.job_schedule_index.insert_schedule(
+                        series_name,
+                        next_ts)
+                    logging.debug(
+                        "Something went wrong when trying to create new job")
                     logging.debug(
                         f"Corresponding error: {e}, "
                         f'exception class: {e.__class__.__name__}')
+
+                await asyncio.sleep(0.1)
 
             await asyncio.sleep(Config.watcher_interval)
 

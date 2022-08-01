@@ -147,7 +147,7 @@ class ResourceManager:
         if self._resource_type == "series":
             from lib.series.seriesmanager import SeriesManager
             async with SeriesManager.get_state(rc.name) as state:
-                ServerState.index_series_schedules(rc, state)
+                rc.schedule_jobs(state)
 
     def get_resource_index_value(self, resource: dict):
         if self._extra_index_field is None:

@@ -5,6 +5,7 @@ from typing import Optional, Union
 from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS
 from enodo.model.config.series import SeriesConfigModel, \
     SeriesJobConfigModel
+from lib.config import Config
 from lib.series.seriesstate import SeriesState
 from lib.serverstate import ServerState
 
@@ -67,6 +68,25 @@ class Series(StoredResource):
             job_config_name)
         return removed
 
+    def check_datapoint_count(
+            self, state: SeriesState) -> tuple:
+        if self.config.min_data_points is not None:
+            if state.get_datapoints_count() < \
+                    self.config.min_data_points:
+                return False, self.config.min_data_points
+        elif state.get_datapoints_count() < \
+                Config.min_data_points:
+            return False, Config.min_data_points
+        return True, None
+
+    def schedule_jobs(self, state):
+        job_schedules = state.get_all_job_schedules()
+        for job_config_name in self.config.job_config:
+            self.schedule_job(
+                job_config_name, state,
+                initial=not (job_config_name in job_schedules))
+        ServerState.index_series_schedules(self, state)
+
     def schedule_job(
             self, job_config_name: str, state: SeriesState,
             initial=False):
@@ -95,7 +115,6 @@ class Series(StoredResource):
         if next_value is not None:
             job_schedule['value'] = next_value
             state.set_job_schedule(job_config_name, job_schedule)
-        ServerState.index_series_schedules(self, state)
 
     def update(self, data: dict) -> bool:
         config = data.get('config')

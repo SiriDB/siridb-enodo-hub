@@ -439,7 +439,6 @@ class EnodoJobManager:
                     job_response.get('name'),
                     job.job_config.config_name,
                     job_response.get('data'))
-                series.schedule_job(job.job_config.config_name, state)
                 state.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
                 state.set_job_meta(
@@ -463,8 +462,6 @@ class EnodoJobManager:
                         job_response.get('name'),
                         job.job_config.config_name,
                         job_response.get('data'))
-                    series.schedule_job(
-                        job.job_config.config_name, state)
                     state.set_job_status(
                         job.job_config.config_name, JOB_STATUS_DONE)
                     state.set_job_meta(
@@ -487,7 +484,6 @@ class EnodoJobManager:
                     json.dumps(job_response.get('characteristics'))
                 state.health = job_response.get('health')
                 state.interval = job_response.get('interval')
-                series.schedule_job(job.job_config.config_name, state)
                 state.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
                 await SeriesManager.series_changed(
@@ -500,7 +496,6 @@ class EnodoJobManager:
                     f'exception class: {e.__class__.__name__}')
         elif job_type == JOB_TYPE_STATIC_RULES:
             try:
-                series.schedule_job(job.job_config.config_name, state)
                 state.set_job_status(
                     job.job_config.config_name, JOB_STATUS_DONE)
                 state.set_job_meta(
@@ -532,6 +527,8 @@ class EnodoJobManager:
                     f'exception class: {e.__class__.__name__}')
         else:
             logging.error(f"Received unknown job type: {job_type}")
+        series.schedule_job(job.job_config.config_name, state)
+        ServerState.index_series_schedules(series, state)
 
     @classmethod
     async def _send_worker_job_request(cls, worker: WorkerClient,

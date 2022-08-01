@@ -4,7 +4,9 @@ import time
 from typing import Any
 
 from recordclass import dataobject
-from enodo.jobs import JOB_STATUS_NONE, JOB_STATUS_DONE, JOB_STATUS_FAILED
+from enodo.jobs import (
+    JOB_STATUS_NONE, JOB_STATUS_DONE, JOB_STATUS_FAILED,
+    JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_OPEN, JOB_STATUS_PENDING)
 from lib.serverstate import ServerState
 from lib.siridb.siridb import query_series_datapoint_count
 
@@ -56,6 +58,9 @@ class SeriesState(dataobject):
         except Exception:
             return None
         state.lock = asyncio.Lock()
+        for job in state.job_data:
+            if job.status in [JOB_STATUS_PENDING, JOB_STATUS_OPEN]:
+                job.status = JOB_STATUS_NONE
         return state
 
     def serialize(self):
@@ -158,14 +163,18 @@ class SeriesState(dataobject):
                    series) -> bool:
         job_status = self.get_job_status(job_config_name)
         job_schedule = self.get_job_schedule(job_config_name)
+        job_config = series.config.get_config_for_job(job_config_name)
+
+        if job_config.job_type != JOB_TYPE_BASE_SERIES_ANALYSIS:
+            if self.get_job_status(
+                    series.base_analysis_job.config_name) != JOB_STATUS_DONE:
+                return False
 
         if job_status not in [JOB_STATUS_NONE, JOB_STATUS_DONE]:
             jcs = "Job failed" if job_status == JOB_STATUS_FAILED else \
                 "Already active"
             self.set_job_check_status(job_config_name, jcs)
             return False
-
-        job_config = series.config.get_config_for_job(job_config_name)
         module = ClientManager.get_module(job_config.module)
         if module is None:
             self.set_job_check_status(
