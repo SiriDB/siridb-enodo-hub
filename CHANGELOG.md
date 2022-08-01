@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Implemented sorted list for schedule checking
 
 ### Fixed
-- Scheduling issue
+- Scheduling issue fixed
 
 ## [0.1.0-beta4.0.3] - 2022-07-28
 
