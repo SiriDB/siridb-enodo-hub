@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta4.0.6] - 2022-08-01
+
+### Added
+- Copied python 3.10 bisect function, to be work with python 3.9
+
 ## [0.1.0-beta4.0.5] - 2022-08-01
 
 ### Changed
