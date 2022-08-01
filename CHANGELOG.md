@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
-## [0.1.0-beta4.0.3] - 2022-08-01
+## [0.1.0-beta4.0.4] - 2022-08-01
 
 ### Changed
 - Implemented sorted list for schedule checking
