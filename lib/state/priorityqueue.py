@@ -26,7 +26,7 @@ class SeriesPriorityQueue:
                 self.items.remove(series_name)
             self.mapping[series_name] = ts
             pos_to_insert = bisect(
-                self.items, series_name, key=lambda key: self.mapping[key])
+                self.items, ts, key=lambda key: self.mapping[key])
             self.items.insert(pos_to_insert, series_name)
         return True
 
