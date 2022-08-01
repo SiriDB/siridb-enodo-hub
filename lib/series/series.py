@@ -84,7 +84,7 @@ class Series(StoredResource):
         for job_config_name in self.config.job_config:
             self.schedule_job(
                 job_config_name, state,
-                initial=not(job_config_name in job_schedules))
+                initial=not (job_config_name in job_schedules))
         ServerState.index_series_schedules(self, state)
 
     def schedule_job(
