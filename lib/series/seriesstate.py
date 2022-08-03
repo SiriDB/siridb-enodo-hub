@@ -120,7 +120,7 @@ class SeriesState(dataobject):
     def get_job_meta(self, job_config_name: str) -> str:
         job = self._get_job(job_config_name)
         return json.loads(
-            job.analysis_meta) if job.analysis_meta else ""
+            job.analysis_meta) if job.analysis_meta else {}
 
     def set_job_meta(self, config_name: str, analysis_meta: Any):
         self._get_job(config_name).analysis_meta = json.dumps(
@@ -220,7 +220,7 @@ class SeriesState(dataobject):
             "datapoint_count": self.datapoint_count,
             "health": self.health,
             "characteristics": json.loads(
-                self.characteristics) if self.characteristics else "",
+                self.characteristics) if self.characteristics else {},
             "interval": self.interval,
             "job_schedule": self.get_all_job_schedules(),
             "job_statuses": {},
@@ -239,6 +239,6 @@ class SeriesState(dataobject):
             state["job_check_statuses"][
                 job.config_name] = job.check_status
             state["job_analysis_meta"][job.config_name] = json.loads(
-                job.analysis_meta) if job.analysis_meta else ""
+                job.analysis_meta) if job.analysis_meta else {}
 
         return state
