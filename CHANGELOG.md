@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta4.0.8] - 2022-08-03
+
+### Added
+- Added logging when trying to load series templates.
+- Added better logging for siridb exceptions
+
 ## [0.1.0-beta4.0.7] - 2022-08-03
 
 ### Fixed
