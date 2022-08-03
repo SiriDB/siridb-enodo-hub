@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta4.0.7] - 2022-08-03
+
+### Fixed
+- When results are queried, return empty object for `job_meta` if it is empty, instead of an empty string
+
 ## [0.1.0-beta4.0.6] - 2022-08-01
 
 ### Added
