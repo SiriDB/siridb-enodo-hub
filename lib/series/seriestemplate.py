@@ -1,3 +1,5 @@
+import json
+import logging
 from enodo.model.config.series import SeriesJobConfigModel
 
 from lib.state.resource import StoredResource
@@ -6,7 +8,9 @@ from lib.state.resource import StoredResource
 class SeriesConfigTemplate(StoredResource, dict):
 
     def __init__(self, name, description, config, rid=None):
-
+        if 'job_config' not in config:
+            logging.error(
+                f"Invalid template config: {json.dumps(config)}")
         for job_config in config.get('job_config'):
             try:
                 SeriesJobConfigModel(**job_config)
