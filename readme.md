@@ -1,5 +1,5 @@
 
-<p align="center"><img src="https://github.com/siridb/siridb-enodo-hub/raw/development/assets/logo_full.png" alt="Enodo"></p>
+<p align="center"><img src="https://github.com/siridb/siridb-enodo-hub/raw/master/assets/logo_full.png" alt="Enodo"></p>
 
 # Enodo Hub
 
