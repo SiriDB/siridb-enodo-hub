@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta4.0.11] - 2022-08-04
+
+### Fixed
+- Scheduling issue and socketserver loop
+
 ## [0.1.0-beta4.0.10] - 2022-08-04
 
 ### Fixed

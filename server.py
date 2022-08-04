@@ -239,7 +239,9 @@ class Server:
                 await EnodoJobManager.create_job(
                     series.base_analysis_job.config_name, series_name)
                 return
-            raise EnodoScheduleException("No base job created")
+            raise EnodoScheduleException(
+                "No base job created",
+                job_config_name=series.base_analysis_job.config_name)
 
         # loop through scheduled jobs:
         jobs_created = 0
@@ -294,9 +296,13 @@ class Server:
                         continue
                     await self._check_for_jobs(series, state, series_name)
                 except EnodoScheduleException as e:
-                    series.schedule_job(e.job_config_name, state, delay=5)
-                    ServerState.index_series_schedules(series, state)
-                    logging.debug("Job could not be created, rescheduling...")
+                    if e.job_config_name is None:
+                        series.schedule_jobs(state, delay=5)
+                    else:
+                        series.schedule_job(e.job_config_name, state, delay=5)
+                        ServerState.index_series_schedules(series, state)
+                    logging.debug(
+                        "Job could not be created, rescheduling...")
                 except Exception as e:
                     logging.error(
                         "Something went wrong when trying to create new job")
