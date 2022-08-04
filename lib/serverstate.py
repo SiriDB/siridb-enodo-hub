@@ -26,7 +26,7 @@ class ServerState:
     readiness = None
     scheduler = None
     storage = None
-    job_schedule_index = SeriesPriorityQueue()
+    job_schedule_index = None
 
     series_rm = None
     series_config_template_rm = None
@@ -35,6 +35,7 @@ class ServerState:
     @classmethod
     async def async_setup(cls, sio, storage):
         cls.running = True
+        cls.job_schedule_index = SeriesPriorityQueue()
         cls.work_queue = True
         cls.readiness = False
         cls.sio = sio

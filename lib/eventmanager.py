@@ -173,7 +173,8 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
                     f'Calling EnodoEventOutput webhook {self.url}')
                 async with aiohttp.ClientSession(
                         timeout=aiohttp.ClientTimeout(total=3),
-                        ssl=False) as session:
+                        connector=aiohttp.TCPConnector(
+                            verify_ssl=False)) as session:
                     await session.post(
                         self.url,
                         data=self._get_payload(event),

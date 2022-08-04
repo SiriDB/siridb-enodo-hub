@@ -38,6 +38,8 @@ class ThingsDBStorage:
 
         logging.debug(
             f"Creating resource of type {resource_type}")
+        if "rid" in data:
+            del data["rid"]
         resp = await self.client.query("""//ti
             .get(resource_type).push(object);
             str(object.id());
@@ -49,7 +51,8 @@ class ThingsDBStorage:
         data = resource.to_store_data
         rid = resource.rid
         resource_type = resource.resource_type
-
+        if "rid" in data:
+            del data["rid"]
         logging.debug(
             f"Saving data of {rid} of type {resource_type}")
         resp = await self.client.query("""//ti
@@ -60,16 +63,14 @@ class ThingsDBStorage:
 
     async def load_by_type(self, resource_type: str) -> list:
         resp = await self.client.query(
-            """.get(resource_type).map(|item| {
-            item["rid"] = str(item.id()); item.copy(10)})""",
+            """.get(resource_type)""",
             resource_type=resource_type)
         return resp
 
     async def load_by_type_and_key(self, resource_type: str, key: Any,
                                    value: Any) -> dict:
         resp = await self.client.query(
-            """.get(resource_type).filter(|item| item.get(key) == value)
-            .map(|item| {item["rid"] = str(item.id()); item.copy(10)})""",
+            """.get(resource_type).filter(|item| item.get(key) == value)""",
             resource_type=resource_type, key=key, value=value)
         if len(resp) < 1:
             return None
@@ -80,8 +81,6 @@ class ThingsDBStorage:
         resp = await self.client.query(
             """//ti
             t = thing(rid);
-            t['rid'] = str(t.id());
-            t.copy(10)
             """,
             rid=int(rid))
         return resp

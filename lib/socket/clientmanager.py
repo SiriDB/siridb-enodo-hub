@@ -11,7 +11,7 @@ from enodo.model.config.worker import (WORKER_MODE_DEDICATED_JOB_TYPE,
 from enodo.protocol.package import UPDATE_SERIES, create_header
 from enodo.jobs import JOB_STATUS_OPEN
 from lib.serverstate import ServerState
-from lib.state.resource import ResourceManager, StoredResource
+from lib.state.resource import ResourceManager, StoredResource, from_thing
 from lib.eventmanager import (ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE,
                               EnodoEvent, EnodoEventManager)
 
@@ -72,8 +72,8 @@ class WorkerClient(EnodoClient):
     def __init__(self,
                  client_id: str,
                  ip_address: str,
-                 writer: StreamWriter,
                  module: dict,
+                 writer: Optional[StreamWriter] = None,
                  lib_version: Optional[str] = "unknown",
                  last_seen: Optional[int] = None,
                  busy=False,
@@ -118,6 +118,13 @@ class WorkerClient(EnodoClient):
     @property
     def resource_type(self):
         return "workers"
+
+    @property
+    def to_store_data(self):
+        data = self.to_dict()
+        del data["writer"]
+        data['ip_address'] = "str"
+        return data
 
     @StoredResource.async_changed
     async def reconnected(self, ip_address: str, writer: StreamWriter,
@@ -386,6 +393,7 @@ class ClientManager:
         workers = await ServerState.storage.load_by_type("workers")
         for w in workers:
             try:
+                from_thing(w)
                 worker = WorkerClient(**w)
                 worker.online = False
                 await cls.add_client(worker)
