@@ -295,6 +295,7 @@ class Server:
                     await self._check_for_jobs(series, state, series_name)
                 except EnodoScheduleException as e:
                     series.schedule_job(e.job_config_name, state, delay=5)
+                    ServerState.index_series_schedules(series, state)
                     logging.debug("Job could not be created, rescheduling...")
                 except Exception as e:
                     logging.error(
