@@ -79,17 +79,15 @@ class Series(StoredResource):
             return False, Config.min_data_points
         return True, None
 
-    def schedule_jobs(self, state):
+    def schedule_jobs(self, state, delay=0):
         job_schedules = state.get_all_job_schedules()
         for job_config_name in self.config.job_config:
-            self.schedule_job(
-                job_config_name, state,
-                initial=not (job_config_name in job_schedules))
+            self.schedule_job(job_config_name, state, initial=not (
+                job_config_name in job_schedules), delay=delay)
         ServerState.index_series_schedules(self, state)
 
-    def schedule_job(
-            self, job_config_name: str, state: SeriesState,
-            initial=False, delay=0):
+    def schedule_job(self, job_config_name: str, state: SeriesState,
+                     initial=False, delay=0):
         job_config = self.config.get_config_for_job(job_config_name)
         if job_config is None:
             return False
