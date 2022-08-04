@@ -263,6 +263,50 @@ class Server:
                                    base_only=True)
         return True
 
+    async def work_schedule_queue(self):
+        current_time = time()
+        while len(ServerState.job_schedule_index.items) > 0:
+            async with ServerState.job_schedule_index.seek_and_hold() as \
+                    (series_name, next_ts):
+                if next_ts > current_time:
+                    break
+                series, state = \
+                    await SeriesManager.get_series_read_only(series_name)
+                # Check if series is valid and not ignored
+                if series is None or series.is_ignored():
+                    continue
+                # Check if series does have any failed jobs
+                if len(EnodoJobManager.get_failed_jobs_for_series(
+                        series_name)) > 0:
+                    continue
+                # Check if requirement of min amount of datapoints is met
+                if state.get_datapoints_count() is None:
+                    continue
+            series_name, next_ts = \
+                await ServerState.job_schedule_index.pop()
+
+            try:
+                if await self._handle_low_datapoints(series, state):
+                    continue
+                await self._check_for_jobs(series, state, series_name)
+            except EnodoScheduleException as e:
+                if e.job_config_name is None:
+                    series.schedule_jobs(state, delay=5)
+                else:
+                    series.schedule_job(e.job_config_name, state, delay=5)
+                    ServerState.index_series_schedules(series, state)
+                logging.debug(
+                    "Job could not be created, "
+                    f"rescheduling {series_name}...")
+            except Exception as e:
+                logging.error(
+                    "Something went wrong when trying to create new job")
+                logging.debug(
+                    f"Corresponding error: {e}, "
+                    f'exception class: {e.__class__.__name__}')
+
+            await asyncio.sleep(0.1)
+
     async def watch_series(self):
         """Background task to check each series if
         jobs need to be managed
@@ -270,47 +314,14 @@ class Server:
         while ServerState.running:
             ServerState.tasks_last_runs['watch_series'] = \
                 datetime.datetime.now()
-            current_time = time()
-            while len(ServerState.job_schedule_index.items) > 0:
-                async with ServerState.job_schedule_index.seek_and_hold() as \
-                        (series_name, next_ts):
-                    if next_ts > current_time:
-                        break
-                    series, state = \
-                        await SeriesManager.get_series_read_only(series_name)
-                    # Check if series is valid and not ignored
-                    if series is None or series.is_ignored():
-                        continue
-                    # Check if series does have any failed jobs
-                    if len(EnodoJobManager.get_failed_jobs_for_series(
-                            series_name)) > 0:
-                        continue
-                    # Check if requirement of min amount of datapoints is met
-                    if state.get_datapoints_count() is None:
-                        continue
-                series_name, next_ts = \
-                    await ServerState.job_schedule_index.pop()
 
-                try:
-                    if await self._handle_low_datapoints(series, state):
-                        continue
-                    await self._check_for_jobs(series, state, series_name)
-                except EnodoScheduleException as e:
-                    if e.job_config_name is None:
-                        series.schedule_jobs(state, delay=5)
-                    else:
-                        series.schedule_job(e.job_config_name, state, delay=5)
-                        ServerState.index_series_schedules(series, state)
-                    logging.debug(
-                        "Job could not be created, rescheduling...")
-                except Exception as e:
-                    logging.error(
-                        "Something went wrong when trying to create new job")
-                    logging.debug(
-                        f"Corresponding error: {e}, "
-                        f'exception class: {e.__class__.__name__}')
-
-                await asyncio.sleep(0.1)
+            try:
+                await self.work_schedule_queue()
+            except Exception as e:
+                logging.error("Something is wrong with the watch series job")
+                logging.debug(f"Corresponding error: {e}")
+                import traceback
+                traceback.format_exc()
 
             await asyncio.sleep(Config.watcher_interval)
 

@@ -5,6 +5,7 @@ import logging
 import time
 from asyncio import StreamWriter
 from typing import Any, Callable, Optional, Union
+import uuid
 
 import qpack
 from enodo.jobs import *
@@ -84,7 +85,7 @@ class EnodoJobManager:
     _max_job_timeout = 60 * 5
     _lock = None
     _next_job_id = 0
-    _lock = asyncio.Lock()
+    _lock = None
 
     _max_in_queue_before_warning = None
     _update_queue_cb = None
@@ -93,6 +94,7 @@ class EnodoJobManager:
     def setup(cls, update_queue_cb: Callable):
         cls._update_queue_cb = update_queue_cb
         cls._max_in_queue_before_warning = Config.max_in_queue_before_warning
+        cls._lock = asyncio.Lock()
 
     @classmethod
     def _build_index(cls):
@@ -154,8 +156,10 @@ class EnodoJobManager:
                 job_config_name,
                 "Job created")
             job_config = config.get_job(job_config_name)
-            job = EnodoJob(None, config.name, job_config,
-                           job_data=None)  # TODO: Catch exception
+            job = EnodoJob(
+                str(uuid.uuid4()).replace("-", ""),
+                config.name, job_config,
+                job_data=None)  # TODO: Catch exception
             await cls._add_job(job)
 
     @classmethod

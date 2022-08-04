@@ -3,12 +3,31 @@ import contextlib
 from typing import Any
 from abc import abstractproperty
 import functools
+
 from lib.serverstate import ServerState
 from lib.state.lruqueue import LRUQueue
 from lib.state.queue import SimpleQueue
 
 
 resource_manager_index = {}
+
+
+def from_thing(thing: dict) -> dict:
+    if '#' in thing:
+        thing['rid'] = thing['#']
+        remove_things_id(thing)
+
+
+def remove_things_id(val: dict) -> dict:
+    if "#" in val:
+        del val['#']
+    for key in val:
+        if isinstance(val[key], dict):
+            remove_things_id(val[key])
+        if isinstance(val[key], list):
+            for item in val[key]:
+                if isinstance(item, dict):
+                    remove_things_id(item)
 
 
 class StoredResource:
@@ -115,6 +134,12 @@ class ResourceManager:
         self._cache_only = cache_only
         self._extra_index_field = extra_index_field
 
+    def to_resource_class(self, data):
+        if "#" in data:
+            data['rid'] = data['#']
+            remove_things_id(data)
+        return self._resource_class(**data)
+
     def cleanup(self):
         pass
 
@@ -139,7 +164,7 @@ class ResourceManager:
 
     @contextlib.asynccontextmanager
     async def create_resource(self, resource: dict):
-        rc = self._resource_class(**resource)
+        rc = self.to_resource_class(resource)
         yield rc
         await rc.create_save()
         self._resources[rc.rid] = self.get_resource_index_value(
@@ -175,7 +200,7 @@ class ResourceManager:
             self._resource_type, key, value)
         if data is None:
             return None
-        resp = self._resource_class(**data)
+        resp = self.to_resource_class(data)
         return resp
 
     async def get_resource(self, rid: str,
@@ -187,9 +212,9 @@ class ResourceManager:
             resp = self._queue.get(rid)
         if resp is None:
             resp = \
-                self._resource_class(**(
+                self.to_resource_class(
                     await ServerState.storage.load_by_type_and_rid(
-                        self._resource_type, rid)))
+                        self._resource_type, rid))
             self._queue.put(rid, resp)
         return resp
 

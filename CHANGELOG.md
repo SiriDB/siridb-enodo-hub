@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta4.0.12] - 2022-08-04
+
+### Fixed
+- Event no ssl check issue
+- Locks created before asyncio.run was called (class variables)
+- Removed thing ids and map to `rid` for stored resources
+
 ## [0.1.0-beta4.0.11] - 2022-08-04
 
 ### Fixed
