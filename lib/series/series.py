@@ -89,7 +89,7 @@ class Series(StoredResource):
 
     def schedule_job(
             self, job_config_name: str, state: SeriesState,
-            initial=False):
+            initial=False, delay=0):
         job_config = self.config.get_config_for_job(job_config_name)
         if job_config is None:
             return False
@@ -113,7 +113,7 @@ class Series(StoredResource):
                 next_value = \
                     state.datapoint_count + job_config.job_schedule
         if next_value is not None:
-            job_schedule['value'] = next_value
+            job_schedule['value'] = next_value + delay
             state.set_job_schedule(job_config_name, job_schedule)
 
     def update(self, data: dict) -> bool:

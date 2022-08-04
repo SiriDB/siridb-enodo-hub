@@ -13,6 +13,7 @@ from enodo.protocol.packagedata import *
 from enodo.protocol.package import LISTENER_NEW_SERIES_POINTS, \
     WORKER_UPDATE_BUSY, WORKER_JOB_RESULT, WORKER_REFUSED, \
     WORKER_JOB_CANCELLED
+from lib.exceptions.enodoexception import EnodoScheduleException
 from lib.series.seriestemplate import SeriesConfigTemplate
 from lib.state.thingsdbstorage import ThingsDBStorage
 from lib.util.upgrade import UpgradeUtil
@@ -238,7 +239,7 @@ class Server:
                 await EnodoJobManager.create_job(
                     series.base_analysis_job.config_name, series_name)
                 return
-            raise Exception("No base job created")
+            raise EnodoScheduleException("No base job created")
 
         # loop through scheduled jobs:
         jobs_created = 0
@@ -250,7 +251,7 @@ class Server:
                 jobs_created += 1
 
         if jobs_created == 0:
-            raise Exception("No job created")
+            raise EnodoScheduleException("No job created")
 
     async def _handle_low_datapoints(self, series, state):
         dp_ok, _ = series.check_datapoint_count(state)
@@ -292,11 +293,11 @@ class Server:
                     if await self._handle_low_datapoints(series, state):
                         continue
                     await self._check_for_jobs(series, state, series_name)
+                except EnodoScheduleException as e:
+                    series.schedule_job(e.job_config_name, state, delay=5)
+                    logging.debug("Job could not be created, rescheduling...")
                 except Exception as e:
-                    await ServerState.job_schedule_index.insert_schedule(
-                        series_name,
-                        next_ts)
-                    logging.debug(
+                    logging.error(
                         "Something went wrong when trying to create new job")
                     logging.debug(
                         f"Corresponding error: {e}, "
