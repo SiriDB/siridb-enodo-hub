@@ -4,7 +4,6 @@ from time import time
 import asyncio
 import logging
 import signal
-from turtle import delay
 
 import aiohttp_cors
 import socketio
