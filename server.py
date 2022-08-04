@@ -237,6 +237,7 @@ class Server:
                     series.base_analysis_job.config_name, series):
                 await EnodoJobManager.create_job(
                     series.base_analysis_job.config_name, series_name)
+                return
             raise Exception("No base job created")
 
         # loop through scheduled jobs:
