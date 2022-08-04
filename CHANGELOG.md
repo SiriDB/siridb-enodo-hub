@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta4.0.10] - 2022-08-04
+
+### Fixed
+- Rescheduling series job with delay after not due exception
+
 ## [0.1.0-beta4.0.9] - 2022-08-04
 
 ### Fixed
