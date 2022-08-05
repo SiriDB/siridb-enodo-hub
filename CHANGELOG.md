@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta4.0.16] - 2022-08-06
+
+### Fixed
+- Add delay correctly to next schedule value when something went wrong
+
 ## [0.1.0-beta4.0.15] - 2022-08-05
 
 ### Fixed
