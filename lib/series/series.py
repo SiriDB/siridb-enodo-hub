@@ -35,7 +35,7 @@ class Series(StoredResource):
             return
         self._config_from_template = True
         config = ServerState.series_config_template_rm.get_cached_resource(
-            config)
+            int(config))
         if config is None:
             raise Exception("Invalid series config template rid")
         config = SeriesConfigModel(**config.series_config)
@@ -111,6 +111,10 @@ class Series(StoredResource):
                 next_value = \
                     state.datapoint_count + job_config.job_schedule
         if next_value is not None:
+            if delay > 0 and job_schedule["type"] == "TS":
+                current_ts = int(time.time())
+                if next_value < current_ts:
+                    next_value = current_ts
             job_schedule['value'] = next_value + delay
             state.set_job_schedule(job_config_name, job_schedule)
 

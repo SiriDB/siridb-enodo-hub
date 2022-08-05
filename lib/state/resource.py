@@ -189,7 +189,8 @@ class ResourceManager:
     def set_cache(self, resource):
         self._queue.put(resource.rid, resource)
 
-    def get_cached_resource(self, rid: str) -> StoredResource:
+    def get_cached_resource(self, rid: int) -> StoredResource:
+        rid = int(rid)
         return self._queue.get(rid)
 
     def get_cached_resources(self) -> list:
@@ -203,8 +204,9 @@ class ResourceManager:
         resp = self.to_resource_class(data)
         return resp
 
-    async def get_resource(self, rid: str,
+    async def get_resource(self, rid: int,
                            use_cache: bool = True) -> StoredResource:
+        rid = int(rid)
         if rid not in self._resources:
             return None
         resp = None
@@ -225,9 +227,11 @@ class ResourceManager:
         return list(self._resources.values())
 
     def get_resource_rid_value(self, rid) -> list:
+        rid = int(rid)
         return self._resources.get(rid)
 
-    def rid_exists(self, rid: str) -> bool:
+    def rid_exists(self, rid: int) -> bool:
+        rid = int(rid)
         return rid in self._resources
 
     def get_resource_count(self) -> int:
