@@ -225,6 +225,11 @@ class BaseHandler:
             if bc is None:
                 return {'error': 'Something went wrong when adding '
                         'the series. Missing base analysis job'}, 400
+        else:
+            config = ServerState.series_config_template_rm.get_cached_resource(
+                int(data.get('config')))
+            if config is None:
+                return {'error': 'Series config template not found'}, 404
         if 'meta' in data and (data.get('meta') is not None and
                                not isinstance(data.get('meta'), dict)):
             return {'error': 'Something went wrong when adding '

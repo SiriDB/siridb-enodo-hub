@@ -115,8 +115,9 @@ class Series(StoredResource):
         if not dp_ok:
             if job_schedule["type"] == "TS":
                 diff = min_points - state.datapoint_count
+                interval = state.interval if state.interval is not None else 60
                 job_schedule['value'] = int(
-                    time.time()) + diff * state.interval
+                    time.time()) + diff * interval
             elif job_schedule["type"] == "N":
                 job_schedule['value'] = min_points
             asyncio.ensure_future(state.update_datapoints_count())
