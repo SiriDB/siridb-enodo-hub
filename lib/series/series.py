@@ -110,11 +110,27 @@ class Series(StoredResource):
             elif job_schedule["value"] <= state.datapoint_count:
                 next_value = \
                     state.datapoint_count + job_config.job_schedule
+
+        dp_ok, min_points = self.check_datapoint_count(state)
+        if not dp_ok:
+            if job_schedule["type"] == "TS":
+                diff = min_points - state.datapoint_count
+                job_schedule['value'] = int(
+                    time.time()) + diff * state.interval
+            elif job_schedule["type"] == "N":
+                job_schedule['value'] = min_points
+            asyncio.ensure_future(state.update_datapoints_count())
+
         if next_value is not None:
+            # Apply delay to current ts, instead of ts in past
             if delay > 0 and job_schedule["type"] == "TS":
                 current_ts = int(time.time())
                 if next_value < current_ts:
                     next_value = current_ts
+            # Apply delay to current count, instead of count in past
+            elif delay > 0 and job_schedule["type"] == "N":
+                if next_value < state.datapoint_count:
+                    next_value = state.datapoint_count
             job_schedule['value'] = next_value + delay
             state.set_job_schedule(job_config_name, job_schedule)
 
