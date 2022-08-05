@@ -42,7 +42,7 @@ class ThingsDBStorage:
             del data["rid"]
         resp = await self.client.query("""//ti
             .get(resource_type).push(object);
-            str(object.id());
+            object.id();
         """, object=data, resource_type=resource_type)
         resource.rid = resp
         return resource
@@ -86,7 +86,7 @@ class ThingsDBStorage:
         return resp
 
     async def get_all_rids_for_type(self, resource_type: str) -> list:
-        q = ".get(resource_type).map(|item| str(item.id()))"
+        q = ".get(resource_type).map(|item| item.id())"
         resp = await self.client.query(q, resource_type=resource_type)
         return resp
 

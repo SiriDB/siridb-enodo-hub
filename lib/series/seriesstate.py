@@ -123,8 +123,7 @@ class SeriesState(dataobject):
             job.analysis_meta) if job.analysis_meta else {}
 
     def set_job_meta(self, config_name: str, analysis_meta: Any):
-        self._get_job(config_name).analysis_meta = json.dumps(
-            analysis_meta)
+        self._get_job(config_name).analysis_meta = json.dumps(analysis_meta)
 
     def get_datapoints_count(self) -> int:
         return self.datapoint_count
@@ -168,6 +167,8 @@ class SeriesState(dataobject):
         if job_config.job_type != JOB_TYPE_BASE_SERIES_ANALYSIS:
             if self.get_job_status(
                     series.base_analysis_job.config_name) != JOB_STATUS_DONE:
+                self.set_job_check_status(job_config_name,
+                                          "Base job is not done")
                 return False
 
         if job_status not in [JOB_STATUS_NONE, JOB_STATUS_DONE]:
@@ -177,8 +178,7 @@ class SeriesState(dataobject):
             return False
         module = ClientManager.get_module(job_config.module)
         if module is None:
-            self.set_job_check_status(
-                job_config_name, "Unknown module")
+            self.set_job_check_status(job_config_name, "Unknown module")
             return False
         r_job = job_config.requires_job
         if r_job is not None and series.config.get_config_for_job(
@@ -197,8 +197,7 @@ class SeriesState(dataobject):
         if job_schedule["type"] == "N" and \
                 job_schedule["value"] <= self.datapoint_count:
             return True
-        self.set_job_check_status(
-            job_config_name, "Not yet scheduled")
+        self.set_job_check_status(job_config_name, "Not yet scheduled")
         return False
 
     def get_errors(self) -> list:
@@ -206,8 +205,7 @@ class SeriesState(dataobject):
         from ..jobmanager import EnodoJobManager
         errors = [
             job.error
-            for job in EnodoJobManager.get_failed_jobs_for_series(
-                self.name)]
+            for job in EnodoJobManager.get_failed_jobs_for_series(self.name)]
         return errors
 
     def is_ignored(self) -> bool:
@@ -236,8 +234,7 @@ class SeriesState(dataobject):
                 "type": job.schedule_type
             }
             state["job_statuses"][job.config_name] = job.status
-            state["job_check_statuses"][
-                job.config_name] = job.check_status
+            state["job_check_statuses"][job.config_name] = job.check_status
             state["job_analysis_meta"][job.config_name] = json.loads(
                 job.analysis_meta) if job.analysis_meta else {}
 

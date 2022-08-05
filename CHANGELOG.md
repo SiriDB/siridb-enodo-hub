@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta4.0.13] - 2022-08-05
+
+### Fixed
+- Corrected every rid to int type
+
+### Added
+- Added extra job check status, when base job is not done
+
 ## [0.1.0-beta4.0.12] - 2022-08-04
 
 ### Fixed

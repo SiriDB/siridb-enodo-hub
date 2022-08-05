@@ -35,7 +35,7 @@ class Series(StoredResource):
             return
         self._config_from_template = True
         config = ServerState.series_config_template_rm.get_cached_resource(
-            config)
+            int(config))
         if config is None:
             raise Exception("Invalid series config template rid")
         config = SeriesConfigModel(**config.series_config)
