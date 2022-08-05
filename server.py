@@ -275,10 +275,6 @@ class Server:
                 # Check if series is valid and not ignored
                 if series is None or series.is_ignored():
                     continue
-                # Check if series does have any failed jobs
-                if len(EnodoJobManager.get_failed_jobs_for_series(
-                        series_name)) > 0:
-                    continue
                 # Check if requirement of min amount of datapoints is met
                 if state.get_datapoints_count() is None:
                     continue
@@ -287,6 +283,7 @@ class Server:
 
             try:
                 if await self._handle_low_datapoints(series, state):
+                    series.schedule_jobs(state, delay=10)
                     continue
                 await self._check_for_jobs(series, state, series_name)
             except EnodoScheduleException as e:

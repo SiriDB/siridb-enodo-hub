@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta4.0.14] - 2022-08-05
+
+### Fixed
+- Fixed low datapoint count scheduling issue
+- Fixed add series by template id (str/int support)
+- Fixed priority queue sorting
+
 ## [0.1.0-beta4.0.13] - 2022-08-05
 
 ### Fixed

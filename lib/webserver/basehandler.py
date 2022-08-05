@@ -214,7 +214,7 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        if not isinstance(data.get('config'), str):
+        if isinstance(data.get('config'), dict):
             try:
                 series_config = SeriesConfigModel(**data.get('config'))
             except Exception as e:
@@ -446,9 +446,14 @@ class BaseHandler:
     @classmethod
     @sync_simple_fields_filter(is_list=False)
     def resp_get_enodo_hub_status(cls):
+        queue = {}
+        queue_items = list(ServerState.job_schedule_index.items)
+        for series_name in queue_items:
+            queue[series_name] = ServerState.job_schedule_index.mapping.get(
+                series_name)
         return {'data': {
             'version': VERSION,
-            'job_index_queue': ServerState.job_schedule_index.mapping
+            'job_index_queue': queue
         }}
 
     @classmethod

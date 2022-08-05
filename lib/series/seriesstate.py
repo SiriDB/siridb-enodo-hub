@@ -40,8 +40,7 @@ class SeriesState(dataobject):
     characteristics: str = None
     job_data: list = None
     lock: asyncio.Lock = None
-    last_checked_dp: int = None
-    _update_dp_at: int = None
+    _last_updated_dp: int = None
 
     def defaults(self):
         if self.job_data is None:
@@ -135,28 +134,22 @@ class SeriesState(dataobject):
         :return:
         """
         async with self.lock:
-            self.last_checked_dp = int(time.time())
+            self._last_updated_dp = int(time.time())
             self.datapoint_count += add_to_count
 
     async def set_datapoints_count(self, new_count: int):
         async with self.lock:
-            self.last_checked_dp = int(time.time())
+            self._last_updated_dp = int(time.time())
             self.datapoint_count = new_count
 
-    async def update_datapoints_count(self, at: int):
-        if self.datapoint_count >= at:
-            return
-        if self.last_checked_dp is None:
-            self.last_checked_dp = int(time.time())
-        if self._update_dp_at is None:
-            diff = at - self.datapoint_count
-            self._update_dp_at = diff * self.interval + self.last_checked_dp
-        if self._update_dp_at <= int(time.time()):
+    async def update_datapoints_count(self):
+        current_time = int(time.time())
+        if self._last_updated_dp is None or \
+                self._last_updated_dp < (current_time - 3600):
+            self._last_updated_dp = current_time
             collected_datapoints = await query_series_datapoint_count(
                 ServerState.get_siridb_data_conn(), self.name)
             await self.set_datapoints_count(collected_datapoints)
-            if collected_datapoints < at:
-                self._update_dp_at = None
 
     def is_job_due(self, job_config_name: str,
                    series) -> bool:
