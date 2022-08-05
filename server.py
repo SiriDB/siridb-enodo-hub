@@ -283,15 +283,11 @@ class Server:
 
             try:
                 if await self._handle_low_datapoints(series, state):
-                    series.schedule_jobs(state, delay=10)
+                    series.schedule_jobs(state, delay=60)
                     continue
                 await self._check_for_jobs(series, state, series_name)
             except EnodoScheduleException as e:
-                if e.job_config_name is None:
-                    series.schedule_jobs(state, delay=10)
-                else:
-                    series.schedule_job(e.job_config_name, state, delay=10)
-                    ServerState.index_series_schedules(series, state)
+                series.schedule_jobs(state, delay=60)
                 logging.debug(
                     "Job could not be created, "
                     f"rescheduling {series_name}...")

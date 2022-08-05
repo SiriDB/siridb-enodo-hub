@@ -97,9 +97,10 @@ class Series(StoredResource):
         if job_schedule is None:
             job_schedule = {"value": 0,
                             "type": job_config.job_schedule_type}
+
+        current_ts = int(time.time())
         next_value = None
         if job_schedule["type"] == "TS":
-            current_ts = int(time.time())
             if initial:
                 next_value = current_ts
             elif job_schedule["value"] <= current_ts:
@@ -116,23 +117,26 @@ class Series(StoredResource):
             if job_schedule["type"] == "TS":
                 diff = min_points - state.datapoint_count
                 interval = state.interval if state.interval is not None else 60
-                job_schedule['value'] = int(
-                    time.time()) + diff * interval
+                next_value = int(time.time()) + diff * interval
             elif job_schedule["type"] == "N":
-                job_schedule['value'] = min_points
+                next_value = min_points
             asyncio.ensure_future(state.update_datapoints_count())
 
         if next_value is not None:
             # Apply delay to current ts, instead of ts in past
             if delay > 0 and job_schedule["type"] == "TS":
-                current_ts = int(time.time())
                 if next_value < current_ts:
                     next_value = current_ts
+                if next_value - current_ts < delay:
+                    next_value = current_ts + delay
             # Apply delay to current count, instead of count in past
             elif delay > 0 and job_schedule["type"] == "N":
                 if next_value < state.datapoint_count:
                     next_value = state.datapoint_count
-            job_schedule['value'] = next_value + delay
+                if next_value - state.datapoint_count < delay:
+                    next_value = state.datapoint_count + delay
+
+            job_schedule['value'] = next_value
             state.set_job_schedule(job_config_name, job_schedule)
 
     def update(self, data: dict) -> bool:

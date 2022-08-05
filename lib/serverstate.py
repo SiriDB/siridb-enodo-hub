@@ -145,6 +145,8 @@ class ServerState:
 
     @classmethod
     def index_series_schedules(cls, series, state):
+        if series.is_ignored():
+            return False
         job_schedules = state.get_all_job_schedules()
         earliest = None
         for job_config_name in series.config.job_config:
@@ -171,7 +173,7 @@ class ServerState:
                 if earliest is None or next_ts < earliest:
                     earliest = next_ts
         if earliest is not None:
-            ensure_future(
+            return ensure_future(
                 cls.job_schedule_index.insert_schedule(
                     series.name, earliest))
 
