@@ -111,6 +111,10 @@ class Series(StoredResource):
                 next_value = \
                     state.datapoint_count + job_config.job_schedule
         if next_value is not None:
+            if delay > 0 and job_schedule["type"] == "TS":
+                current_ts = int(time.time())
+                if next_value < current_ts:
+                    next_value = current_ts
             job_schedule['value'] = next_value + delay
             state.set_job_schedule(job_config_name, job_schedule)
 
