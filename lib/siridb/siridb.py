@@ -90,10 +90,11 @@ async def query_group_expression_by_name(siridb_client, group_name):
 
 async def query_all_series_results(siridb_client, series_name, selector="*"):
     result = None
+    name_escaped = re.escape(series_name).replace('/', r'\/')
     try:
         result = await siridb_client.query(
             f'select {selector} from '
-            f'/enodo_{re.escape(series_name)}_.*?$/')
+            f'/enodo_{name_escaped}_.*?$/')
     except (QueryError, InsertError, ServerError, PoolError,
             AuthenticationError, UserAuthError) as e:
         msg = str(e) or type(e).__name__
@@ -104,13 +105,14 @@ async def query_all_series_results(siridb_client, series_name, selector="*"):
 async def query_series_forecasts(siridb_client, series_name, selector="*",
                                  only_future=False):
     result = None
+    name_escaped = re.escape(series_name).replace('/', r'\/')
     after = ""
     if only_future:
         after = " after now"
     try:
         result = await siridb_client.query(
             f'select {selector} from '
-            f'/enodo_{re.escape(series_name)}_forecast_.*?$/{after}')
+            f'/enodo_{name_escaped}_forecast_.*?$/{after}')
     except (QueryError, InsertError, ServerError, PoolError,
             AuthenticationError, UserAuthError) as e:
         msg = str(e) or type(e).__name__
@@ -120,10 +122,11 @@ async def query_series_forecasts(siridb_client, series_name, selector="*",
 
 async def query_series_anomalies(siridb_client, series_name, selector="*"):
     result = None
+    name_escaped = re.escape(series_name).replace('/', r'\/')
     try:
         result = await siridb_client.query(
             f'select {selector} from '
-            f'/enodo_{re.escape(series_name)}_anomalies_.*?$/')
+            f'/enodo_{name_escaped}_anomalies_.*?$/')
     except (QueryError, InsertError, ServerError, PoolError,
             AuthenticationError, UserAuthError) as e:
         msg = str(e) or type(e).__name__
@@ -134,10 +137,11 @@ async def query_series_anomalies(siridb_client, series_name, selector="*"):
 async def query_series_static_rules_hits(
         siridb_client, series_name, selector="*"):
     result = None
+    name_escaped = re.escape(series_name).replace('/', r'\/')
     try:
         result = await siridb_client.query(
             f'select {selector} from '
-            f'/enodo_{re.escape(series_name)}_static_rules_.*?$/')
+            f'/enodo_{name_escaped}_static_rules_.*?$/')
     except (QueryError, InsertError, ServerError, PoolError,
             AuthenticationError, UserAuthError) as e:
         msg = str(e) or type(e).__name__

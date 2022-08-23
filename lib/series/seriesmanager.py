@@ -251,9 +251,10 @@ class SeriesManager:
 
     @classmethod
     async def cleanup_series(cls, series_name):
+        name_escaped = re.escape(series_name).replace('/', r'\/')
         await drop_series(
             ServerState.get_siridb_output_conn(),
-            f"/enodo_{re.escape(series_name)}.*?.*?$/")
+            f"/enodo_{name_escaped}.*?.*?$/")
 
     @classmethod
     async def add_to_datapoint_counter(cls, series_name, value):
