@@ -1,11 +1,75 @@
 
 # Change Log
 All notable changes to this project will be documented in this file.
- 
+
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
+
+## [0.1.0-beta4.0.17] - 2022-08-23
+
+### Fixed
+- Escape slashes in a series name.
+
+## [0.1.0-beta4.0.16] - 2022-08-06
+
+### Fixed
+- Add delay correctly to next schedule value when something went wrong
+
+## [0.1.0-beta4.0.15] - 2022-08-05
+
+### Fixed
+- Use default interval when base job has not ran before
+- Fixed better error message when adding series with unknown config template
+
+## [0.1.0-beta4.0.14] - 2022-08-05
+
+### Fixed
+- Fixed low datapoint count scheduling issue
+- Fixed add series by template id (str/int support)
+- Fixed priority queue sorting
+
+## [0.1.0-beta4.0.13] - 2022-08-05
+
+### Fixed
+- Corrected every rid to int type
+
+### Added
+- Added extra job check status, when base job is not done
+
+## [0.1.0-beta4.0.12] - 2022-08-04
+
+### Fixed
+- Event no ssl check issue
+- Locks created before asyncio.run was called (class variables)
+- Removed thing ids and map to `rid` for stored resources
+
+## [0.1.0-beta4.0.11] - 2022-08-04
+
+### Fixed
+- Scheduling issue and socketserver loop
+
+## [0.1.0-beta4.0.10] - 2022-08-04
+
+### Fixed
+- Rescheduling series job with delay after not due exception
+
+## [0.1.0-beta4.0.9] - 2022-08-04
+
+### Fixed
+- Fixed exception raising when nothing is wrong
+
+## [0.1.0-beta4.0.8] - 2022-08-03
+
+### Added
+- Added logging when trying to load series templates.
+- Added better logging for siridb exceptions
+
+## [0.1.0-beta4.0.7] - 2022-08-03
+
+### Fixed
+- When results are queried, return empty object for `job_meta` if it is empty, instead of an empty string
 
 ## [0.1.0-beta4.0.6] - 2022-08-01
 
@@ -191,7 +255,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Added
 - Implemented use_max_points property in job configs
-  
+
 ### Fixed
 - Bug with worker is_going_busy status on reconnect
 - Fixed return http status on not found when fetching series details
@@ -208,7 +272,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Online status of clients exposed to API
 
 ### Changed
-- Changed series config and job config. Job config is now a list of jobs. Not categorised by job type. Forecast, anomaly detection jobs can be in the list multiple times. 
+- Changed series config and job config. Job config is now a list of jobs. Not categorised by job type. Forecast, anomaly detection jobs can be in the list multiple times.
 - Jobs get an unique identifier `config_name`, which can be set to now the `config_name` beforehand
 - Jobs can be silenced by the silenced property in the job config. This makes sure no events will be created for the job's results.
 - A job can require an other job the be run beforehand by using the `requires_job` property
@@ -241,38 +305,38 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 - Fixed siridb connection status update for subscribers socket.io before socket.io is setup
 
 ## [0.1.0-beta2.1] - 2021-03-17
-  
+
 Migration: series config's are changed completely. Removing series.json from the data folder is necessary. You will need to re-add the series after this.
- 
+
 ### Added
 
 - Support for series management page in the GUI
- 
+
 ### Changed
-  
+
 - Series config is changed. Mainly the job config is setup per job type. This includes `model_params`
 - Package size is change, removed unnecessary bytes
- 
+
 ### Fixed
- 
+
 - Bug with job management
 - Model fetching
- 
+
 ## [0.1.0-beta2.0] - 2021-03-04
-  
+
 Migration: config file changed, all siridb related config is in a seperate settings.enodo file in the root of the data folder you give up within the conf file.
- 
+
 ### Added
 
 - FFE model for faster forcasting and anomaly detection
 - Static rules (min/max thresholds)
 - Environment variable support
- 
+
 ### Changed
-  
+
 - Siridb connection settings moved to `settings.enodo file`, these settings can be changed during runtime
- 
+
 ### Fixed
- 
+
 - Bug with listener handshake
 - Cleanup

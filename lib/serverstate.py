@@ -26,7 +26,7 @@ class ServerState:
     readiness = None
     scheduler = None
     storage = None
-    job_schedule_index = SeriesPriorityQueue()
+    job_schedule_index = None
 
     series_rm = None
     series_config_template_rm = None
@@ -35,6 +35,7 @@ class ServerState:
     @classmethod
     async def async_setup(cls, sio, storage):
         cls.running = True
+        cls.job_schedule_index = SeriesPriorityQueue()
         cls.work_queue = True
         cls.readiness = False
         cls.sio = sio
@@ -144,6 +145,8 @@ class ServerState:
 
     @classmethod
     def index_series_schedules(cls, series, state):
+        if series.is_ignored():
+            return False
         job_schedules = state.get_all_job_schedules()
         earliest = None
         for job_config_name in series.config.job_config:
@@ -170,7 +173,7 @@ class ServerState:
                 if earliest is None or next_ts < earliest:
                     earliest = next_ts
         if earliest is not None:
-            ensure_future(
+            return ensure_future(
                 cls.job_schedule_index.insert_schedule(
                     series.name, earliest))
 

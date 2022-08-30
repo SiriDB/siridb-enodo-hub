@@ -40,8 +40,7 @@ class SeriesState(dataobject):
     characteristics: str = None
     job_data: list = None
     lock: asyncio.Lock = None
-    last_checked_dp: int = None
-    _update_dp_at: int = None
+    _last_updated_dp: int = None
 
     def defaults(self):
         if self.job_data is None:
@@ -120,11 +119,10 @@ class SeriesState(dataobject):
     def get_job_meta(self, job_config_name: str) -> str:
         job = self._get_job(job_config_name)
         return json.loads(
-            job.analysis_meta) if job.analysis_meta else ""
+            job.analysis_meta) if job.analysis_meta else {}
 
     def set_job_meta(self, config_name: str, analysis_meta: Any):
-        self._get_job(config_name).analysis_meta = json.dumps(
-            analysis_meta)
+        self._get_job(config_name).analysis_meta = json.dumps(analysis_meta)
 
     def get_datapoints_count(self) -> int:
         return self.datapoint_count
@@ -136,28 +134,22 @@ class SeriesState(dataobject):
         :return:
         """
         async with self.lock:
-            self.last_checked_dp = int(time.time())
+            self._last_updated_dp = int(time.time())
             self.datapoint_count += add_to_count
 
     async def set_datapoints_count(self, new_count: int):
         async with self.lock:
-            self.last_checked_dp = int(time.time())
+            self._last_updated_dp = int(time.time())
             self.datapoint_count = new_count
 
-    async def update_datapoints_count(self, at: int):
-        if self.datapoint_count >= at:
-            return
-        if self.last_checked_dp is None:
-            self.last_checked_dp = int(time.time())
-        if self._update_dp_at is None:
-            diff = at - self.datapoint_count
-            self._update_dp_at = diff * self.interval + self.last_checked_dp
-        if self._update_dp_at <= int(time.time()):
+    async def update_datapoints_count(self):
+        current_time = int(time.time())
+        if self._last_updated_dp is None or \
+                self._last_updated_dp < (current_time - 3600):
+            self._last_updated_dp = current_time
             collected_datapoints = await query_series_datapoint_count(
                 ServerState.get_siridb_data_conn(), self.name)
             await self.set_datapoints_count(collected_datapoints)
-            if collected_datapoints < at:
-                self._update_dp_at = None
 
     def is_job_due(self, job_config_name: str,
                    series) -> bool:
@@ -168,6 +160,8 @@ class SeriesState(dataobject):
         if job_config.job_type != JOB_TYPE_BASE_SERIES_ANALYSIS:
             if self.get_job_status(
                     series.base_analysis_job.config_name) != JOB_STATUS_DONE:
+                self.set_job_check_status(job_config_name,
+                                          "Base job is not done")
                 return False
 
         if job_status not in [JOB_STATUS_NONE, JOB_STATUS_DONE]:
@@ -177,8 +171,7 @@ class SeriesState(dataobject):
             return False
         module = ClientManager.get_module(job_config.module)
         if module is None:
-            self.set_job_check_status(
-                job_config_name, "Unknown module")
+            self.set_job_check_status(job_config_name, "Unknown module")
             return False
         r_job = job_config.requires_job
         if r_job is not None and series.config.get_config_for_job(
@@ -197,8 +190,7 @@ class SeriesState(dataobject):
         if job_schedule["type"] == "N" and \
                 job_schedule["value"] <= self.datapoint_count:
             return True
-        self.set_job_check_status(
-            job_config_name, "Not yet scheduled")
+        self.set_job_check_status(job_config_name, "Not yet scheduled")
         return False
 
     def get_errors(self) -> list:
@@ -206,8 +198,7 @@ class SeriesState(dataobject):
         from ..jobmanager import EnodoJobManager
         errors = [
             job.error
-            for job in EnodoJobManager.get_failed_jobs_for_series(
-                self.name)]
+            for job in EnodoJobManager.get_failed_jobs_for_series(self.name)]
         return errors
 
     def is_ignored(self) -> bool:
@@ -220,7 +211,7 @@ class SeriesState(dataobject):
             "datapoint_count": self.datapoint_count,
             "health": self.health,
             "characteristics": json.loads(
-                self.characteristics) if self.characteristics else "",
+                self.characteristics) if self.characteristics else {},
             "interval": self.interval,
             "job_schedule": self.get_all_job_schedules(),
             "job_statuses": {},
@@ -236,9 +227,8 @@ class SeriesState(dataobject):
                 "type": job.schedule_type
             }
             state["job_statuses"][job.config_name] = job.status
-            state["job_check_statuses"][
-                job.config_name] = job.check_status
+            state["job_check_statuses"][job.config_name] = job.check_status
             state["job_analysis_meta"][job.config_name] = json.loads(
-                job.analysis_meta) if job.analysis_meta else ""
+                job.analysis_meta) if job.analysis_meta else {}
 
         return state

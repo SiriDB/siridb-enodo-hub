@@ -35,7 +35,7 @@ class Series(StoredResource):
             return
         self._config_from_template = True
         config = ServerState.series_config_template_rm.get_cached_resource(
-            config)
+            int(config))
         if config is None:
             raise Exception("Invalid series config template rid")
         config = SeriesConfigModel(**config.series_config)
@@ -79,17 +79,15 @@ class Series(StoredResource):
             return False, Config.min_data_points
         return True, None
 
-    def schedule_jobs(self, state):
+    def schedule_jobs(self, state, delay=0):
         job_schedules = state.get_all_job_schedules()
         for job_config_name in self.config.job_config:
-            self.schedule_job(
-                job_config_name, state,
-                initial=not (job_config_name in job_schedules))
+            self.schedule_job(job_config_name, state, initial=not (
+                job_config_name in job_schedules), delay=delay)
         ServerState.index_series_schedules(self, state)
 
-    def schedule_job(
-            self, job_config_name: str, state: SeriesState,
-            initial=False):
+    def schedule_job(self, job_config_name: str, state: SeriesState,
+                     initial=False, delay=0):
         job_config = self.config.get_config_for_job(job_config_name)
         if job_config is None:
             return False
@@ -99,9 +97,10 @@ class Series(StoredResource):
         if job_schedule is None:
             job_schedule = {"value": 0,
                             "type": job_config.job_schedule_type}
+
+        current_ts = int(time.time())
         next_value = None
         if job_schedule["type"] == "TS":
-            current_ts = int(time.time())
             if initial:
                 next_value = current_ts
             elif job_schedule["value"] <= current_ts:
@@ -112,7 +111,31 @@ class Series(StoredResource):
             elif job_schedule["value"] <= state.datapoint_count:
                 next_value = \
                     state.datapoint_count + job_config.job_schedule
+
+        dp_ok, min_points = self.check_datapoint_count(state)
+        if not dp_ok:
+            if job_schedule["type"] == "TS":
+                diff = min_points - state.datapoint_count
+                interval = state.interval if state.interval is not None else 60
+                next_value = int(time.time()) + diff * interval
+            elif job_schedule["type"] == "N":
+                next_value = min_points
+            asyncio.ensure_future(state.update_datapoints_count())
+
         if next_value is not None:
+            # Apply delay to current ts, instead of ts in past
+            if delay > 0 and job_schedule["type"] == "TS":
+                if next_value < current_ts:
+                    next_value = current_ts
+                if next_value - current_ts < delay:
+                    next_value = current_ts + delay
+            # Apply delay to current count, instead of count in past
+            elif delay > 0 and job_schedule["type"] == "N":
+                if next_value < state.datapoint_count:
+                    next_value = state.datapoint_count
+                if next_value - state.datapoint_count < delay:
+                    next_value = state.datapoint_count + delay
+
             job_schedule['value'] = next_value
             state.set_job_schedule(job_config_name, job_schedule)
 

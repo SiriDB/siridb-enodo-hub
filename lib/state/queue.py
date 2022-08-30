@@ -11,7 +11,8 @@ class SimpleQueue:
         return list(self.cache.values())
 
     def remove(self, key: str):
-        self.cache.pop(key)
+        if key in self.cache:
+            self.cache.pop(key)
 
     def get(self, key: str) -> Any:
         return self.cache.get(key)

@@ -26,10 +26,11 @@ class SocketServer:
         self._server_running = False
 
     async def create(self, loop=None):
-        loop = loop or asyncio.get_event_loop()
+        loop = loop or asyncio.get_running_loop()
         self._server_running = True
         self._server = await ServerState.scheduler.spawn(asyncio.start_server(
-            self._handle_client_connection, self._hostname, self._port))
+            self._handle_client_connection, self._hostname, self._port,
+            loop=loop))
 
     async def stop(self):
         self._server_running = False
