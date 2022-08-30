@@ -31,13 +31,12 @@ class Series(StoredResource):
 
     def _setup_config(self, config):
         if isinstance(config, dict):
-            self.config = SeriesConfigModel(**config)
-            return
+            raise Exception("Invalid config")
         self._config_from_template = True
-        config = ServerState.series_config_template_rm.get_cached_resource(
+        config = ServerState.series_config_rm.get_cached_resource(
             int(config))
         if config is None:
-            raise Exception("Invalid series config template rid")
+            raise Exception("Invalid series config rid")
         config = SeriesConfigModel(**config.series_config)
         self.config = config
 

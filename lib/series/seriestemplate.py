@@ -1,34 +1,31 @@
 import json
 import logging
-from enodo.model.config.series import SeriesJobConfigModel
+from enodo.model.config.series import SeriesConfigModel
 
 from lib.state.resource import StoredResource
 
 
-class SeriesConfigTemplate(StoredResource, dict):
+class SeriesConfig(StoredResource, SeriesConfigModel):
 
-    def __init__(self, name, description, config, rid=None):
+    def __init__(self, config, rid=None):
         if 'job_config' not in config:
             logging.error(
-                f"Invalid template config: {json.dumps(config)}")
-        for job_config in config.get('job_config'):
-            try:
-                SeriesJobConfigModel(**job_config)
-            except Exception as e:
-                raise Exception(
-                    f"Invalid job config for template {rid}")
+                f"Invalid config: {json.dumps(config)}")
+        try:
+            super(SeriesConfigModel, self).__init__(**config)
+        except Exception as e:
+            raise Exception(
+                f"Invalid job config {rid}")
 
-        super(SeriesConfigTemplate, self).__init__({
+        super(StoredResource, self).__init__({
             "rid": rid,
-            "name": name,
-            "description": description,
             "config": config
         })
 
     @classmethod
     @property
     def resource_type(cls):
-        return "series_config_templates"
+        return "series_configs"
 
     @property
     def to_store_data(self):

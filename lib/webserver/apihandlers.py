@@ -253,7 +253,7 @@ class ApiHandlers:
     @classmethod
     @EnodoAuth.auth.required
     @implement_fields_query
-    async def get_series_config_templates(cls, request, fields=None):
+    async def get_series_configs(cls, request, fields=None):
         """Get all series config templates
 
         Args:
@@ -265,14 +265,14 @@ class ApiHandlers:
         Query args:
             fields (String, comma seperated): list of fields to return
         """
-        data, status = BaseHandler.resp_get_series_config_templates(
+        data, status = BaseHandler.resp_get_series_configs(
             fields=fields)
         return web.json_response(
             data=data, status=status)
 
     @classmethod
     @EnodoAuth.auth.required
-    async def add_series_config_templates(cls, request):
+    async def add_series_config(cls, request):
         """Add a series config template
 
         Args:
@@ -286,13 +286,13 @@ class ApiHandlers:
         except JSONDecodeError as e:
             resp, status = {'error': 'Invalid JSON'}, 400
         else:
-            resp, status = await BaseHandler.resp_add_series_config_templates(
+            resp, status = await BaseHandler.resp_add_series_config(
                 data)
         return web.json_response(data=resp, status=status)
 
     @classmethod
     @EnodoAuth.auth.required
-    async def remove_series_config_templates(cls, request):
+    async def remove_series_config(cls, request):
         """Remove a series config template
 
         Args:
@@ -303,14 +303,14 @@ class ApiHandlers:
         """
         rid = urllib.parse.unquote(
             request.match_info['rid'])
-        data, status = await BaseHandler.resp_remove_series_config_templates(
+        data, status = await BaseHandler.resp_remove_series_config(
             rid)
         return web.json_response(
             data=data, status=status)
 
     @classmethod
     @EnodoAuth.auth.required
-    async def update_series_config_templates_static(cls, request):
+    async def update_series_config_static(cls, request):
         """Update a series config template
 
         Args:
@@ -326,14 +326,14 @@ class ApiHandlers:
         rid = urllib.parse.unquote(
             request.match_info['rid'])
         data, status = \
-            await BaseHandler.resp_update_series_config_templates_static(
+            await BaseHandler.resp_update_series_config_static(
                 rid, data.get("name"), data.get("description"))
         return web.json_response(
             data=data, status=status)
 
     @classmethod
     @EnodoAuth.auth.required
-    async def update_series_config_templates(cls, request):
+    async def update_series_config(cls, request):
         """Update a series config template
 
         Args:
@@ -349,7 +349,7 @@ class ApiHandlers:
         rid = urllib.parse.unquote(
             request.match_info['rid'])
         data, status = \
-            await BaseHandler.resp_update_series_config_templates(
+            await BaseHandler.resp_update_series_config(
                 rid, data)
         return web.json_response(
             data=data, status=status)

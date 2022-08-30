@@ -214,22 +214,10 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        if isinstance(data.get('config'), dict):
-            try:
-                series_config = SeriesConfigModel(**data.get('config'))
-            except Exception as e:
-                return {'error': 'Invalid series config',
-                        'message': str(e)}, 400
-            bc = series_config.get_config_for_job_type(
-                JOB_TYPE_BASE_SERIES_ANALYSIS, first_only=True)
-            if bc is None:
-                return {'error': 'Something went wrong when adding '
-                        'the series. Missing base analysis job'}, 400
-        else:
-            config = ServerState.series_config_template_rm.get_cached_resource(
-                int(data.get('config')))
-            if config is None:
-                return {'error': 'Series config template not found'}, 404
+        config = ServerState.series_config_rm.get_cached_resource(
+            int(data.get('config')))
+        if config is None:
+            return {'error': 'Series config template not found'}, 404
         if 'meta' in data and (data.get('meta') is not None and
                                not isinstance(data.get('meta'), dict)):
             return {'error': 'Something went wrong when adding '
@@ -327,14 +315,14 @@ class BaseHandler:
 
     @classmethod
     @sync_simple_fields_filter(return_index=0)
-    def resp_get_series_config_templates(cls):
-        scrm = ServerState.series_config_template_rm
+    def resp_get_series_configs(cls):
+        scrm = ServerState.series_config_rm
         templates = scrm.get_cached_resources()
         return {'data': templates}, 200
 
     @classmethod
-    async def resp_add_series_config_templates(cls, config_template: dict):
-        scrm = ServerState.series_config_template_rm
+    async def resp_add_series_config(cls, config_template: dict):
+        scrm = ServerState.series_config_rm
 
         if scrm.rid_exists(int(config_template.get("rid", -1))):
             return {'error': "template already exists"}, 400
@@ -346,11 +334,11 @@ class BaseHandler:
             return {'data': template}, 201
 
     @classmethod
-    async def resp_remove_series_config_templates(cls, rid: str):
-        scrm = ServerState.series_config_template_rm
+    async def resp_remove_series_config(cls, rid: str):
+        scrm = ServerState.series_config_rm
         rid = int(rid)
         if not scrm.rid_exists(rid):
-            return {'error': "template does not exists"}, 404
+            return {'error': "config does not exists"}, 404
 
         async for series in ServerState.series_rm.itter():
             if series._config_from_template:
@@ -363,12 +351,12 @@ class BaseHandler:
         return {'data': None}, 200
 
     @classmethod
-    async def resp_update_series_config_templates_static(cls, rid: str,
-                                                         name: str, desc: str):
-        scrm = ServerState.series_config_template_rm
+    async def resp_update_series_config_static(cls, rid: str,
+                                               name: str, desc: str):
+        scrm = ServerState.series_config_rm
         rid = int(rid)
         if not scrm.rid_exists(rid):
-            return {'error': "template does not exists"}, 404
+            return {'error': "config does not exists"}, 404
 
         template = await scrm.get_resource(rid)
         if name is not None:
@@ -380,12 +368,12 @@ class BaseHandler:
         return {'data': template}, 201
 
     @classmethod
-    async def resp_update_series_config_templates(cls, rid: str,
-                                                  config: dict):
-        scrm = ServerState.series_config_template_rm
+    async def resp_update_series_config(cls, rid: str,
+                                        config: dict):
+        scrm = ServerState.series_config_rm
         rid = int(rid)
         if not scrm.rid_exists(rid):
-            return {'error': "template does not exists"}, 404
+            return {'error': "config does not exists"}, 404
 
         template = await scrm.get_resource(rid)
         if config is None:

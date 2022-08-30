@@ -29,7 +29,7 @@ class ServerState:
     job_schedule_index = None
 
     series_rm = None
-    series_config_template_rm = None
+    series_config_rm = None
     job_config_template_rm = None
 
     @classmethod
@@ -44,7 +44,6 @@ class ServerState:
         cls.storage = storage
 
         cls.tasks_last_runs = {
-            'watch_series': None,
             'check_jobs': None,
             'manage_connections': None
         }

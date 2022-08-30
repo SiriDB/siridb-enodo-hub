@@ -4,5 +4,8 @@
     },
     "0.1.0-beta4.0.0": {
         "upgrade": ".series_states = {}.restrict('thing'); .hub_version = \"0.1.0-beta4.0.0\"; .settings = {}"
+    },
+    "0.1.0-beta4.0.18": {
+        "upgrade": ".series_configs = .series_config_templates; .del('series_config_templates'); .del('series_states'); .hub_version = \"0.1.0-beta4.0.18\";"
     }
 }

@@ -36,19 +36,19 @@ def setup_routes(app, cors):
         ApiHandlers.resolve_series_job_status)
     app.router.add_get(
         "/api/template/series",
-        ApiHandlers.get_series_config_templates)
+        ApiHandlers.get_series_configs)
     app.router.add_post(
         "/api/template/series",
-        ApiHandlers.add_series_config_templates)
+        ApiHandlers.add_series_config)
     app.router.add_delete(
         "/api/template/series/{rid}",
-        ApiHandlers.remove_series_config_templates)
+        ApiHandlers.remove_series_config)
     app.router.add_put(
         "/api/template/series/{rid}/static",
-        ApiHandlers.update_series_config_templates_static)
+        ApiHandlers.update_series_config_static)
     app.router.add_put(
         "/api/template/series/{rid}",
-        ApiHandlers.update_series_config_templates)
+        ApiHandlers.update_series_config)
     app.router.add_get(
         "/api/enodo/module", ApiHandlers.get_possible_analyser_modules,
         allow_head=False)

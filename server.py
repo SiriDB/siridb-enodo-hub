@@ -14,7 +14,7 @@ from enodo.protocol.package import LISTENER_NEW_SERIES_POINTS, \
     WORKER_UPDATE_BUSY, WORKER_JOB_RESULT, WORKER_REFUSED, \
     WORKER_JOB_CANCELLED
 from lib.exceptions.enodoexception import EnodoScheduleException
-from lib.series.seriestemplate import SeriesConfigTemplate
+from lib.series.seriestemplate import SeriesConfig
 from lib.state.thingsdbstorage import ThingsDBStorage
 from lib.util.upgrade import UpgradeUtil
 
@@ -52,7 +52,6 @@ class Server:
         self.backend_socket = None
         self._log_level = log_level
 
-        self._watch_series_task = None
         self._check_jobs_task = None
         self._connection_management_task = None
 
@@ -116,9 +115,9 @@ class Server:
             SocketIoHandler.prepare(self.sio)
             SocketIoRouter(self.sio)
 
-        ServerState.series_config_template_rm = ResourceManager(
-            'series_config_templates', SeriesConfigTemplate, cache_only=True)
-        await ServerState.series_config_template_rm.load()
+        ServerState.series_config_rm = ResourceManager(
+            'series_configs', SeriesConfig, cache_only=True)
+        await ServerState.series_config_rm.load()
         ServerState.series_rm = ResourceManager(
             'series', Series, extra_index_field="name",
             keep_in_memory=-1)
@@ -136,7 +135,6 @@ class Server:
         await ClientManager.load_from_disk()
 
         scheduler = ServerState.scheduler
-        self._watch_series_task = await scheduler.spawn(self.watch_series())
         self._check_jobs_task = await scheduler.spawn(
             EnodoJobManager.check_for_jobs())
         self._connection_management_task = await scheduler.spawn(
@@ -262,61 +260,6 @@ class Server:
         await self._check_for_jobs(series, state, series.name,
                                    base_only=True)
         return True
-
-    async def work_schedule_queue(self):
-        current_time = time()
-        while len(ServerState.job_schedule_index.items) > 0:
-            async with ServerState.job_schedule_index.seek_and_hold() as \
-                    (series_name, next_ts):
-                if next_ts > current_time:
-                    break
-                series, state = \
-                    await SeriesManager.get_series_read_only(series_name)
-                # Check if series is valid and not ignored
-                if series is None or series.is_ignored():
-                    continue
-                # Check if requirement of min amount of datapoints is met
-                if state.get_datapoints_count() is None:
-                    continue
-            series_name, next_ts = \
-                await ServerState.job_schedule_index.pop()
-
-            try:
-                if await self._handle_low_datapoints(series, state):
-                    series.schedule_jobs(state, delay=60)
-                    continue
-                await self._check_for_jobs(series, state, series_name)
-            except EnodoScheduleException as e:
-                series.schedule_jobs(state, delay=60)
-                logging.debug(
-                    "Job could not be created, "
-                    f"rescheduling {series_name}...")
-            except Exception as e:
-                logging.error(
-                    "Something went wrong when trying to create new job")
-                logging.debug(
-                    f"Corresponding error: {e}, "
-                    f'exception class: {e.__class__.__name__}')
-
-            await asyncio.sleep(0.1)
-
-    async def watch_series(self):
-        """Background task to check each series if
-        jobs need to be managed
-        """
-        while ServerState.running:
-            ServerState.tasks_last_runs['watch_series'] = \
-                datetime.datetime.now()
-
-            try:
-                await self.work_schedule_queue()
-            except Exception as e:
-                logging.error("Something is wrong with the watch series job")
-                logging.debug(f"Corresponding error: {e}")
-                import traceback
-                traceback.format_exc()
-
-            await asyncio.sleep(Config.watcher_interval)
 
     async def stop_server(self):
         """Stop all parts of the server for a clean shutdown
