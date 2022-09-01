@@ -12,6 +12,7 @@ from enodo.jobs import (
 
 MIN_DATA_FILE_VERSION = "1.0.0"
 CURRENT_DATA_FILE_VERSION = "1.0.0"
+LOOKUP_SZ = 8192
 
 
 def _json_datetime_serializer(o):
@@ -190,3 +191,22 @@ def implement_fields_query(func):
                 fields = fields.split(",")
         return await func(cls, request, fields=fields)
     return wrapped
+
+
+def generate_worker_lookup(worker_count: int) -> dict:
+    lookup = {}
+    counters = {}
+    for n in range(worker_count):
+        m = n+1
+        for i in range(n):
+            counters[i] = i
+        for i in range(LOOKUP_SZ):
+            counters[lookup[i]] += 1
+            if counters[lookup[i]] % m == 0:
+                lookup[i] = n
+    return lookup
+
+
+def get_worker_for_series(lookup: dict, series_name: str) -> int:
+    n = sum(bytearray(series_name))
+    return lookup[n % LOOKUP_SZ]

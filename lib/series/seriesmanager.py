@@ -12,21 +12,13 @@ from enodo.jobs import (JOB_TYPE_FORECAST_SERIES,
                         JOB_TYPE_STATIC_RULES)
 from lib.config import Config
 
-from lib.eventmanager import ENODO_EVENT_ANOMALY_DETECTED,\
-    EnodoEventManager, EnodoEvent
-from enodo.protocol.package import UPDATE_SERIES, create_header
-from lib.eventmanager import (ENODO_EVENT_ANOMALY_DETECTED, EnodoEvent,
-                              EnodoEventManager)
-from lib.series.seriesstate import SeriesState
 from lib.serverstate import ServerState
 from lib.siridb.siridb import (
-    drop_series, insert_points, query_group_expression_by_name,
-    query_series_anomalies, query_series_data,
-    query_series_datapoint_count, query_series_forecasts,
+    drop_series, query_group_expression_by_name,
+    query_series_anomalies, query_series_data, query_series_forecasts,
     query_series_static_rules_hits)
 from lib.socket import ClientManager
-from lib.socketio import (SUBSCRIPTION_CHANGE_TYPE_ADD,
-                          SUBSCRIPTION_CHANGE_TYPE_DELETE)
+from lib.util.util import generate_worker_lookup
 
 
 class SeriesManager:
@@ -36,46 +28,23 @@ class SeriesManager:
     _srm = None  # Series Resource Manager
     _schedule = {}
     _states = {}
+    _worker_lookup = None
 
     @classmethod
-    async def prepare(cls, update_cb=None):
+    def prepare(cls, update_cb=None):
         cls._update_cb = update_cb
         cls._labels_last_update = None
         cls._srm = ServerState.series_rm
-        logging.info("Loading saved series states...")
-        await cls._load_states()
-        async for series in cls._srm.itter():
-            async with cls.get_state(series.name) as state:
-                ServerState.index_series_schedules(series, state)
+        cls.update_worker_lookup(0)
+        logging.info("Loading saved series...")
 
     @classmethod
-    async def _load_states(cls):
-        state_file_path = os.path.join(Config.base_dir, "state.json")
-        if not os.path.exists(state_file_path):
-            cls._states = {}
-            return
-        with open(state_file_path, 'r') as f:
-            _states = json.loads(f.read())
-            cls._states = {
-                state["name"]: SeriesState.unserialize(state)
-                for state in _states.values()}
+    def update_worker_lookup(cls, count):
+        cls._worker_lookup = generate_worker_lookup(count)
 
     @classmethod
-    def get_active_series(cls):
-        return list(cls._states.keys())
-
-    @classmethod
-    async def series_changed(cls, change_type: str, series_name: str):
-        pass
-        # if cls._update_cb is not None:
-        #     if change_type == "delete":
-        #         await cls._update_cb(change_type, series_name, series_name)
-        #     else:
-        #         async with SeriesManager.get_series(series_name) as series:
-        #             await cls._update_cb(
-        #                 change_type,
-        #                 series.to_dict(),
-        #                 series_name)
+    def get_active_series(cls) -> list:
+        return cls._srm.get_resource_rid_values()
 
     @classmethod
     async def add_series(cls, series: dict):
@@ -90,36 +59,11 @@ class SeriesManager:
         if await cls._srm.get_resource_by_key("name",
                                               series.get('name')) is not None:
             return False
-        collected_datapoints = await query_series_datapoint_count(
-            ServerState.get_siridb_data_conn(), series.get('name'))
-        # If collected_datapoints is None, the series does not exist.
-        if collected_datapoints is not None:
-            async with cls._srm.create_resource(series) as resp:
-                if series.get('name') not in cls._states:
-                    cls._states[series.get('name')] = SeriesState(
-                        series.get('name'))
-                    cls._states[series.get('name')].defaults()
-                cls._states[series.get('name')].datapoint_count = \
-                    collected_datapoints
-            asyncio.ensure_future(cls.series_changed(
-                SUBSCRIPTION_CHANGE_TYPE_ADD, series.get('name')))
-            asyncio.ensure_future(
-                cls.update_listeners(await cls.get_listener_series_info()))
-            return True
-        return None
-
-    @classmethod
-    @contextlib.asynccontextmanager
-    async def get_series(cls, series_name):
-        config = await cls._srm.get_resource_by_key("name", series_name)
-        state = cls._states.get(series_name)
-        if config is None or state is None:
-            yield None, None
-            return
-        async with config.lock:
-            async with state.lock:
-                yield config, state
-                await config.store()
+        async with cls._srm.create_resource(series) as resp:
+            pass
+        asyncio.ensure_future(
+            cls.update_listeners(await cls.get_listener_series_info()))
+        return True
 
     @classmethod
     @contextlib.asynccontextmanager
@@ -131,42 +75,6 @@ class SeriesManager:
         async with series.lock:
             yield series
             await series.store()
-
-    @classmethod
-    @contextlib.asynccontextmanager
-    async def get_state(cls, series_name) -> SeriesState:
-        state = cls._states.get(series_name)
-        if state is None:
-            cls._states[series_name] = SeriesState(series_name)
-            cls._states[series_name].defaults()
-            yield cls._states[series_name]
-            return
-        async with state.lock:
-            yield state
-
-    @classmethod
-    def get_state_read_only(cls, series_name):
-        if cls._states.get(series_name) is not None:
-            return cls._states[series_name]
-        s = SeriesState(series_name)
-        s.defaults()
-        return s
-
-    @classmethod
-    async def get_series_read_only(cls, series_name):
-        state = cls._states.get(series_name)
-        if state is None:
-            cls._states[series_name] = SeriesState(series_name)
-            cls._states[series_name].defaults()
-        return await cls._srm.get_resource_by_key("name", series_name), state
-
-    @classmethod
-    async def get_config_read_only(cls, series_name):
-        return await cls._srm.get_resource_by_key("name", series_name)
-
-    # @classmethod
-    # def get_all_series(cls):
-    #     return cls._srm.get_resource_rid_values()
 
     @classmethod
     async def get_listener_series_info(cls):
@@ -214,15 +122,6 @@ class SeriesManager:
         return cls._srm.get_resource_count()
 
     @classmethod
-    async def get_ignored_series_count(cls):
-        count = 0
-        async for series in cls._srm.itter():
-            if series.is_ignored is True:
-                count += 1
-
-        return count
-
-    @classmethod
     def get_all_series_names(cls, regex_filter=None):
         series_names = cls._srm.get_resource_rid_values()
         if regex_filter is not None:
@@ -238,14 +137,9 @@ class SeriesManager:
         series = await cls._srm.get_resource_by_key("name", series_name)
         if series is not None:
             await cls._srm.delete_resource(series)
-            del cls._states[series_name]
             asyncio.ensure_future(
-                ServerState.job_schedule_index.remove(series_name))
+                cls.update_listeners(await cls.get_listener_series_info()))
             await cls.cleanup_series(series_name)
-            asyncio.ensure_future(
-                cls.series_changed(
-                    SUBSCRIPTION_CHANGE_TYPE_DELETE, series_name)
-            )
             return True
         return False
 
@@ -255,83 +149,6 @@ class SeriesManager:
         await drop_series(
             ServerState.get_siridb_output_conn(),
             f"/enodo_{name_escaped}.*?.*?$/")
-
-    @classmethod
-    async def add_to_datapoint_counter(cls, series_name, value):
-        series = await cls._srm.get_resource_by_key("name", series_name)
-        if series is not None:
-            await series.add_to_datapoints_count(value)
-        elif series_name not in cls._series:
-            await cls.add_series(series_name)
-
-    @classmethod
-    async def add_forecast_to_series(cls, series_name,
-                                     job_config_name, points):
-        if await cls._srm.get_resource_by_key(
-                "name", series_name) is not None:
-            await drop_series(
-                ServerState.get_siridb_output_conn(),
-                f'"enodo_{series_name}_forecast_{job_config_name}"')
-            await insert_points(
-                ServerState.get_siridb_output_conn(),
-                f'enodo_{series_name}_forecast_{job_config_name}', points)
-
-    @classmethod
-    async def add_anomalies_to_series(cls, series_name,
-                                      job_config_name, points):
-        series = await cls._srm.get_resource_by_key("name", series_name)
-        if series is not None:
-            event = EnodoEvent(
-                'Anomaly detected!',
-                f'{len(points)} anomalies detected for series {series_name} \
-                    via job {job_config_name}',
-                ENODO_EVENT_ANOMALY_DETECTED, series=series)
-            await EnodoEventManager.handle_event(event)
-            await drop_series(
-                ServerState.get_siridb_output_conn(),
-                f'"enodo_{series_name}_anomalies_{job_config_name}"')
-            if len(points) > 0:
-                await insert_points(
-                    ServerState.get_siridb_output_conn(),
-                    f'enodo_{series_name}_anomalies_{job_config_name}',
-                    points)
-
-    @classmethod
-    async def add_static_rule_hits_to_series(cls, series_name,
-                                             job_config_name, points):
-        if await cls._srm.get_resource_by_key(
-                "name", series_name) is not None:
-            await drop_series(
-                ServerState.get_siridb_output_conn(),
-                f'"enodo_{series_name}_static_rules_{job_config_name}"')
-            await insert_points(
-                ServerState.get_siridb_output_conn(),
-                f'enodo_{series_name}_static_rules_{job_config_name}', points)
-
-    @classmethod
-    async def get_series_forecast(cls, series_name):
-        values = await query_series_data(
-            ServerState.get_siridb_output_conn(), f'forecast_{series_name}')
-        if values is not None:
-            return values.get(f'forecast_{series_name}', None)
-        return None
-
-    @classmethod
-    async def get_series_anomalies(cls, series_name):
-        values = await query_series_data(
-            ServerState.get_siridb_output_conn(), f'anomalies_{series_name}')
-        if values is not None:
-            return values.get(f'anomalies_{series_name}', None)
-        return None
-
-    @classmethod
-    async def get_series_static_rules(cls, series_name):
-        values = await query_series_data(
-            ServerState.get_siridb_output_conn(),
-            f'static_rules_{series_name}')
-        if values is not None:
-            return values.get(f'static_rules_{series_name}', None)
-        return None
 
     @classmethod
     async def get_series_output_by_job_type(cls, series_name, job_type,

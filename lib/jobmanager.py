@@ -2,10 +2,8 @@ import asyncio
 import datetime
 import json
 import logging
-import time
 from asyncio import StreamWriter
 from typing import Any, Callable, Optional, Union
-import uuid
 
 import qpack
 from enodo.jobs import *
@@ -93,267 +91,19 @@ class EnodoJobManager:
     @classmethod
     def setup(cls, update_queue_cb: Callable):
         cls._update_queue_cb = update_queue_cb
-        cls._max_in_queue_before_warning = Config.max_in_queue_before_warning
         cls._lock = asyncio.Lock()
 
     @classmethod
-    def _build_index(cls):
-        cls._active_jobs_index = {}
-        for job in cls._active_jobs:
-            cls._active_jobs_index[job.rid] = job
+    async def check_for_jobs(cls):
+        while ServerState.work_queue:
+            ServerState.tasks_last_runs['check_jobs'] = datetime.datetime.now(
+            )
+            if len(cls._open_jobs) != 0:
+                for next_job in cls._open_jobs:
+                    await cls._try_activate_job(next_job)
 
-    @classmethod
-    def get_active_jobs(cls) -> list:
-        return cls._active_jobs
-
-    @classmethod
-    def get_failed_jobs(cls) -> list:
-        return cls._failed_jobs
-
-    @classmethod
-    def get_open_jobs_count(cls) -> list:
-        return len(cls._open_jobs)
-
-    @classmethod
-    def get_active_jobs_count(cls) -> int:
-        return len(cls._active_jobs)
-
-    @classmethod
-    def get_failed_jobs_count(cls) -> int:
-        return len(cls._failed_jobs)
-
-    @classmethod
-    def get_active_jobs_by_worker(cls, worker_id: str) -> list:
-        return [job for job in cls._active_jobs if job.worker_id == worker_id]
-
-    @classmethod
-    async def clear_jobs(cls):
-        jobs = []
-        for job in cls._active_jobs:
-            jobs.append(job)
-        for job in jobs:
-            async with cls._lock:
-                await cls._deactivate_job(job)
-            await cls._send_worker_cancel_job(job.worker_id, job.rid)
-            async with SeriesManager.get_state(job.series_name) as state:
-                state.set_job_status(job.job_config.config_name,
-                                     JOB_STATUS_NONE)
-            jobs = []
-        for job in cls._open_jobs:
-            jobs.append(job)
-        for job in jobs:
-            cls._open_jobs.remove(job)
-            async with SeriesManager.get_state(job.series_name) as state:
-                state.set_job_status(job.job_config.config_name,
-                                     JOB_STATUS_NONE)
-
-    @classmethod
-    async def create_job(cls, job_config_name: str, series_name: str):
-        config = await SeriesManager.get_config_read_only(series_name)
-        async with SeriesManager.get_state(series_name) as state:
-            state.set_job_status(job_config_name, JOB_STATUS_OPEN)
-            state.set_job_check_status(
-                job_config_name,
-                "Job created")
-            job_config = config.get_job(job_config_name)
-            job = EnodoJob(
-                str(uuid.uuid4()).replace("-", ""),
-                config.name, job_config,
-                job_data=None)  # TODO: Catch exception
-            await cls._add_job(job)
-
-    @classmethod
-    async def _add_job(cls, job: EnodoJob):
-        if not isinstance(job, EnodoJob):
-            raise Exception('Incorrect job instance')
-
-        cls._open_jobs.append(job)
-        if cls._update_queue_cb is not None:
-            await cls._update_queue_cb(
-                SUBSCRIPTION_CHANGE_TYPE_ADD, EnodoJob.to_dict(job))
-
-    @classmethod
-    def has_series_failed_jobs(cls, series_name: str) -> bool:
-        for job in cls._failed_jobs:
-            if job.series_name == series_name:
-                return True
-        return False
-
-    @classmethod
-    def get_failed_jobs_for_series(cls, series_name: str) -> list:
-        jobs = []
-        for job in cls._failed_jobs:
-            if job.series_name == series_name:
-                jobs.append(job)
-        return jobs
-
-    @classmethod
-    async def remove_failed_jobs_for_series(cls, series_name: str,
-                                            job_config_name: Optional[str] =
-                                            None):
-        for job in cls.get_failed_jobs_for_series(series_name):
-            if job_config_name is None or \
-                    job.job_config.config_name == job_config_name:
-                cls._failed_jobs.remove(job)
-                await job.delete()
-
-    @classmethod
-    @cls_lock()
-    async def activate_job(cls, job_id: int, worker_id: str):
-        j = None
-        for job in cls._open_jobs:
-            if job.rid == job_id:
-                j = job
-                break
-        if j is not None:
-            await cls._activate_job(j, worker_id)
-
-    @classmethod
-    async def _activate_job(cls, job: EnodoJob, worker_id: str):
-        if job is None or worker_id is None:
-            return
-
-        if job in cls._open_jobs:
-            cls._open_jobs.remove(job)
-            if cls._update_queue_cb is not None:
-                await cls._update_queue_cb(
-                    SUBSCRIPTION_CHANGE_TYPE_DELETE, job.rid)
-        job.send_at = time.time()
-        job.worker_id = worker_id
-        cls._active_jobs.append(job)
-        cls._active_jobs_index[job.rid] = job
-
-    @classmethod
-    def get_activated_job(cls, job_id: int) -> EnodoJob:
-        for job in cls._active_jobs:
-            if job.rid == job_id:
-                return job
-
-        return None
-
-    @classmethod
-    @cls_lock()
-    async def deactivate_job(cls, job_id: int):
-        j = None
-        for job in cls._active_jobs:
-            if job.rid == job_id:
-                j = job
-                break
-
-        await cls._deactivate_job(j)
-
-    @classmethod
-    async def _deactivate_job(cls, job: EnodoJob):
-        if job in cls._active_jobs:
-            cls._active_jobs.remove(job)
-            del cls._active_jobs_index[job.rid]
-
-    @classmethod
-    @cls_lock()
-    async def cancel_job(cls, job: EnodoJob):
-        if job in cls._active_jobs:
-            cls._active_jobs.remove(job)
-            del cls._active_jobs_index[job.rid]
-            cls._open_jobs.append(job)
-
-    @classmethod
-    @cls_lock()
-    async def cancel_jobs_for_series(cls, series_name: str):
-        await cls._cancel_jobs_for_series(series_name)
-
-    @classmethod
-    async def _cancel_jobs_for_series(cls, series_name: str):
-        jobs = []
-        for job in cls._open_jobs:
-            if job.series_name == series_name:
-                jobs.append(job)
-
-        for job in jobs:
-            cls._open_jobs.remove(job)
-            if cls._update_queue_cb is not None:
-                await cls._update_queue_cb(
-                    SUBSCRIPTION_CHANGE_TYPE_DELETE, job.rid)
-
-        jobs = []
-
-        for job in cls._active_jobs:
-            if job.series_name == series_name:
-                jobs.append(job)
-
-        for job in jobs:
-            cls._active_jobs.remove(job)
-            if cls._update_queue_cb is not None:
-                await cls._update_queue_cb(
-                    SUBSCRIPTION_CHANGE_TYPE_DELETE, job.rid)
-
-    @classmethod
-    @cls_lock()
-    async def cancel_jobs_by_config_name(cls, series_name: str,
-                                         job_config_name: str):
-        jobs = []
-        for job in cls._open_jobs:
-            if job.series_name == series_name and \
-                    job.job_config.config_name == job_config_name:
-                jobs.append(job)
-        for job in jobs:
-            cls._open_jobs.remove(job)
-        jobs = []
-
-        for job in cls._active_jobs:
-            if job.series_name == series_name and \
-                    job.job_config.config_name == job_config_name:
-                jobs.append(job)
-        for job in jobs:
-            cls._active_jobs.remove(job)
-
-        for job in cls._failed_jobs:
-            if job.series_name == series_name and \
-                    job.job_config.config_name == job_config_name:
-                jobs.append(job)
-        for job in jobs:
-            cls._active_jobs.remove(job)
-
-    @classmethod
-    @cls_lock()
-    async def set_job_failed(cls, job_id: int, error: str):
-        j = None
-        for job in cls._active_jobs:
-            if job.rid == job_id:
-                j = job
-                break
-        await cls._set_job_failed(j, error)
-
-    @classmethod
-    async def _set_job_failed(cls, job: EnodoJob, error: str):
-        if job is not None:
-            job.error = error
-            async with SeriesManager.get_state(job.series_name) as state:
-                if state is not None:
-                    state.set_job_status(
-                        job.job_config.config_name, JOB_STATUS_FAILED)
-            await cls._cancel_jobs_for_series(job.series_name)
-            if job in cls._active_jobs:
-                cls._active_jobs.remove(job)
-            del cls._active_jobs_index[job.rid]
-            cls._failed_jobs.append(job)
-
-    @classmethod
-    @cls_lock()
-    async def clean_jobs(cls):
-        for job in cls._active_jobs:
-            now = int(time.time())
-            if (now - job.send_at) > cls._max_job_timeout:
-                await cls._set_job_failed(job, "Job timed-out")
-                await cls._send_worker_cancel_job(job.worker_id, job.rid)
-
-        if len(cls._open_jobs) > cls._max_in_queue_before_warning:
-            event = EnodoEvent(
-                'Job queue too long',
-                f'{len(cls._open_jobs)} jobs waiting \
-                in queue exceeds threshold of \
-                    {cls._max_in_queue_before_warning}',
-                ENODO_EVENT_JOB_QUEUE_TOO_LONG)
-            await EnodoEventManager.handle_event(event)
+            await cls.clean_jobs()
+            await asyncio.sleep(Config.watcher_interval)
 
     @classmethod
     @cls_lock()
@@ -393,22 +143,6 @@ class EnodoJobManager:
             logging.debug(
                 f"Corresponding error: {e}, "
                 f'exception class: {e.__class__.__name__}')
-
-    @classmethod
-    async def check_for_jobs(cls):
-        while ServerState.work_queue:
-            ServerState.tasks_last_runs['check_jobs'] = datetime.datetime.now(
-            )
-            if len(cls._open_jobs) == 0:
-                await cls.clean_jobs()
-                await asyncio.sleep(Config.watcher_interval)
-                continue
-
-            for next_job in cls._open_jobs:
-                await cls._try_activate_job(next_job)
-
-            await cls.clean_jobs()
-            await asyncio.sleep(Config.watcher_interval)
 
     @classmethod
     async def receive_job_result(cls, writer: StreamWriter, packet_type,

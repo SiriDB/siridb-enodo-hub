@@ -10,6 +10,7 @@ from enodo.model.config.worker import (WORKER_MODE_DEDICATED_JOB_TYPE,
                                        WORKER_MODE_GLOBAL)
 from enodo.protocol.package import UPDATE_SERIES, create_header
 from enodo.jobs import JOB_STATUS_OPEN
+from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
 from lib.state.resource import ResourceManager, StoredResource, from_thing
 from lib.eventmanager import (ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE,
@@ -258,6 +259,7 @@ class ClientManager:
         elif isinstance(client, WorkerClient):
             cls.workers[client.client_id] = client
             await cls._refresh_dedicated_cache()
+            SeriesManager.update_worker_lookup(len(cls.workers))
 
     @classmethod
     async def get_listener_by_id(cls, client_id) -> ListenerClient:

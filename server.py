@@ -13,7 +13,6 @@ from enodo.protocol.packagedata import *
 from enodo.protocol.package import LISTENER_NEW_SERIES_POINTS, \
     WORKER_UPDATE_BUSY, WORKER_JOB_RESULT, WORKER_REFUSED, \
     WORKER_JOB_CANCELLED
-from lib.exceptions.enodoexception import EnodoScheduleException
 from lib.series.seriestemplate import SeriesConfig
 from lib.state.thingsdbstorage import ThingsDBStorage
 from lib.util.upgrade import UpgradeUtil
@@ -125,7 +124,7 @@ class Server:
 
         # Setup internal managers for handling and managing series,
         # clients, jobs, events and modules
-        await SeriesManager.prepare(
+        SeriesManager.prepare(
             SocketIoHandler.internal_updates_series_subscribers)
         await ClientManager.setup(SeriesManager)
         EnodoJobManager.setup(
@@ -161,36 +160,6 @@ class Server:
                 manager.cleanup()
             await asyncio.sleep(10)
 
-    async def wait_for_queue(self):
-        """Wait for queue to be empty or until max amount of seconds
-        """
-        logging.info("...Start waiting for queue to be empty")
-        start_ts = time()
-        current_ts = start_ts
-        queues_empty = EnodoJobManager.get_open_jobs_count() == 0 and \
-            EnodoJobManager.get_active_jobs_count() == 0
-        while (current_ts - start_ts) < 60 and not queues_empty and \
-                not self._force_shutdown:
-            current_ts = time()
-            queues_empty = EnodoJobManager.get_open_jobs_count(
-            ) == 0 and EnodoJobManager.get_active_jobs_count() == 0
-            await asyncio.sleep(1)
-
-        if not queues_empty:
-            if self._force_shutdown:
-                logging.info(
-                    "...Queue is not empty, but shutdown is forced, "
-                    "canceling jobs")
-            else:
-                logging.info(
-                    "...Queue is not empty, but hit max time limit, "
-                    "canceling jobs")
-            await EnodoJobManager.clear_jobs()
-        else:
-            logging.info(
-                "...Queue is empty, closing task to work queue")
-        ServerState.work_queue = False
-
     async def _manage_connections(self):
         """Background task to check if all connections are up
         """
@@ -220,46 +189,6 @@ class Server:
                             f"Background task \"{task}\" is unresponsive!")
             except Exception as _:
                 logging.error('Watching background tasks failed')
-
-    async def _check_for_jobs(self, series, state, series_name,
-                              base_only=False):
-        """Private function to check if jobs need to be created
-
-        Args:
-            series (Series): Series instance
-            series_name (string): name of series
-        """
-
-        if base_only:
-            # Check if base analysis needs to run
-            if state.is_job_due(
-                    series.base_analysis_job.config_name, series):
-                await EnodoJobManager.create_job(
-                    series.base_analysis_job.config_name, series_name)
-                return
-            raise EnodoScheduleException(
-                "No base job created",
-                job_config_name=series.base_analysis_job.config_name)
-
-        # loop through scheduled jobs:
-        jobs_created = 0
-        job_schedules = state.get_all_job_schedules()
-        for job_config_name in series.config.job_config:
-            if job_config_name in job_schedules and \
-                    state.is_job_due(job_config_name, series):
-                await EnodoJobManager.create_job(job_config_name, series_name)
-                jobs_created += 1
-
-        if jobs_created == 0:
-            raise EnodoScheduleException("No job created")
-
-    async def _handle_low_datapoints(self, series, state):
-        dp_ok, _ = series.check_datapoint_count(state)
-        if dp_ok:
-            return False
-        await self._check_for_jobs(series, state, series.name,
-                                   base_only=True)
-        return True
 
     async def stop_server(self):
         """Stop all parts of the server for a clean shutdown
@@ -291,7 +220,6 @@ class Server:
 
         await SeriesManager.close()
         ServerState.running = False
-        await self.wait_for_queue()
         logging.info('...Doing clean up')
         await self.clean_up()
 
