@@ -6,7 +6,7 @@ from siridb.connector.lib.exceptions import QueryError, InsertError, \
 
 from aiohttp import web
 from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_NONE
-from enodo.model.config.series import SeriesConfigModel
+from enodo.model.config.series import SeriesJobConfigModel
 
 from lib.config import Config
 from lib.eventmanager import EnodoEventManager
@@ -65,8 +65,6 @@ class BaseHandler:
         if series is None:
             return {'data': {}}, 404
         series_data = series.to_dict()
-        series_data["state"] = SeriesManager.get_state_read_only(
-            series.name).to_dict()
         return {'data': series_data}, 200
 
     @classmethod
@@ -248,70 +246,8 @@ class BaseHandler:
             series_name = ServerState.series_rm.get_resource_rid_value(
                 int(rid))
         if await SeriesManager.remove_series(series_name):
-            await EnodoJobManager.cancel_jobs_for_series(series_name)
-            await EnodoJobManager.remove_failed_jobs_for_series(series_name)
             return 200
         return 404
-
-    @classmethod
-    async def resp_add_job_config(cls, rid, job_config):
-        """add job config to series config
-
-        Args:
-            series_name (string): name of sereis
-            job_config_name (string): name of job config
-
-        Returns:
-            dict: dict with data if succeeded and error when necessary
-        """
-        series_name = ServerState.series_rm.get_resource_rid_value(int(rid))
-        async with SeriesManager.get_config(series_name) as config:
-            if config is None:
-                return {"error": "Series does not exist"}, 400
-
-            try:
-                config.add_job_config(job_config)
-            except Exception as e:
-                return {"error": str(e)}, 400
-            else:
-                logging.info(
-                    f"Added new job config to series {series_name}")
-                return {"data": {"successful": True}}, 200
-
-    @classmethod
-    async def resp_remove_job_config(cls, rid, job_config_name, by_name=False):
-        """Remove job config from series config
-
-        Args:
-            series_name (string): name of sereis
-            job_config_name (string): name of job config
-
-        Returns:
-            dict: dict with data if succeeded and error when necessary
-        """
-        if by_name:
-            series_name = rid
-        else:
-            series_name = ServerState.series_rm.get_resource_rid_value(
-                int(rid))
-        async with SeriesManager.get_series(series_name) as config:
-            if config is None:
-                return {"error": "Series does not exist"}, 400
-
-            try:
-                removed = config.remove_job_config(job_config_name)
-            except Exception as e:
-                return {"error": str(e)}, 400
-            else:
-                if removed:
-                    await EnodoJobManager.cancel_jobs_by_config_name(
-                        series_name,
-                        job_config_name)
-                logging.info(
-                    f"Removed job config \"{job_config_name}\" "
-                    f"from series {series_name}")
-                return {"data": {"successful": removed}}, 200 \
-                    if removed else 404
 
     @classmethod
     @sync_simple_fields_filter(return_index=0)
@@ -411,20 +347,18 @@ class BaseHandler:
                 series_name)}
 
     @classmethod
-    async def resp_resolve_series_job_status(cls, rid,
-                                             job_config_name, by_name=False):
-        if by_name:
-            series_name = rid
-        else:
-            series_name = ServerState.series_rm.get_resource_rid_value(
-                int(rid))
-        await EnodoJobManager.remove_failed_jobs_for_series(series_name,
-                                                            job_config_name)
-        async with SeriesManager.get_series(series_name) as (config, state):
-            state.set_job_status(job_config_name, JOB_STATUS_NONE)
-            config.schedule_job(job_config_name, state, initial=True)
-            ServerState.index_series_schedules(config, state)
-        return {'data': "OK"}
+    async def resp_run_job_for_series(cls,
+                                      series_name: str,
+                                      config: dict):
+        try:
+            job = EnodoJob(None, series_name, SeriesJobConfigModel(**config))
+            await EnodoJobManager.activate_job(job)
+        except Exception as e:
+            logging.error("Cannot activate job")
+            logging.debug(f"Corresponding error: {str(e)}")
+            return {'error': "Cannot activate job"}, 400
+
+        return {}, 200
 
     @classmethod
     @sync_simple_fields_filter()

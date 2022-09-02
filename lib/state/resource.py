@@ -169,10 +169,6 @@ class ResourceManager:
         await rc.create_save()
         self._resources[rc.rid] = self.get_resource_index_value(
             resource)
-        if self._resource_type == "series":
-            from lib.series.seriesmanager import SeriesManager
-            async with SeriesManager.get_state(rc.name) as state:
-                rc.schedule_jobs(state)
 
     def get_resource_index_value(self, resource: dict):
         if self._extra_index_field is None:

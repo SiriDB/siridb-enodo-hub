@@ -195,6 +195,7 @@ def implement_fields_query(func):
 
 def generate_worker_lookup(worker_count: int) -> dict:
     lookup = {}
+    lookup[0] = 0
     counters = {}
     for n in range(worker_count):
         m = n+1

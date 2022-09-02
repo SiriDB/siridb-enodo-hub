@@ -25,29 +25,22 @@ def setup_routes(app, cors):
 
     app.router.add_delete(
         "/api/series/{rid}", ApiHandlers.remove_series)
-    app.router.add_delete(
-        "/api/series/{rid}/job/{job_config_name}",
-        ApiHandlers.remove_series_job_config)
     app.router.add_post(
-        "/api/series/{rid}/job",
-        ApiHandlers.add_series_job_config)
+        "/api/series/{rid}/run", ApiHandlers.run_job_for_series)
     app.router.add_get(
-        "/api/series/{rid}/resolve/{job_config_name}",
-        ApiHandlers.resolve_series_job_status)
-    app.router.add_get(
-        "/api/template/series",
+        "/api/config/series",
         ApiHandlers.get_series_configs)
     app.router.add_post(
-        "/api/template/series",
+        "/api/config/series",
         ApiHandlers.add_series_config)
     app.router.add_delete(
-        "/api/template/series/{rid}",
+        "/api/config/series/{rid}",
         ApiHandlers.remove_series_config)
     app.router.add_put(
-        "/api/template/series/{rid}/static",
+        "/api/config/series/{rid}/static",
         ApiHandlers.update_series_config_static)
     app.router.add_put(
-        "/api/template/series/{rid}",
+        "/api/config/series/{rid}",
         ApiHandlers.update_series_config)
     app.router.add_get(
         "/api/enodo/module", ApiHandlers.get_possible_analyser_modules,

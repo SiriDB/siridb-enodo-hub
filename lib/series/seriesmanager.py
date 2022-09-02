@@ -28,19 +28,13 @@ class SeriesManager:
     _srm = None  # Series Resource Manager
     _schedule = {}
     _states = {}
-    _worker_lookup = None
 
     @classmethod
     def prepare(cls, update_cb=None):
         cls._update_cb = update_cb
         cls._labels_last_update = None
         cls._srm = ServerState.series_rm
-        cls.update_worker_lookup(0)
         logging.info("Loading saved series...")
-
-    @classmethod
-    def update_worker_lookup(cls, count):
-        cls._worker_lookup = generate_worker_lookup(count)
 
     @classmethod
     def get_active_series(cls) -> list:
@@ -75,6 +69,11 @@ class SeriesManager:
         async with series.lock:
             yield series
             await series.store()
+
+    @classmethod
+    async def get_config_read_only(cls, series_name):
+        series = await cls._srm.get_resource_by_key("name", series_name)
+        return series
 
     @classmethod
     async def get_listener_series_info(cls):

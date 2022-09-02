@@ -9,12 +9,12 @@ from enodo.model.config.worker import (WORKER_MODE_DEDICATED_JOB_TYPE,
                                        WORKER_MODE_DEDICATED_SERIES,
                                        WORKER_MODE_GLOBAL)
 from enodo.protocol.package import UPDATE_SERIES, create_header
-from enodo.jobs import JOB_STATUS_OPEN
-from lib.series.seriesmanager import SeriesManager
+from enodo.jobs import JOB_TYPES
 from lib.serverstate import ServerState
 from lib.state.resource import ResourceManager, StoredResource, from_thing
 from lib.eventmanager import (ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE,
                               EnodoEvent, EnodoEventManager)
+from lib.util.util import generate_worker_lookup
 
 
 class EnodoClient(StoredResource):
@@ -96,17 +96,6 @@ class WorkerClient(EnodoClient):
             worker_config = WorkerConfigModel(**worker_config)
         self.worker_config = worker_config
 
-    def support_module_for_job(
-            self, job_type: str, module_name: str) -> bool:
-        return self.module.name == module_name and \
-            self.module.support_job_type(job_type)
-
-    def conform_params(self, module_name: str, job_type: str,
-                       params: dict) -> bool:
-        if self.module.name == module_name:
-            return self.module.conform_to_params(job_type, params)
-        return False
-
     @StoredResource.changed
     def set_config(self, worker_config: WorkerConfigModel):
         if isinstance(worker_config, WorkerConfigModel):
@@ -154,17 +143,24 @@ class ClientManager:
     workers = {}
     series_manager = None
 
-    _dedicated_for_series = {}
-    _dedicated_for_job_type = {}
-
     _crm = None
+    _worker_lookup = {}
 
     @classmethod
     async def setup(cls, series_manager):
         cls.series_manager = series_manager
-        await cls._refresh_dedicated_cache()
         cls._crm = ResourceManager("workers", WorkerClient)
         await cls._crm.load()
+        cls.update_worker_lookup()
+
+    @classmethod
+    def update_worker_lookup(cls):
+        for job_type in JOB_TYPES:
+            count = 0
+            for worker in cls.workers:
+                if job_type in worker.module.supported_jobs:
+                    count += 1
+            cls._worker_lookup[job_type] = generate_worker_lookup(count)
 
     @classmethod
     @property
@@ -193,30 +189,6 @@ class ClientManager:
                         for worker_id in cls.workers
                         if cls.workers[worker_id].busy is True]
         return len(busy_workers)
-
-    @classmethod
-    async def _refresh_dedicated_cache(cls):
-        cls._dedicated_for_series = {}
-        cls._dedicated_for_job_type = {}
-        for worker_id in cls.workers:
-            w = cls.workers.get(worker_id)
-            if not w.online:
-                continue
-            if w.worker_config.mode == WORKER_MODE_DEDICATED_SERIES:
-                if cls._dedicated_for_series[w.worker_config.series] is None:
-                    cls._dedicated_for_series[w.worker_config.series] = [
-                        worker_id]
-                else:
-                    cls._dedicated_for_series[w.worker_config.series].append(
-                        worker_id)
-            elif w.worker_config.mode == WORKER_MODE_DEDICATED_JOB_TYPE:
-                if cls._dedicated_for_job_type[
-                        w.worker_config.job_type] is None:
-                    cls._dedicated_for_job_type[w.worker_config.job_type] = [
-                        worker_id]
-                else:
-                    cls._dedicated_for_job_type[
-                        w.worker_config.job_type].append(worker_id)
 
     @classmethod
     async def listener_connected(cls, peername: str, writer: StreamWriter,
@@ -258,8 +230,7 @@ class ClientManager:
             cls.listeners[client.client_id] = client
         elif isinstance(client, WorkerClient):
             cls.workers[client.client_id] = client
-            await cls._refresh_dedicated_cache()
-            SeriesManager.update_worker_lookup(len(cls.workers))
+            cls.update_worker_lookup()
 
     @classmethod
     async def get_listener_by_id(cls, client_id) -> ListenerClient:
@@ -282,17 +253,16 @@ class ClientManager:
         return cls._dedicated_for_job_type
 
     @classmethod
-    async def get_free_worker(cls, series_name: str, job_type: str,
-                              module_name: str) -> WorkerClient:
+    async def get_free_worker(cls,
+                              series_name: str,
+                              job_type: str) -> WorkerClient:
         # Check if there is a worker free that's dedicated for the series
         if cls._dedicated_for_series.get(series_name) is not None:
             for worker in cls._dedicated_for_series[series_name].values():
                 if not worker.online:
                     continue
                 if not worker.busy and not worker.is_going_busy:
-                    if worker.support_module_for_job(
-                            job_type, module_name):
-                        return worker
+                    return worker
 
         # Check if there is a worker free that's dedicated for the job_type
         if cls._dedicated_for_job_type.get(job_type) is not None:
@@ -300,17 +270,14 @@ class ClientManager:
                 if not worker.online:
                     continue
                 if not worker.busy and not worker.is_going_busy:
-                    if worker.support_module_for_job(
-                            job_type, module_name):
-                        return worker
+                    return worker
 
         for worker in cls.workers.values():
             if not worker.online:
                 continue
             if worker.worker_config.mode == WORKER_MODE_GLOBAL and \
                     not worker.busy and not worker.is_going_busy:
-                if worker.support_module_for_job(job_type, module_name):
-                    return worker
+                return worker
 
         return None
 
@@ -345,9 +312,8 @@ class ClientManager:
 
     @classmethod
     async def set_worker_offline(cls, client_id: str):
-        await cls.check_for_pending_series(cls.workers[client_id])
         cls.workers[client_id].online = False
-        await cls._refresh_dedicated_cache()
+        cls.update_worker_lookup()
 
     @classmethod
     async def set_listener_offline(cls, client_id: str):
@@ -373,22 +339,6 @@ class ClientManager:
                 f'Client {client_id} went offline without goodbye',
                 ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE)
             await EnodoEventManager.handle_event(event)
-
-    @classmethod
-    async def check_for_pending_series(cls, client: WorkerClient):
-        # To stop circular import
-        from ..jobmanager import EnodoJobManager
-        from ..series.seriesmanager import SeriesManager
-        pending_jobs = EnodoJobManager.get_active_jobs_by_worker(
-            client.client_id)
-        if len(pending_jobs) > 0:
-            for job in pending_jobs:
-                await EnodoJobManager.cancel_job(job)
-                async with SeriesManager.get_state(job.series_name) as state:
-                    state.set_job_status(
-                        job.job_config.config_name, JOB_STATUS_OPEN)
-                    logging.info(
-                        f'Setting for series job status pending to false...')
 
     @ classmethod
     async def load_from_disk(cls):

@@ -3,12 +3,14 @@ import datetime
 import json
 import logging
 from asyncio import StreamWriter
+import time
 from typing import Any, Callable, Optional, Union
+from uuid import uuid4
 
 import qpack
 from enodo.jobs import *
 from enodo.model.config.series import SeriesJobConfigModel
-from enodo.protocol.package import WORKER_JOB, WORKER_JOB_CANCEL, create_header
+from enodo.protocol.package import WORKER_REQUEST, create_header
 from enodo.protocol.packagedata import (EnodoJobDataModel,
                                         EnodoJobRequestDataModel)
 from lib.socket.clientmanager import WorkerClient
@@ -42,6 +44,8 @@ class EnodoJob(StoredResource):
         if not isinstance(
                 job_data, EnodoJobDataModel) and job_data is not None:
             raise Exception('Unknown job data value')
+        if rid is None:
+            rid = str(uuid4()).replace("-", "")
         self.rid = rid
         self.series_name = series_name
         self.job_config = job_config
@@ -93,21 +97,20 @@ class EnodoJobManager:
         cls._update_queue_cb = update_queue_cb
         cls._lock = asyncio.Lock()
 
-    @classmethod
-    async def check_for_jobs(cls):
-        while ServerState.work_queue:
-            ServerState.tasks_last_runs['check_jobs'] = datetime.datetime.now(
-            )
-            if len(cls._open_jobs) != 0:
-                for next_job in cls._open_jobs:
-                    await cls._try_activate_job(next_job)
+    # @classmethod
+    # async def check_for_jobs(cls):
+    #     while ServerState.work_queue:
+    #         ServerState.tasks_last_runs['check_jobs'] = datetime.datetime.now(
+    #         )
+    #         if len(cls._open_jobs) != 0:
+    #             for next_job in cls._open_jobs:
+    #                 await cls._try_activate_job(next_job)
 
-            await cls.clean_jobs()
-            await asyncio.sleep(Config.watcher_interval)
+    #         await asyncio.sleep(Config.watcher_interval)
 
     @classmethod
     @cls_lock()
-    async def _try_activate_job(cls, next_job: EnodoJob):
+    async def activate_job(cls, next_job: EnodoJob):
         try:
             series = await SeriesManager.get_config_read_only(
                 next_job.series_name)
@@ -115,20 +118,8 @@ class EnodoJobManager:
                 return
 
             worker = await ClientManager.get_free_worker(
-                next_job.series_name, next_job.job_config.job_type,
-                series.get_module(
-                    next_job.job_config.config_name))
+                next_job.series_name, next_job.job_config.job_type)
             if worker is None:
-                return
-
-            if not worker.conform_params(
-                    next_job.job_config.module, next_job.job_config.
-                    job_type, next_job.job_config.module_params):
-                async with SeriesManager.get_state(
-                        next_job.series_name) as state:
-                    state.set_job_check_status(
-                        next_job.job_config.config_name,
-                        "Module params not conform")
                 return
 
             logging.info(
@@ -145,27 +136,34 @@ class EnodoJobManager:
                 f'exception class: {e.__class__.__name__}')
 
     @classmethod
-    async def receive_job_result(cls, writer: StreamWriter, packet_type,
-                                 packet_id: int, job_response: Any,
-                                 client_id: str):
-        job_id = job_response.get('job_id')
-        if job_response.get('error') is not None:
-            logging.error(
-                "Error returned by worker for series "
-                f"{job_response.get('name')}")
-            await cls.set_job_failed(job_id, job_response.get('error'))
+    async def _activate_job(cls, job: EnodoJob, worker_id: str):
+        if job is None or worker_id is None:
             return
 
-        job_type = job_response.get('job_type')
-        job = cls.get_activated_job(job_id)
+        job.send_at = time.time()
+        job.worker_id = worker_id
+
+    @classmethod
+    async def receive_request_result(cls, writer: StreamWriter, packet_type,
+                                     packet_id: int, response: Any,
+                                     client_id: str):
+        request_id = response.get('request_id')
+        if response.get('error') is not None:
+            logging.error(
+                "Error returned by worker for series "
+                f"{response.get('name')}")
+            return
+
+        job_type = response.get('job_type')
+        job = cls.get_activated_job(request_id)
         if job is None:
             logging.error("Received a result for a non-existing job")
             return
-        await cls.deactivate_job(job_id)
+        await cls.deactivate_job(request_id)
         config = await SeriesManager.get_config_read_only(
-            job_response.get('name'))
-        async with SeriesManager.get_state(job_response.get('name')) as state:
-            await cls.handle_job_result(job_response, job_type,
+            response.get('name'))
+        async with SeriesManager.get_state(response.get('name')) as state:
+            await cls.handle_job_result(response, job_type,
                                         job, config, state)
 
     @classmethod
@@ -272,16 +270,16 @@ class EnodoJobManager:
     async def _send_worker_job_request(cls, worker: WorkerClient,
                                        job: EnodoJob):
         try:
-            series, state = \
-                await SeriesManager.get_series_read_only(job.series_name)
+            series = await SeriesManager.get_config_read_only(job.series_name)
             job_data = EnodoJobRequestDataModel(
+                request_id=str(uuid4()),
+                request_type="run",
                 job_id=job.rid, job_config=job.job_config,
                 series_name=job.series_name,
                 series_config=series.config,
-                series_state=state.to_dict(),
                 siridb_ts_units=ServerState.siridb_ts_unit)
             data = qpack.packb(job_data.serialize())
-            header = create_header(len(data), WORKER_JOB, 0)
+            header = create_header(len(data), WORKER_REQUEST, 0)
             worker.writer.write(header + data)
         except Exception as e:
             logging.error(
@@ -301,8 +299,8 @@ class EnodoJobManager:
                 f"Asking worker {worker_id} to cancel job {job_id}")
             data = qpack.packb(
                 {'job_id': job_id})
-            header = create_header(len(data), WORKER_JOB_CANCEL, 0)
-            worker.writer.write(header + data)
+            # header = create_header(len(data), WORKER_JOB_CANCEL, 0)
+            # worker.writer.write(header + data)
         except Exception as e:
             logging.error(
                 f"Something went wrong when sending worker to cancel job")
@@ -335,16 +333,3 @@ class EnodoJobManager:
     @classmethod
     def get_open_queue(cls) -> list:
         return [EnodoJob.to_dict(job) for job in cls._open_jobs]
-
-    @classmethod
-    @cls_lock()
-    async def load_from_disk(cls):
-        failed_jobs = await ServerState.storage.load_by_type("failed_jobs")
-        cls._failed_jobs = [
-            EnodoJob.from_dict(job_data)
-            for job_data in failed_jobs]
-
-        cls._build_index()
-
-        logging.info(
-            f'Loaded {len(failed_jobs)} failed jobs from disk')

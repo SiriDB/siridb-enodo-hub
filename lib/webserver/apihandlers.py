@@ -4,7 +4,6 @@ from urllib.parse import unquote
 
 from aiohttp import web
 from aiohttp_basicauth import BasicAuthMiddleware
-from attr import field
 from lib.config import Config
 from lib.serverstate import ServerState
 from lib.socket import ClientManager
@@ -115,14 +114,13 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
-    async def resolve_series_job_status(cls, request):
-        """Resolve a job from a series
+    async def run_job_for_series(cls, request):
+        """Run job for series
+
+        Args:
 
         Returns:
-            _type_: _description_
-
-        Query args:
-            byName (string): 1, 0 or true, false
+            dict with siridb response
         """
         rid = unquote(request.match_info['rid'])
         by_name = False
@@ -130,11 +128,20 @@ class ApiHandlers:
             q_by_name = request.rel_url.query['byName']
             if q_by_name == "1" or q_by_name.lower() == "true":
                 by_name = True
-        job_name = unquote(request.match_info['job_config_name'])
-        await BaseHandler.resp_resolve_series_job_status(rid, job_name,
-                                                         by_name=by_name)
+        if by_name:
+            series_name = rid
+        else:
+            series_name = ServerState.series_rm.get_resource_rid_value(
+                int(rid))
+        try:
+            data = await request.json()
+        except JSONDecodeError as e:
+            resp, status = {'error': 'Invalid JSON'}, 400
+        else:
+            resp, status = await BaseHandler.resp_run_job_for_series(
+                series_name, data)
         return web.json_response(
-            {}, dumps=safe_json_dumps, status=200)
+            resp, dumps=safe_json_dumps, status=status)
 
     @classmethod
     @EnodoAuth.auth.required
@@ -200,55 +207,6 @@ class ApiHandlers:
             data={}, status=await BaseHandler.resp_remove_series(
                 rid,
                 by_name=by_name))
-
-    @classmethod
-    @EnodoAuth.auth.required
-    async def add_series_job_config(cls, request):
-        """Add a job config to a series
-
-        Args:
-            request (Request): aiohttp request
-
-        Returns:
-            _type_: _description_
-        """
-        rid = request.match_info['series_name']
-        try:
-            data = await request.json()
-        except JSONDecodeError as e:
-            resp, status = {'error': 'Invalid JSON'}, 400
-        else:
-            resp, status = await BaseHandler.resp_add_job_config(
-                rid, data)
-        return web.json_response(
-            data=resp, status=status)
-
-    @classmethod
-    @EnodoAuth.auth.required
-    async def remove_series_job_config(cls, request):
-        """Remove a job config from a series
-
-        Args:
-            request (Request): aiohttp request
-
-        Returns:
-            _type_: _description_
-
-        Query args:
-            byName (string): 1, 0 or true, false
-        """
-        rid = unquote(request.match_info['rid'])
-        by_name = False
-        if 'byName' in request.rel_url.query:
-            q_by_name = request.rel_url.query['byName']
-            if q_by_name == "1" or q_by_name.lower() == "true":
-                by_name = True
-        job_config_name = urllib.parse.unquote(
-            request.match_info['job_config_name'])
-        data, status = await BaseHandler.resp_remove_job_config(
-            rid, job_config_name, by_name=by_name)
-        return web.json_response(
-            data=data, status=status)
 
     @classmethod
     @EnodoAuth.auth.required

@@ -1,5 +1,4 @@
 import datetime
-from time import time
 
 import asyncio
 import logging
@@ -11,9 +10,8 @@ from aiohttp import web
 from aiojobs.aiohttp import setup
 from enodo.protocol.packagedata import *
 from enodo.protocol.package import LISTENER_NEW_SERIES_POINTS, \
-    WORKER_UPDATE_BUSY, WORKER_JOB_RESULT, WORKER_REFUSED, \
-    WORKER_JOB_CANCELLED
-from lib.series.seriestemplate import SeriesConfig
+    WORKER_REQUEST, WORKER_REQUEST_RESULT
+from lib.series.seriesconfig import SeriesConfig
 from lib.state.thingsdbstorage import ThingsDBStorage
 from lib.util.upgrade import UpgradeUtil
 
@@ -27,8 +25,7 @@ from lib.series.series import Series
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
 from lib.socket import ClientManager
-from lib.socket.handler import receive_new_series_points, \
-    receive_worker_status_update, received_worker_refused
+from lib.socket.handler import receive_new_series_points
 from lib.socket.socketserver import SocketServer
 from lib.socketio.socketiohandlers import SocketIoHandler
 from lib.socketio.socketiorouter import SocketIoRouter
@@ -100,11 +97,8 @@ class Server:
             Config.socket_server_host, Config.socket_server_port,
             Config.internal_security_token,
             {LISTENER_NEW_SERIES_POINTS: receive_new_series_points,
-             WORKER_JOB_RESULT: EnodoJobManager.receive_job_result,
-             WORKER_UPDATE_BUSY: receive_worker_status_update,
-             WORKER_REFUSED: received_worker_refused,
-             WORKER_JOB_CANCELLED: EnodoJobManager.
-             receive_worker_cancelled_job})
+             WORKER_REQUEST: EnodoJobManager.receive_request_result,
+             WORKER_REQUEST_RESULT: EnodoJobManager.receive_request_result})
 
         # Setup REST API handlers
         ApiHandlers.prepare()
@@ -129,13 +123,10 @@ class Server:
         await ClientManager.setup(SeriesManager)
         EnodoJobManager.setup(
             SocketIoHandler.internal_updates_queue_subscribers)
-        await EnodoJobManager.load_from_disk()
         await EnodoEventManager.async_setup()
         await ClientManager.load_from_disk()
 
         scheduler = ServerState.scheduler
-        self._check_jobs_task = await scheduler.spawn(
-            EnodoJobManager.check_for_jobs())
         self._connection_management_task = await scheduler.spawn(
             self._manage_connections())
         self._watch_tasks_task = await scheduler.spawn(self.watch_tasks())

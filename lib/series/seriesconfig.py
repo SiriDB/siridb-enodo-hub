@@ -5,20 +5,22 @@ from enodo.model.config.series import SeriesConfigModel
 from lib.state.resource import StoredResource
 
 
-class SeriesConfig(StoredResource, SeriesConfigModel):
+class SeriesConfig(dict, StoredResource):
 
-    def __init__(self, config, rid=None):
+    def __init__(self, name, description, config, rid=None):
         if 'job_config' not in config:
             logging.error(
                 f"Invalid config: {json.dumps(config)}")
         try:
-            super(SeriesConfigModel, self).__init__(**config)
+            config = SeriesConfigModel(**config)
         except Exception as e:
             raise Exception(
                 f"Invalid job config {rid}")
 
-        super(StoredResource, self).__init__({
+        super(SeriesConfig, self).__init__({
             "rid": rid,
+            "name": name,
+            "description": description,
             "config": config
         })
 

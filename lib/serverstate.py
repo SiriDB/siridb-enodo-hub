@@ -14,7 +14,6 @@ from lib.state.priorityqueue import SeriesPriorityQueue
 
 class ServerState:
     running = None
-    work_queue = None
     sio = None
     siridb_data_client = None
     siridb_output_client = None
@@ -36,7 +35,6 @@ class ServerState:
     async def async_setup(cls, sio, storage):
         cls.running = True
         cls.job_schedule_index = SeriesPriorityQueue()
-        cls.work_queue = True
         cls.readiness = False
         cls.sio = sio
         cls.siridb_data_client_lock = Lock()
