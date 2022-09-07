@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta4.0.19] - 2022-09-07
+
+### Fixed
+- Event slots
+
 ## [0.1.0-beta4.0.18] - 2022-09-07
 
 ### Changed
