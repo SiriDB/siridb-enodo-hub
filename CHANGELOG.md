@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta4.0.18] - 2022-09-07
+
+### Changed
+- Event per anomaly point instead of anomaly bundle
+
+### Fixed
+- Escape of seriesname for events
+- Fixed event only when anomalies not empty
+
 ## [0.1.0-beta4.0.17] - 2022-08-23
 
 ### Fixed
