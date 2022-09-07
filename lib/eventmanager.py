@@ -48,7 +48,7 @@ class EnodoEvent:
     that occured. No state data is saved.
     """
     __slots__ = ('title', 'message', 'event_type',
-                 'series', 'ts', 'severity', 'uuid')
+                 'series', 'series_name', 'ts', 'value', 'severity', 'uuid')
 
     def __init__(self, title, message, event_type,
                  series=None, ts=None, value=None):
