@@ -50,7 +50,8 @@ class EnodoEvent:
     __slots__ = ('title', 'message', 'event_type',
                  'series', 'ts', 'severity', 'uuid')
 
-    def __init__(self, title, message, event_type, series=None):
+    def __init__(self, title, message, event_type,
+                 series=None, ts=None, value=None):
         if event_type not in ENODO_EVENT_TYPES:
             raise Exception()  # TODO Nice exception
         self.title = title
@@ -58,7 +59,9 @@ class EnodoEvent:
         self.event_type = event_type
         self.series = series  # only needs to be set if it regards a
         # series related event
-        self.ts = int(time.time())
+        self.series_name = json.dumps(series.name)
+        self.ts = ts or int(time.time())
+        self.value = value
         self.uuid = str(uuid.uuid4()).replace("-", "")
 
     def to_dict(self):

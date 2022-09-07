@@ -281,20 +281,23 @@ class SeriesManager:
                                       job_config_name, points):
         series = await cls._srm.get_resource_by_key("name", series_name)
         if series is not None:
-            event = EnodoEvent(
-                'Anomaly detected!',
-                f'{len(points)} anomalies detected for series {series_name} \
-                    via job {job_config_name}',
-                ENODO_EVENT_ANOMALY_DETECTED, series=series)
-            await EnodoEventManager.handle_event(event)
             await drop_series(
                 ServerState.get_siridb_output_conn(),
                 f'"enodo_{series_name}_anomalies_{job_config_name}"')
-            if len(points) > 0:
-                await insert_points(
-                    ServerState.get_siridb_output_conn(),
-                    f'enodo_{series_name}_anomalies_{job_config_name}',
-                    points)
+            if len(points) < 1:
+                return
+            for point in points:
+                event = EnodoEvent(
+                    'Anomaly detected!',
+                    (f'{len(points)} anomalies detected'
+                     f' for series {series_name} via job {job_config_name}'),
+                    ENODO_EVENT_ANOMALY_DETECTED, series=series, ts=point[0],
+                    value=point[1])
+                await EnodoEventManager.handle_event(event)
+            await insert_points(
+                ServerState.get_siridb_output_conn(),
+                f'enodo_{series_name}_anomalies_{job_config_name}',
+                points)
 
     @classmethod
     async def add_static_rule_hits_to_series(cls, series_name,
