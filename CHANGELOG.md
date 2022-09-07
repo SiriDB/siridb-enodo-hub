@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
-## [0.1.0-beta4.0.18] - 2022-00-07
+## [0.1.0-beta4.0.18] - 2022-09-07
 
 ### Changed
 - Event per anomaly point instead of anomaly bundle
