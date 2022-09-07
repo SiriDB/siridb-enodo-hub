@@ -59,7 +59,7 @@ class EnodoEvent:
         self.event_type = event_type
         self.series = series  # only needs to be set if it regards a
         # series related event
-        self.series_name = json.dumps(series.name)
+        self.series_name = json.dumps(series.name) if series else None
         self.ts = ts or int(time.time())
         self.value = value
         self.uuid = str(uuid.uuid4()).replace("-", "")
