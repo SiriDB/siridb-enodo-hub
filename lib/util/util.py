@@ -1,3 +1,4 @@
+from asyncore import loop
 import datetime
 import functools
 import json
@@ -195,13 +196,15 @@ def implement_fields_query(func):
 
 def generate_worker_lookup(worker_count: int) -> dict:
     lookup = {}
-    lookup[0] = 0
+    for i in range(LOOKUP_SZ):
+        lookup[i] = 0
     counters = {}
-    for n in range(worker_count):
+    for n in range(1, worker_count):
         m = n+1
         for i in range(n):
             counters[i] = i
         for i in range(LOOKUP_SZ):
+            lookup[i]
             counters[lookup[i]] += 1
             if counters[lookup[i]] % m == 0:
                 lookup[i] = n
@@ -209,5 +212,6 @@ def generate_worker_lookup(worker_count: int) -> dict:
 
 
 def get_worker_for_series(lookup: dict, series_name: str) -> int:
-    n = sum(bytearray(series_name))
+    n = sum(bytearray(series_name, encoding='utf-8'))
+    print(lookup)
     return lookup[n % LOOKUP_SZ]

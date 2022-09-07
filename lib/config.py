@@ -77,6 +77,7 @@ class Config:
     _path = None
     min_data_points = None
     watcher_interval = None
+    hub_id = None
 
     # Siridb
     siridb_host = None
@@ -271,6 +272,8 @@ class Config:
         cls.siridb_output_database = cls._config.get_r(
             'siridb_output',
             'database')
+
+        cls.hub_id = cls._config.get_r('hub', 'id')
 
     @staticmethod
     def to_int(val):

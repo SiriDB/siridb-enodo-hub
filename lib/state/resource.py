@@ -170,6 +170,13 @@ class ResourceManager:
         self._resources[rc.rid] = self.get_resource_index_value(
             resource)
 
+    async def create_and_return(self, resource: dict):
+        rc = self.to_resource_class(resource)
+        await rc.create_save()
+        self._resources[rc.rid] = self.get_resource_index_value(
+            resource)
+        return rc
+
     def get_resource_index_value(self, resource: dict):
         if self._extra_index_field is None:
             return None

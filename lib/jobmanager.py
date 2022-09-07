@@ -117,7 +117,7 @@ class EnodoJobManager:
             if series is None:
                 return
 
-            worker = await ClientManager.get_free_worker(
+            worker = await ClientManager.get_worker(
                 next_job.series_name, next_job.job_config.job_type)
             if worker is None:
                 return
@@ -126,7 +126,6 @@ class EnodoJobManager:
                 f"Adding series: sending {next_job.series_name} to "
                 f"Worker for job type {next_job.job_config.job_type}")
             await cls._send_worker_job_request(worker, next_job)
-            worker.is_going_busy = True
             await cls._activate_job(next_job, worker.client_id)
         except Exception as e:
             logging.error(
@@ -134,6 +133,8 @@ class EnodoJobManager:
             logging.debug(
                 f"Corresponding error: {e}, "
                 f'exception class: {e.__class__.__name__}')
+            import traceback
+            print(traceback.format_exc())
 
     @classmethod
     async def _activate_job(cls, job: EnodoJob, worker_id: str):

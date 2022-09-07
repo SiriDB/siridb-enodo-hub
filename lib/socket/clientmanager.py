@@ -4,17 +4,15 @@ from asyncio import StreamWriter
 from typing import Any, Optional, Union
 
 import qpack
-from enodo import EnodoModule, WorkerConfigModel
-from enodo.model.config.worker import (WORKER_MODE_DEDICATED_JOB_TYPE,
-                                       WORKER_MODE_DEDICATED_SERIES,
-                                       WORKER_MODE_GLOBAL)
+from enodo import WorkerConfigModel
 from enodo.protocol.package import UPDATE_SERIES, create_header
-from enodo.jobs import JOB_TYPES
+from enodo.jobs import JOB_TYPES, JOB_TYPE_FORECAST_SERIES
 from lib.serverstate import ServerState
+from lib.socket.socketclient import WorkerSocketClient
 from lib.state.resource import ResourceManager, StoredResource, from_thing
 from lib.eventmanager import (ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE,
                               EnodoEvent, EnodoEventManager)
-from lib.util.util import generate_worker_lookup
+from lib.util.util import generate_worker_lookup, get_worker_for_series
 
 
 class EnodoClient(StoredResource):
@@ -69,32 +67,17 @@ class ListenerClient(EnodoClient):
         return False
 
 
-class WorkerClient(EnodoClient):
+class WorkerClient(StoredResource):
     def __init__(self,
-                 client_id: str,
-                 ip_address: str,
-                 module: dict,
-                 writer: Optional[StreamWriter] = None,
-                 lib_version: Optional[str] = "unknown",
-                 last_seen: Optional[int] = None,
-                 busy=False,
-                 rid: Optional[str] = None,
-                 worker_config: Optional[
-                     Union[dict, WorkerConfigModel]] = None,
-                 online=False):
-        super().__init__(client_id, ip_address,
-                         writer, lib_version, last_seen, online)
+                 hostname: str,
+                 port: int,
+                 worker_config: dict,
+                 rid: Optional[str] = None):
         self.rid = rid
-        self.busy = busy
-        self.is_going_busy = False
-        self.module = EnodoModule(**module)
-        if worker_config is None:
-            worker_config = WorkerConfigModel(
-                WORKER_MODE_GLOBAL, dedicated_job_type=None,
-                dedicated_series_name=None)
-        elif isinstance(worker_config, dict):
-            worker_config = WorkerConfigModel(**worker_config)
-        self.worker_config = worker_config
+        self.hostname = hostname
+        self.port = port
+        self.worker_config = WorkerConfigModel(**worker_config)
+        self._client = WorkerSocketClient(hostname, port, worker_config)
 
     @StoredResource.changed
     def set_config(self, worker_config: WorkerConfigModel):
@@ -112,28 +95,17 @@ class WorkerClient(EnodoClient):
     @property
     def to_store_data(self):
         data = self.to_dict()
-        del data["writer"]
-        data['ip_address'] = "str"
+        if "_client" in data:
+            del data["_client"]
+        if "rid" in data:
+            del data["rid"]
         return data
-
-    @StoredResource.async_changed
-    async def reconnected(self, ip_address: str, writer: StreamWriter,
-                          module: dict):
-        await super().reconnected(ip_address, writer)
-        self.busy = False
-        self.is_going_busy = False
-        self.module = EnodoModule(**module)
 
     def to_dict(self) -> dict:
         return {
             'rid': self.rid,
-            'client_id': self.client_id,
-            'ip_address': self.ip_address,
-            'writer': None,
-            'module': self.module,
-            'lib_version': self.version,
-            'last_seen': self.last_seen,
-            'busy': self.busy,
+            'hostname': self.hostname,
+            'port': self.port,
             'worker_config': self.worker_config
         }
 
@@ -141,6 +113,7 @@ class WorkerClient(EnodoClient):
 class ClientManager:
     listeners = {}
     workers = {}
+    workers_indexed = {}
     series_manager = None
 
     _crm = None
@@ -153,14 +126,38 @@ class ClientManager:
         await cls._crm.load()
         cls.update_worker_lookup()
 
+        # await cls.add_worker({
+        #     "hostname": "localhost",
+        #     "port": 9105,
+        #     "worker_config": {
+        #         "supported_job_types": [JOB_TYPE_FORECAST_SERIES],
+        #         "config": {}
+        #     }
+        # })
+
     @classmethod
     def update_worker_lookup(cls):
+        cls.workers_indexed = {}
+        for worker in cls.workers.values():
+            pass
+        cls._worker_lookup = {}
         for job_type in JOB_TYPES:
             count = 0
-            for worker in cls.workers:
-                if job_type in worker.module.supported_jobs:
+            for worker in cls.workers.values():
+                if job_type in worker.worker_config.supported_job_types:
                     count += 1
-            cls._worker_lookup[job_type] = generate_worker_lookup(count)
+            if count > 1:
+                cls._worker_lookup[job_type] = generate_worker_lookup(count)
+
+    @classmethod
+    def load_worker(cls, worker):
+        cls.workers[worker.rid] = worker
+
+    @classmethod
+    async def add_worker(cls, worker: dict):
+        worker = await cls._crm.create_and_return(worker)
+        cls.load_worker(worker)
+        cls.update_worker_lookup()
 
     @classmethod
     @property
@@ -172,10 +169,6 @@ class ClientManager:
         return m_index
 
     @classmethod
-    def get_module(cls, name: str) -> EnodoModule:
-        return cls.modules.get(name)
-
-    @classmethod
     def get_listener_count(cls) -> int:
         return len(cls.listeners.keys())
 
@@ -184,53 +177,19 @@ class ClientManager:
         return len(cls.workers.keys())
 
     @classmethod
-    def get_busy_worker_count(cls) -> int:
-        busy_workers = [cls.workers[worker_id]
-                        for worker_id in cls.workers
-                        if cls.workers[worker_id].busy is True]
-        return len(busy_workers)
-
-    @classmethod
     async def listener_connected(cls, peername: str, writer: StreamWriter,
                                  client_data: Any):
         client_id = client_data.get('client_id')
         if client_id not in cls.listeners:
             client = ListenerClient(client_id, peername, writer,
                                     client_data.get('version', None))
-            await cls.add_client(client)
+            await cls.add_listener(client)
         else:
             await cls.listeners.get(client_id).reconnected(peername, writer)
 
     @classmethod
-    async def worker_connected(cls, peername: str, writer: StreamWriter,
-                               client_data: Any):
-        client_id = client_data.get('client_id')
-        if client_id not in cls.workers:
-            logging.info(f'New worker with id: {client_id} connected')
-            client = await WorkerClient.create({
-                "client_id": client_id,
-                "ip_address": peername,
-                "writer": writer,
-                "module": client_data.get('module'),
-                "lib_version": client_data.get('lib_version', None),
-                "busy": client_data.get('busy', None),
-                "online": True
-            })
-            await cls.add_client(client)
-        else:
-            logging.info(f'Known worker with id: {client_id} connected')
-            await cls.workers.get(client_id).reconnected(
-                peername,
-                writer,
-                client_data.get('module'))
-
-    @classmethod
-    async def add_client(cls, client: EnodoClient):
-        if isinstance(client, ListenerClient):
-            cls.listeners[client.client_id] = client
-        elif isinstance(client, WorkerClient):
-            cls.workers[client.client_id] = client
-            cls.update_worker_lookup()
+    async def add_listener(cls, client: ListenerClient):
+        cls.listeners[client.client_id] = client
 
     @classmethod
     async def get_listener_by_id(cls, client_id) -> ListenerClient:
@@ -245,41 +204,13 @@ class ClientManager:
         return None
 
     @classmethod
-    async def get_dedicated_series_workers(cls) -> dict:
-        return cls._dedicated_for_series
-
-    @classmethod
-    async def get_dedicated_job_type_workers(cls) -> dict:
-        return cls._dedicated_for_job_type
-
-    @classmethod
-    async def get_free_worker(cls,
-                              series_name: str,
-                              job_type: str) -> WorkerClient:
-        # Check if there is a worker free that's dedicated for the series
-        if cls._dedicated_for_series.get(series_name) is not None:
-            for worker in cls._dedicated_for_series[series_name].values():
-                if not worker.online:
-                    continue
-                if not worker.busy and not worker.is_going_busy:
-                    return worker
-
-        # Check if there is a worker free that's dedicated for the job_type
-        if cls._dedicated_for_job_type.get(job_type) is not None:
-            for worker in cls._dedicated_for_series[job_type].values():
-                if not worker.online:
-                    continue
-                if not worker.busy and not worker.is_going_busy:
-                    return worker
-
-        for worker in cls.workers.values():
-            if not worker.online:
-                continue
-            if worker.worker_config.mode == WORKER_MODE_GLOBAL and \
-                    not worker.busy and not worker.is_going_busy:
-                return worker
-
-        return None
+    async def get_worker(cls,
+                         series_name: str,
+                         job_type: str) -> WorkerClient:
+        if job_type in cls._worker_lookup:
+            return get_worker_for_series(
+                cls._worker_lookup[job_type], series_name)
+        return 0
 
     @classmethod
     def update_listeners(cls, data: Any):
@@ -303,32 +234,15 @@ class ClientManager:
                 logging.info(f'Lost connection to listener: {client}')
                 listener.online = False
 
-        for client in cls.workers:
-            worker = cls.workers.get(client)
-            if worker.online and \
-                    (time.time() - worker.last_seen) > max_timeout:
-                logging.info(f'Lost connection to worker: {client}')
-                worker.online = False
-
-    @classmethod
-    async def set_worker_offline(cls, client_id: str):
-        cls.workers[client_id].online = False
-        cls.update_worker_lookup()
-
     @classmethod
     async def set_listener_offline(cls, client_id: str):
         cls.listeners[client_id].online = False
 
     @classmethod
     async def assert_if_client_is_offline(cls, client_id: str):
-        client = None
-        if client_id in cls.listeners:
-            client = cls.listeners.get(client_id)
-        elif client_id in cls.workers:
-            client = cls.workers.get(client_id)
-
-        if client is None:
+        if client_id not in cls.listeners:
             return
+        client = cls.listeners.get(client_id)
 
         if client.online:
             logging.error(
@@ -346,12 +260,11 @@ class ClientManager:
         for w in workers:
             try:
                 from_thing(w)
-                worker = WorkerClient(**w)
-                worker.online = False
-                await cls.add_client(worker)
+                cls.load_worker(WorkerClient(**w))
             except Exception as e:
                 logging.warning(
                     "Tried loading invalid data when loading worker")
                 logging.debug(
                     f"Corresponding error: {e}, "
                     f'exception class: {e.__class__.__name__}')
+        cls.update_worker_lookup()
