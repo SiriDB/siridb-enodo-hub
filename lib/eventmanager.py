@@ -7,28 +7,18 @@ import uuid
 import aiohttp
 from jinja2 import Environment
 
-from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_ADD, \
-    SUBSCRIPTION_CHANGE_TYPE_UPDATE, SUBSCRIPTION_CHANGE_TYPE_DELETE
 from lib.serverstate import ServerState
 from lib.state.resource import StoredResource
 from lib.state.resource import ResourceManager
-from lib.util import cls_lock
-from lib.serverstate import ServerState
-from lib.socketio import (SUBSCRIPTION_CHANGE_TYPE_ADD,
-                          SUBSCRIPTION_CHANGE_TYPE_DELETE,
-                          SUBSCRIPTION_CHANGE_TYPE_UPDATE)
 from lib.util import cls_lock
 
 ENODO_EVENT_ANOMALY_DETECTED = "event_anomaly_detected"
 ENODO_EVENT_JOB_QUEUE_TOO_LONG = "job_queue_too_long"
 ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE = "lost_client_without_goodbye"
-ENODO_EVENT_STATIC_RULE_FAIL = "event_static_rule_fail"
 ENODO_EVENT_TYPES = [ENODO_EVENT_ANOMALY_DETECTED,
                      ENODO_EVENT_JOB_QUEUE_TOO_LONG,
-                     ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE,
-                     ENODO_EVENT_STATIC_RULE_FAIL]
-ENODO_SERIES_RELATED_EVENT_TYPES = [ENODO_EVENT_ANOMALY_DETECTED,
-                                    ENODO_EVENT_STATIC_RULE_FAIL]
+                     ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE]
+ENODO_SERIES_RELATED_EVENT_TYPES = [ENODO_EVENT_ANOMALY_DETECTED]
 
 ENODO_EVENT_OUTPUT_WEBHOOK = 1
 ENODO_EVENT_OUTPUT_TYPES = [ENODO_EVENT_OUTPUT_WEBHOOK]

@@ -8,17 +8,14 @@ import re
 import qpack
 from enodo.protocol.package import create_header, UPDATE_SERIES
 from enodo.jobs import (JOB_TYPE_FORECAST_SERIES,
-                        JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES,
-                        JOB_TYPE_STATIC_RULES)
+                        JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES)
 from lib.config import Config
 
 from lib.serverstate import ServerState
 from lib.siridb.siridb import (
     drop_series, query_group_expression_by_name,
-    query_series_anomalies, query_series_data, query_series_forecasts,
-    query_series_static_rules_hits)
+    query_series_anomalies, query_series_data, query_series_forecasts)
 from lib.socket import ClientManager
-from lib.util.util import generate_worker_lookup
 
 
 class SeriesManager:
@@ -158,9 +155,6 @@ class SeriesManager:
                 series_name, only_future=forecast_future_only)
         elif job_type == JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES:
             return await query_series_anomalies(
-                ServerState.get_siridb_output_conn(), series_name)
-        elif job_type == JOB_TYPE_STATIC_RULES:
-            return await query_series_static_rules_hits(
                 ServerState.get_siridb_output_conn(), series_name)
 
         return {}

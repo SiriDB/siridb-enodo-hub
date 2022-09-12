@@ -1,42 +1,32 @@
 import logging
 import time
 from asyncio import StreamWriter
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 import qpack
 from enodo import WorkerConfigModel
 from enodo.protocol.package import UPDATE_SERIES, create_header
-from enodo.jobs import JOB_TYPES, JOB_TYPE_FORECAST_SERIES
+from enodo.jobs import (JOB_TYPE_FORECAST_SERIES,
+                        JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES)
 from lib.serverstate import ServerState
 from lib.socket.socketclient import WorkerSocketClient
 from lib.state.resource import ResourceManager, StoredResource, from_thing
-from lib.eventmanager import (ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE,
-                              EnodoEvent, EnodoEventManager)
 from lib.util.util import generate_worker_lookup, get_worker_for_series
 
 
-class EnodoClient(StoredResource):
-
-    def __init__(
-            self, client_id: str, ip_address: str, writer: StreamWriter,
-            version: Optional[str] = "unknown",
-            last_seen: Optional[Union[str, Union[float, int]]] = None,
-            online=True):
+class ListenerClient:
+    def __init__(self,
+                 client_id: str,
+                 ip_address: str,
+                 writer: StreamWriter,
+                 version: Optional[str] = "unknown",
+                 last_seen: Optional[int] = None):
+        super().__init__(client_id, ip_address, writer, version, last_seen)
         self.client_id = client_id
         self.ip_address = ip_address
         self.writer = writer
         self.version = version
-        self.online = online
-        self._last_seen = int(time.time()) if last_seen is None \
-            else int(last_seen)
-
-    @property
-    def last_seen(self) -> int:
-        return self._last_seen
-
-    @last_seen.setter
-    def last_seen(self, val: Union[str, Union[float, int]]):
-        self._last_seen = int(val)
+        self.last_seen = last_seen
 
     async def reconnected(self, ip_address: str, writer: StreamWriter):
         self.online = True
@@ -53,27 +43,15 @@ class EnodoClient(StoredResource):
                 'online': self.online}
 
 
-class ListenerClient(EnodoClient):
-    def __init__(self,
-                 client_id: str,
-                 ip_address: str,
-                 writer: StreamWriter,
-                 version: Optional[str] = "unknown",
-                 last_seen: Optional[int] = None):
-        super().__init__(client_id, ip_address, writer, version, last_seen)
-
-    @property
-    def should_be_stored(self):
-        return False
-
-
 class WorkerClient(StoredResource):
     def __init__(self,
                  hostname: str,
                  port: int,
                  worker_config: dict,
+                 increment_id: int,
                  rid: Optional[str] = None):
         self.rid = rid
+        self.increment_id = increment_id
         self.hostname = hostname
         self.port = port
         self.worker_config = WorkerConfigModel(**worker_config)
@@ -104,27 +82,58 @@ class WorkerClient(StoredResource):
     def to_dict(self) -> dict:
         return {
             'rid': self.rid,
+            'increment_id': self.increment_id,
             'hostname': self.hostname,
             'port': self.port,
             'worker_config': self.worker_config
         }
 
 
+class WorkerPool:
+    __slots__ = ('pool_id', '_workers', '_pool', '_lookups')
+
+    def __init__(self, pool_id, workers):
+        self.pool_id = pool_id
+        self._pool = {}
+        self._lookups = {}
+        self._build(workers)
+
+    def _build(self, workers):
+        self._pool = {
+            JOB_TYPE_FORECAST_SERIES: {},
+            JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES: {}
+        }
+        for worker in workers:
+            self._pool[
+                worker.worker_config.job_type][worker.increment_id] = worker
+        for job_type in self._pool:
+            self._lookups[job_type] = generate_worker_lookup(
+                len(self._pool[job_type]))
+
+    def add(self, worker):
+        job_type = worker.worker_config.job_type
+        increment_id = len(self._pool[job_type])
+        worker.increment_id = increment_id
+        self._pool[job_type][increment_id] = worker
+        self._lookups = generate_worker_lookup(len(self._pool[
+            worker.worker_config.job_type]))
+
+    def get_worker(self, job_type, series_name):
+        idx = get_worker_for_series(self._lookups[job_type], series_name)
+        return self._pool[job_type][idx]
+
+
 class ClientManager:
     listeners = {}
-    workers = {}
-    workers_indexed = {}
+    _worker_pools = {}
     series_manager = None
-
     _crm = None
-    _worker_lookup = {}
 
     @classmethod
     async def setup(cls, series_manager):
         cls.series_manager = series_manager
         cls._crm = ResourceManager("workers", WorkerClient)
         await cls._crm.load()
-        cls.update_worker_lookup()
 
         # await cls.add_worker({
         #     "hostname": "localhost",
@@ -136,37 +145,8 @@ class ClientManager:
         # })
 
     @classmethod
-    def update_worker_lookup(cls):
-        cls.workers_indexed = {}
-        for worker in cls.workers.values():
-            pass
-        cls._worker_lookup = {}
-        for job_type in JOB_TYPES:
-            count = 0
-            for worker in cls.workers.values():
-                if job_type in worker.worker_config.supported_job_types:
-                    count += 1
-            if count > 1:
-                cls._worker_lookup[job_type] = generate_worker_lookup(count)
-
-    @classmethod
-    def load_worker(cls, worker):
-        cls.workers[worker.rid] = worker
-
-    @classmethod
-    async def add_worker(cls, worker: dict):
-        worker = await cls._crm.create_and_return(worker)
-        cls.load_worker(worker)
-        cls.update_worker_lookup()
-
-    @classmethod
-    @property
-    def modules(cls) -> dict:
-        m_index = {}
-        for worker in cls.workers.values():
-            d_val = {worker.module.name: worker.module}
-            m_index = m_index | d_val
-        return m_index
+    def update_worker_pools(cls, workers):
+        cls._worker_pools[0] = WorkerPool(0, workers)
 
     @classmethod
     def get_listener_count(cls) -> int:
@@ -207,10 +187,7 @@ class ClientManager:
     async def get_worker(cls,
                          series_name: str,
                          job_type: str) -> WorkerClient:
-        if job_type in cls._worker_lookup:
-            return get_worker_for_series(
-                cls._worker_lookup[job_type], series_name)
-        return 0
+        return cls._worker_pools[0].get_worker(job_type, series_name)
 
     @classmethod
     def update_listeners(cls, data: Any):
@@ -248,23 +225,20 @@ class ClientManager:
             logging.error(
                 f'Client {client_id} went offline without goodbye')
             client.online = False
-            event = EnodoEvent(
-                'Lost client',
-                f'Client {client_id} went offline without goodbye',
-                ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE)
-            await EnodoEventManager.handle_event(event)
+            # TODO: emit alert
 
-    @ classmethod
+    @classmethod
     async def load_from_disk(cls):
         workers = await ServerState.storage.load_by_type("workers")
+        loaded_workers = []
         for w in workers:
             try:
                 from_thing(w)
-                cls.load_worker(WorkerClient(**w))
+                loaded_workers.append(WorkerClient(**w))
             except Exception as e:
                 logging.warning(
                     "Tried loading invalid data when loading worker")
                 logging.debug(
                     f"Corresponding error: {e}, "
                     f'exception class: {e.__class__.__name__}')
-        cls.update_worker_lookup()
+        cls.update_worker_pools(loaded_workers)

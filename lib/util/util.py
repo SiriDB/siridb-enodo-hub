@@ -8,8 +8,7 @@ from packaging import version
 import urllib.parse
 
 from enodo.jobs import (
-    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_FORECAST_SERIES,
-    JOB_TYPE_STATIC_RULES)
+    JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES, JOB_TYPE_FORECAST_SERIES)
 
 MIN_DATA_FILE_VERSION = "1.0.0"
 CURRENT_DATA_FILE_VERSION = "1.0.0"
@@ -51,8 +50,7 @@ def get_job_config_output_series_name(
         series_name, job_type, config_name):
     job_prefix_mapping = {
         JOB_TYPE_FORECAST_SERIES: "forecast",
-        JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES: "anomalies",
-        JOB_TYPE_STATIC_RULES: "static_rules"
+        JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES: "anomalies"
     }
     return f"enodo_{series_name}_{job_prefix_mapping[job_type]}_{config_name}"
 

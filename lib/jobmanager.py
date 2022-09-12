@@ -18,9 +18,6 @@ from lib.state.resource import StoredResource
 from lib.util import cls_lock
 
 from .config import Config
-from .eventmanager import (ENODO_EVENT_JOB_QUEUE_TOO_LONG,
-                           ENODO_EVENT_STATIC_RULE_FAIL, EnodoEvent,
-                           EnodoEventManager)
 from .series.seriesmanager import SeriesManager
 from .serverstate import ServerState
 from .socket import ClientManager
@@ -228,37 +225,6 @@ class EnodoJobManager:
             except Exception as e:
                 logging.error(
                     f"Something went wrong when receiving base analysis job")
-                logging.debug(
-                    f"Corresponding error: {e}, "
-                    f'exception class: {e.__class__.__name__}')
-        elif job_type == JOB_TYPE_STATIC_RULES:
-            try:
-                state.set_job_status(
-                    job.job_config.config_name, JOB_STATUS_DONE)
-                state.set_job_meta(
-                    job.job_config.config_name,
-                    {'analyse_region': job_response.get(
-                        'analyse_region')})
-                await SeriesManager.add_static_rule_hits_to_series(
-                    job_response.get('name'),
-                    job.job_config.config_name,
-                    job_response.get('data'))
-                if len(job_response.get('data')):
-                    for failed_check in job_response.get('data'):
-                        event = EnodoEvent(
-                            'Static rule failed!',
-                            (f'Series {job_response.get("name")} failed a'
-                             f'static rule at ({failed_check[0]}):'
-                             f'{failed_check[1]}'),
-                            ENODO_EVENT_STATIC_RULE_FAIL,
-                            series=series)
-                        await EnodoEventManager.handle_event(
-                            event, series=series)
-                await SeriesManager.series_changed(
-                    SUBSCRIPTION_CHANGE_TYPE_UPDATE, job_response.get('name'))
-            except Exception as e:
-                logging.error(
-                    f"Something went wrong when receiving static rules job")
                 logging.debug(
                     f"Corresponding error: {e}, "
                     f'exception class: {e.__class__.__name__}')

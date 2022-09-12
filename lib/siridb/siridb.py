@@ -132,18 +132,3 @@ async def query_series_anomalies(siridb_client, series_name, selector="*"):
         msg = str(e) or type(e).__name__
         logging.error(f"Problem with SiriDB: {msg}")
     return result
-
-
-async def query_series_static_rules_hits(
-        siridb_client, series_name, selector="*"):
-    result = None
-    name_escaped = re.escape(series_name).replace('/', r'\/')
-    try:
-        result = await siridb_client.query(
-            f'select {selector} from '
-            f'/enodo_{name_escaped}_static_rules_.*?$/')
-    except (QueryError, InsertError, ServerError, PoolError,
-            AuthenticationError, UserAuthError) as e:
-        msg = str(e) or type(e).__name__
-        logging.error(f"Problem with SiriDB: {msg}")
-    return result

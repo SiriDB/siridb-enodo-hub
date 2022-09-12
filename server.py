@@ -17,7 +17,6 @@ from lib.util.upgrade import UpgradeUtil
 
 from lib.webserver.apihandlers import ApiHandlers, auth
 from lib.config import Config
-from lib.eventmanager import EnodoEventManager
 from lib.jobmanager import EnodoJobManager
 
 from lib.logging import prepare_logger
@@ -123,7 +122,6 @@ class Server:
         await ClientManager.setup(SeriesManager)
         EnodoJobManager.setup(
             SocketIoHandler.internal_updates_queue_subscribers)
-        await EnodoEventManager.async_setup()
         await ClientManager.load_from_disk()
 
         scheduler = ServerState.scheduler
