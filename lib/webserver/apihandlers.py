@@ -145,6 +145,35 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
+    async def query_series_state(cls, request):
+        """Query series state for a specific job type
+
+        Args:
+
+        Returns:
+            dict with state response
+        """
+        rid = unquote(request.match_info['rid'])
+        by_name = False
+        if 'byName' in request.rel_url.query:
+            q_by_name = request.rel_url.query['byName']
+            if q_by_name == "1" or q_by_name.lower() == "true":
+                by_name = True
+        if by_name:
+            series_name = rid
+        else:
+            series_name = ServerState.series_rm.get_resource_rid_value(
+                int(rid))
+
+        job_type = unquote(request.match_info['job_type'])
+        data, status = await BaseHandler.resp_query_series_state(
+            series_name,
+            job_type)
+        return web.json_response(
+            data, dumps=safe_json_dumps, status=status)
+
+    @classmethod
+    @EnodoAuth.auth.required
     async def run_siridb_query(cls, request):
         """Run siridb query
 

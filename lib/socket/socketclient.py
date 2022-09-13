@@ -6,14 +6,15 @@ import qpack
 
 from enodo.protocol.package import (
     create_header, read_packet, HANDSHAKE, HANDSHAKE_OK, HANDSHAKE_FAIL,
-    HEARTBEAT, RESPONSE_OK, UNKNOWN_CLIENT)
+    HEARTBEAT, RESPONSE_OK, UNKNOWN_CLIENT, WORKER_QUERY)
 
 from lib.config import Config
+from lib.socket.queryhandler import QueryHandler
 
 
 class WorkerSocketClient:
 
-    def __init__(self, hostname, port, config, heartbeat_interval=5):
+    def __init__(self, hostname, port, config, heartbeat_interval=25):
         self._hostname = hostname
         self._port = port
         self._heartbeat_interval = heartbeat_interval
@@ -72,7 +73,7 @@ class WorkerSocketClient:
                 if diff > int(
                         2*self._heartbeat_interval):
                     logging.error(
-                        "Haven't received heartback response from worker")
+                        "Haven't received heartbeat response from worker")
                     self._connected = False
             await asyncio.sleep(1)
 
@@ -117,13 +118,16 @@ class WorkerSocketClient:
             elif packet_type == UNKNOWN_CLIENT:
                 logging.error(f'Worker does not recognize us')
                 await self._handshake()
+            elif packet_type == WORKER_QUERY:
+                QueryHandler.set_query_result(
+                    data.get('request_id'),
+                    data.get('data'))
             else:
                 logging.error(
                     f'Message type not implemented: {packet_type}')
-            await asyncio.sleep(1)
 
-    async def _send_message(self, length, message_type, data):
-        header = create_header(length, message_type)
+    async def _send_message(self, length, message_type, data, id=1):
+        header = create_header(length, message_type, id)
 
         logging.debug(f"Sending type: {message_type}")
         self._writer.write(header + data)
@@ -132,14 +136,16 @@ class WorkerSocketClient:
         except Exception as e:
             self._connected = False
 
-    async def send_message(self, body, message_type, use_qpack=True):
+    async def send_message(self, body, message_type, id=1, use_qpack=True):
         if not self._connected:
             return False
         if use_qpack:
             body = qpack.packb(body)
-        await self._send_message(len(body), message_type, body)
+        await self._send_message(len(body), message_type, body, id)
 
     async def _handshake(self):
+        if self._read_task is not None:
+            self._read_task.cancel()
         self._read_task = asyncio.Task(self._read_from_socket())
         data = {
             'worker_config': self._config,

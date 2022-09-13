@@ -1,6 +1,4 @@
 import asyncio
-import datetime
-import json
 import logging
 from asyncio import StreamWriter
 import time
@@ -17,13 +15,9 @@ from lib.socket.clientmanager import WorkerClient
 from lib.state.resource import StoredResource
 from lib.util import cls_lock
 
-from .config import Config
 from .series.seriesmanager import SeriesManager
 from .serverstate import ServerState
 from .socket import ClientManager
-from .socketio import (SUBSCRIPTION_CHANGE_TYPE_ADD,
-                       SUBSCRIPTION_CHANGE_TYPE_DELETE,
-                       SUBSCRIPTION_CHANGE_TYPE_UPDATE)
 
 
 class EnodoJob(StoredResource):
@@ -94,17 +88,6 @@ class EnodoJobManager:
         cls._update_queue_cb = update_queue_cb
         cls._lock = asyncio.Lock()
 
-    # @classmethod
-    # async def check_for_jobs(cls):
-    #     while ServerState.work_queue:
-    #         ServerState.tasks_last_runs['check_jobs'] = datetime.datetime.now(
-    #         )
-    #         if len(cls._open_jobs) != 0:
-    #             for next_job in cls._open_jobs:
-    #                 await cls._try_activate_job(next_job)
-
-    #         await asyncio.sleep(Config.watcher_interval)
-
     @classmethod
     @cls_lock()
     async def activate_job(cls, next_job: EnodoJob):
@@ -112,18 +95,26 @@ class EnodoJobManager:
             series = await SeriesManager.get_config_read_only(
                 next_job.series_name)
             if series is None:
+                logging.error(
+                    "Could not send job_type "
+                    f"{next_job.job_config.job_type} for unknown series "
+                    f"{next_job.series_name}")
                 return
 
             worker = await ClientManager.get_worker(
                 next_job.series_name, next_job.job_config.job_type)
             if worker is None:
+                logging.error(
+                    "Could not send job_type "
+                    f"{next_job.job_config.job_type} for series "
+                    f"{next_job.series_name}")
                 return
 
             logging.info(
                 f"Adding series: sending {next_job.series_name} to "
                 f"Worker for job type {next_job.job_config.job_type}")
             await cls._send_worker_job_request(worker, next_job)
-            await cls._activate_job(next_job, worker.client_id)
+            await cls._activate_job(next_job, worker.rid)
         except Exception as e:
             logging.error(
                 "Something went wrong when trying to activate job")
@@ -179,8 +170,6 @@ class EnodoJobManager:
                     job.job_config.config_name,
                     {'analyse_region': job_response.get(
                         'analyse_region')})
-                await SeriesManager.series_changed(
-                    SUBSCRIPTION_CHANGE_TYPE_UPDATE, job_response.get('name'))
             except Exception as e:
                 logging.error(
                     f"Something went wrong when receiving forecast job")
@@ -202,9 +191,6 @@ class EnodoJobManager:
                         job.job_config.config_name,
                         {'analyse_region': job_response.get(
                             'analyse_region')})
-                    await SeriesManager.series_changed(
-                        SUBSCRIPTION_CHANGE_TYPE_UPDATE,
-                        job_response.get('name'))
                 except Exception as e:
                     logging.error(
                         f"Something went wrong when receiving "
@@ -212,22 +198,6 @@ class EnodoJobManager:
                     logging.debug(
                         f"Corresponding error: {e}, "
                         f'exception class: {e.__class__.__name__}')
-        elif job_type == JOB_TYPE_BASE_SERIES_ANALYSIS:
-            try:
-                state.characteristics = \
-                    json.dumps(job_response.get('characteristics'))
-                state.health = job_response.get('health')
-                state.interval = job_response.get('interval')
-                state.set_job_status(
-                    job.job_config.config_name, JOB_STATUS_DONE)
-                await SeriesManager.series_changed(
-                    SUBSCRIPTION_CHANGE_TYPE_UPDATE, job_response.get('name'))
-            except Exception as e:
-                logging.error(
-                    f"Something went wrong when receiving base analysis job")
-                logging.debug(
-                    f"Corresponding error: {e}, "
-                    f'exception class: {e.__class__.__name__}')
         else:
             logging.error(f"Received unknown job type: {job_type}")
         series.schedule_job(job.job_config.config_name, state)
@@ -245,9 +215,8 @@ class EnodoJobManager:
                 series_name=job.series_name,
                 series_config=series.config,
                 siridb_ts_units=ServerState.siridb_ts_unit)
-            data = qpack.packb(job_data.serialize())
-            header = create_header(len(data), WORKER_REQUEST, 0)
-            worker.writer.write(header + data)
+            await worker.client.send_message(job_data.serialize(),
+                                             WORKER_REQUEST)
         except Exception as e:
             logging.error(
                 f"Something went wrong when sending job request to worker")

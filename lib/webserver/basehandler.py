@@ -1,3 +1,4 @@
+from asyncio import wait_for
 import logging
 from aiohttp import web
 
@@ -15,6 +16,7 @@ from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
 from lib.siridb.siridb import query_all_series_results
 from lib.socket.clientmanager import ClientManager
+from lib.socket.queryhandler import QueryHandler
 from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
 from lib.util import regex_valid
 from siridb.connector.lib.exceptions import (
@@ -359,6 +361,16 @@ class BaseHandler:
             return {'error': "Cannot activate job"}, 400
 
         return {}, 200
+
+    @classmethod
+    async def resp_query_series_state(cls, series_name: str, job_type: str):
+        fut = await ClientManager.query_series_state(series_name, job_type)
+        try:
+            result = await wait_for(fut, timeout=5)
+        except Exception:
+            return {'error': "Cannot get result"}, 400
+        else:
+            return {'data': result}, 200
 
     @classmethod
     @sync_simple_fields_filter()

@@ -1,14 +1,18 @@
+import asyncio
 import logging
 import time
-from asyncio import StreamWriter
+from asyncio import Future, StreamWriter
 from typing import Any, Optional
+from uuid import uuid4
 
 import qpack
 from enodo import WorkerConfigModel
-from enodo.protocol.package import UPDATE_SERIES, create_header
+from enodo.protocol.package import UPDATE_SERIES, create_header, WORKER_QUERY
+from enodo.protocol.packagedata import EnodoJobRequestDataModel
 from enodo.jobs import (JOB_TYPE_FORECAST_SERIES,
                         JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES)
 from lib.serverstate import ServerState
+from lib.socket.queryhandler import QueryHandler
 from lib.socket.socketclient import WorkerSocketClient
 from lib.state.resource import ResourceManager, StoredResource, from_thing
 from lib.util.util import generate_worker_lookup, get_worker_for_series
@@ -55,7 +59,7 @@ class WorkerClient(StoredResource):
         self.hostname = hostname
         self.port = port
         self.worker_config = WorkerConfigModel(**worker_config)
-        self._client = WorkerSocketClient(hostname, port, worker_config)
+        self.client = WorkerSocketClient(hostname, port, worker_config)
 
     @StoredResource.changed
     def set_config(self, worker_config: WorkerConfigModel):
@@ -73,8 +77,8 @@ class WorkerClient(StoredResource):
     @property
     def to_store_data(self):
         data = self.to_dict()
-        if "_client" in data:
-            del data["_client"]
+        if "client" in data:
+            del data["client"]
         if "rid" in data:
             del data["rid"]
         return data
@@ -128,21 +132,25 @@ class ClientManager:
     _worker_pools = {}
     series_manager = None
     _crm = None
+    _query_handler = None
 
     @classmethod
     async def setup(cls, series_manager):
         cls.series_manager = series_manager
         cls._crm = ResourceManager("workers", WorkerClient)
         await cls._crm.load()
+        cls._query_handler = QueryHandler()
 
-        # await cls.add_worker({
-        #     "hostname": "localhost",
-        #     "port": 9105,
-        #     "worker_config": {
-        #         "supported_job_types": [JOB_TYPE_FORECAST_SERIES],
-        #         "config": {}
-        #     }
-        # })
+    @classmethod
+    async def query_series_state(cls, series_name, job_type):
+        worker = cls._worker_pools[0].get_worker(job_type, series_name)
+        fut = await cls._query_handler.do_query(worker, series_name)
+        return fut
+
+    @classmethod
+    async def add_worker(cls, worker: dict):
+        worker = await cls._crm.create_and_return(worker)
+        cls._worker_pools[0].add(worker)
 
     @classmethod
     def update_worker_pools(cls, workers):
@@ -242,3 +250,22 @@ class ClientManager:
                     f"Corresponding error: {e}, "
                     f'exception class: {e.__class__.__name__}')
         cls.update_worker_pools(loaded_workers)
+
+        # await cls.add_worker({
+        #     "hostname": "localhost",
+        #     "port": 9104,
+        #     "worker_config": {
+        #         "job_type": JOB_TYPE_FORECAST_SERIES,
+        #         "config": {}
+        #     },
+        #     "increment_id": 0
+        # })
+        # await cls.add_worker({
+        #     "hostname": "localhost",
+        #     "port": 9105,
+        #     "worker_config": {
+        #         "job_type": JOB_TYPE_FORECAST_SERIES,
+        #         "config": {}
+        #     },
+        #     "increment_id": 1
+        # })

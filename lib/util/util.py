@@ -211,5 +211,4 @@ def generate_worker_lookup(worker_count: int) -> dict:
 
 def get_worker_for_series(lookup: dict, series_name: str) -> int:
     n = sum(bytearray(series_name, encoding='utf-8'))
-    print(lookup)
     return lookup[n % LOOKUP_SZ]
