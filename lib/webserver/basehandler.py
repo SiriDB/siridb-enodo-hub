@@ -1,4 +1,5 @@
 from asyncio import wait_for
+import asyncio
 import logging
 from aiohttp import web
 
@@ -6,7 +7,7 @@ from siridb.connector.lib.exceptions import QueryError, InsertError, \
     ServerError, PoolError, AuthenticationError, UserAuthError
 
 from aiohttp import web
-from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS, JOB_STATUS_NONE
+from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS
 from enodo.model.config.series import SeriesJobConfigModel
 
 from lib.config import Config
@@ -17,7 +18,6 @@ from lib.serverstate import ServerState
 from lib.siridb.siridb import query_all_series_results
 from lib.socket.clientmanager import ClientManager
 from lib.socket.queryhandler import QueryHandler
-from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_UPDATE
 from lib.util import regex_valid
 from siridb.connector.lib.exceptions import (
     AuthenticationError, InsertError, PoolError, QueryError,
@@ -364,9 +364,13 @@ class BaseHandler:
 
     @classmethod
     async def resp_query_series_state(cls, series_name: str, job_type: str):
-        fut = await ClientManager.query_series_state(series_name, job_type)
+        fut, fut_id = await ClientManager.query_series_state(
+            series_name, job_type)
         try:
             result = await wait_for(fut, timeout=5)
+        except asyncio.TimeoutError:
+            QueryHandler.clear_query(fut_id)
+            return {'error': "Cannot get result. No response from worker"}, 400
         except Exception:
             return {'error': "Cannot get result"}, 400
         else:

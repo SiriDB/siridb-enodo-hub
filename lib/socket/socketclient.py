@@ -6,10 +6,14 @@ import qpack
 
 from enodo.protocol.package import (
     create_header, read_packet, HANDSHAKE, HANDSHAKE_OK, HANDSHAKE_FAIL,
-    HEARTBEAT, RESPONSE_OK, UNKNOWN_CLIENT, WORKER_QUERY)
+    HEARTBEAT, RESPONSE_OK, UNKNOWN_CLIENT, WORKER_QUERY_RESULT, WORKER_QUERY,
+    WORKER_REQUEST)
+from enodo.model.config.series import SeriesJobConfigModel
 
 from lib.config import Config
 from lib.socket.queryhandler import QueryHandler
+from lib.jobmanager import EnodoJob, EnodoJobManager
+from lib.socket.clientmanager import ClientManager
 
 
 class WorkerSocketClient:
@@ -118,10 +122,26 @@ class WorkerSocketClient:
             elif packet_type == UNKNOWN_CLIENT:
                 logging.error(f'Worker does not recognize us')
                 await self._handshake()
-            elif packet_type == WORKER_QUERY:
+            elif packet_type == WORKER_QUERY_RESULT:
                 QueryHandler.set_query_result(
                     data.get('request_id'),
                     data.get('data'))
+            elif packet_type == WORKER_REQUEST:
+                try:
+                    series_name = data.get('series_name')
+                    config = data.get('job_config')
+                    job = EnodoJob(None, series_name,
+                                   SeriesJobConfigModel(**config))
+                    await EnodoJobManager.activate_job(job)
+                except Exception as e:
+                    logging.error("Cannot activate job")
+                    logging.debug(f"Corresponding error: {str(e)}")
+            elif packet_type == WORKER_QUERY:
+                series_name = data.get('series_name')
+                job_type = data.get('job_type')
+                config_name = data.get('job_config_name')
+                await ClientManager.query_series_state_from_worker(
+                    series_name, job_type, self)
             else:
                 logging.error(
                     f'Message type not implemented: {packet_type}')

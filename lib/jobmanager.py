@@ -200,8 +200,6 @@ class EnodoJobManager:
                         f'exception class: {e.__class__.__name__}')
         else:
             logging.error(f"Received unknown job type: {job_type}")
-        series.schedule_job(job.job_config.config_name, state)
-        ServerState.index_series_schedules(series, state)
 
     @classmethod
     async def _send_worker_job_request(cls, worker: WorkerClient,

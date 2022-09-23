@@ -144,8 +144,14 @@ class ClientManager:
     @classmethod
     async def query_series_state(cls, series_name, job_type):
         worker = cls._worker_pools[0].get_worker(job_type, series_name)
-        fut = await cls._query_handler.do_query(worker, series_name)
-        return fut
+        return await cls._query_handler.do_query(worker, series_name)
+
+    @classmethod
+    async def query_series_state_from_worker(cls,
+                                             series_name, job_type, worker):
+        worker = cls._worker_pools[0].get_worker(job_type, series_name)
+        await cls._query_handler.do_query(worker, series_name,
+                                          origin=worker)
 
     @classmethod
     async def add_worker(cls, worker: dict):
