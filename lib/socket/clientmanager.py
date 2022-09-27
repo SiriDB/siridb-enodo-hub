@@ -1,14 +1,13 @@
-import asyncio
 import logging
 import time
-from asyncio import Future, StreamWriter
+from asyncio import StreamWriter
 from typing import Any, Optional
-from uuid import uuid4
 
 import qpack
 from enodo import WorkerConfigModel
-from enodo.protocol.package import UPDATE_SERIES, create_header, WORKER_QUERY
-from enodo.protocol.packagedata import EnodoJobRequestDataModel
+from enodo.protocol.package import (
+    UPDATE_SERIES, create_header, WORKER_REQUEST, WORKER_REQUEST_RESULT)
+from enodo.protocol.packagedata import EnodoRequest
 from enodo.jobs import (JOB_TYPE_FORECAST_SERIES,
                         JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES)
 from lib.serverstate import ServerState
@@ -53,13 +52,17 @@ class WorkerClient(StoredResource):
                  port: int,
                  worker_config: dict,
                  increment_id: int,
+                 pool_id: int,
                  rid: Optional[str] = None):
         self.rid = rid
         self.increment_id = increment_id
+        self.pool_id = pool_id
         self.hostname = hostname
         self.port = port
         self.worker_config = WorkerConfigModel(**worker_config)
-        self.client = WorkerSocketClient(hostname, port, worker_config)
+        self.client = WorkerSocketClient(
+            hostname, port, worker_config,
+            cbs={WORKER_REQUEST, self._handle_worker_request})
 
     @StoredResource.changed
     def set_config(self, worker_config: WorkerConfigModel):
@@ -83,10 +86,25 @@ class WorkerClient(StoredResource):
             del data["rid"]
         return data
 
+    async def _handle_worker_request(self, data, *args):
+        data = qpack.unpackb(data)
+        data['pool_id'] = self.pool_id
+        data['worker_id'] = self.increment_id
+        request = EnodoRequest(**data)
+        await ClientManager.fetch_request_response_from_worker(
+            request.series_name, request)
+
+    async def _handle_worker_response(self, data, pool_id, worker_id):
+        header = create_header(len(data), WORKER_REQUEST_RESULT) + \
+            pool_id.to_bytes(4, byteorder='big') + \
+            worker_id.to_bytes(1, byteorder='big')
+        await self.client.send_data(header + data)
+
     def to_dict(self) -> dict:
         return {
             'rid': self.rid,
             'increment_id': self.increment_id,
+            'pool_id': self.pool_id,
             'hostname': self.hostname,
             'port': self.port,
             'worker_config': self.worker_config
@@ -147,11 +165,13 @@ class ClientManager:
         return await cls._query_handler.do_query(worker, series_name)
 
     @classmethod
-    async def query_series_state_from_worker(cls,
-                                             series_name, job_type, worker):
-        worker = cls._worker_pools[0].get_worker(job_type, series_name)
-        await cls._query_handler.do_query(worker, series_name,
-                                          origin=worker)
+    async def fetch_request_response_from_worker(
+            cls, series_name, request: EnodoRequest):
+        if request.config is None:
+            return
+        worker = cls._worker_pools[0].get_worker(
+            request.config.job_type, series_name)
+        await worker.client.send_message(request, WORKER_REQUEST)
 
     @classmethod
     async def add_worker(cls, worker: dict):
@@ -160,7 +180,14 @@ class ClientManager:
 
     @classmethod
     def update_worker_pools(cls, workers):
-        cls._worker_pools[0] = WorkerPool(0, workers)
+        pools = {}
+        for worker in workers:
+            if worker.pool_id not in pools:
+                pools[worker.pool_id] = []
+            pools[worker.pool_id].append(worker)
+
+        for idx, workers in pools.items():
+            cls._worker_pools[idx] = WorkerPool(idx, workers)
 
     @classmethod
     def get_listener_count(cls) -> int:
@@ -213,7 +240,7 @@ class ClientManager:
     @classmethod
     def update_listener(cls, listener: ListenerClient, data: Any):
         update = qpack.packb(data)
-        series_update = create_header(len(update), UPDATE_SERIES, 1)
+        series_update = create_header(len(update), UPDATE_SERIES)
         listener.writer.write(series_update + update)
 
     @classmethod

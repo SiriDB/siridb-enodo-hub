@@ -10,5 +10,5 @@ async def receive_new_series_points(writer, packet_type,
         async with SeriesManager.get_state(series_name) as state:
             if state is not None:
                 await state.add_to_datapoints_count(data.get(series_name))
-    response = create_header(0, RESPONSE_OK, packet_id)
+    response = create_header(0, RESPONSE_OK)
     writer.write(response)

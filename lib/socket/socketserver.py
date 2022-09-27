@@ -99,17 +99,16 @@ class SocketServer:
             logging.debug(
                 f'Heartbeat from listener with id: {client_id}')
             l_client.last_seen = time.time()
-            response = create_header(0, HEARTBEAT, packet_id)
+            response = create_header(0, HEARTBEAT)
             writer.write(response)
         elif w_client is not None:
             logging.debug(
                 f'Heartbeat from worker with id: {client_id}')
             w_client.last_seen = time.time()
-            response = create_header(0, HEARTBEAT, packet_id)
+            response = create_header(0, HEARTBEAT)
             writer.write(response)
         else:
-            response = create_header(
-                0, UNKNOWN_CLIENT, packet_id)
+            response = create_header(0, UNKNOWN_CLIENT)
             writer.write(response)
 
     async def _handle_handshake(self, writer, packet_id, data):
@@ -121,12 +120,12 @@ class SocketServer:
                 client_token
                 is None or client_token
                 != self._token):
-            response = create_header(0, HANDSHAKE_FAIL, packet_id)
+            response = create_header(0, HANDSHAKE_FAIL)
             writer.write(response)
             return client_id, False
 
         if 'client_type' not in client_data:
-            response = create_header(0, HANDSHAKE_FAIL, packet_id)
+            response = create_header(0, HANDSHAKE_FAIL)
             writer.write(response)
             return client_id, False
 
@@ -150,21 +149,19 @@ class SocketServer:
                 logging.warning(
                     f"Worker with id : {client_id} tried to connect,"
                     "but has incompatible version")
-                response = create_header(0, HANDSHAKE_FAIL, packet_id)
+                response = create_header(0, HANDSHAKE_FAIL)
                 writer.write(response)
                 return client_id, False
 
             await ClientManager.worker_connected(
                 writer.get_extra_info('peername'), writer, client_data)
-            response = create_header(0, HANDSHAKE_OK, packet_id)
+            response = create_header(0, HANDSHAKE_OK)
             writer.write(response)
             return client_id, True
 
         if client_data.get('client_type') == 'listener':
             update = qpack.packb(
                 await SeriesManager.get_listener_series_info())
-            header = create_header(
-                len(update),
-                UPDATE_SERIES, packet_id)
+            header = create_header(len(update), UPDATE_SERIES)
             writer.write(header + update)
             return client_id, True

@@ -9,8 +9,7 @@ import qpack
 from enodo.jobs import *
 from enodo.model.config.series import SeriesJobConfigModel
 from enodo.protocol.package import WORKER_REQUEST, create_header
-from enodo.protocol.packagedata import (EnodoJobDataModel,
-                                        EnodoJobRequestDataModel)
+from enodo.protocol.packagedata import EnodoJobDataModel, EnodoRequest
 from lib.socket.clientmanager import WorkerClient
 from lib.state.resource import StoredResource
 from lib.util import cls_lock
@@ -206,7 +205,7 @@ class EnodoJobManager:
                                        job: EnodoJob):
         try:
             series = await SeriesManager.get_config_read_only(job.series_name)
-            job_data = EnodoJobRequestDataModel(
+            job_data = EnodoRequest(
                 request_id=str(uuid4()),
                 request_type="run",
                 job_id=job.rid, job_config=job.job_config,

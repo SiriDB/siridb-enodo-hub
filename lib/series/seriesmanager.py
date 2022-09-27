@@ -163,7 +163,7 @@ class SeriesManager:
     async def update_listeners(cls, series):
         for listener in ClientManager.listeners.values():
             update = qpack.packb(series)
-            series_update = create_header(len(update), UPDATE_SERIES, 0)
+            series_update = create_header(len(update), UPDATE_SERIES)
             listener.writer.write(series_update + update)
 
     @classmethod

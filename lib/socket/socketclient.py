@@ -6,19 +6,15 @@ import qpack
 
 from enodo.protocol.package import (
     create_header, read_packet, HANDSHAKE, HANDSHAKE_OK, HANDSHAKE_FAIL,
-    HEARTBEAT, RESPONSE_OK, UNKNOWN_CLIENT, WORKER_QUERY_RESULT, WORKER_QUERY,
-    WORKER_REQUEST)
-from enodo.model.config.series import SeriesJobConfigModel
+    HEARTBEAT, RESPONSE_OK, UNKNOWN_CLIENT, WORKER_QUERY_RESULT)
 
 from lib.config import Config
 from lib.socket.queryhandler import QueryHandler
-from lib.jobmanager import EnodoJob, EnodoJobManager
-from lib.socket.clientmanager import ClientManager
 
 
 class WorkerSocketClient:
 
-    def __init__(self, hostname, port, config, heartbeat_interval=25):
+    def __init__(self, hostname, port, config, heartbeat_interval=25, cbs={}):
         self._hostname = hostname
         self._port = port
         self._heartbeat_interval = heartbeat_interval
@@ -35,6 +31,7 @@ class WorkerSocketClient:
         self._handsshaked = False
         self._read_task = None
         self._connection_task = asyncio.ensure_future(self._run())
+        self._cbs = cbs
 
     async def _connect(self):
         while not self._connected:
@@ -95,20 +92,13 @@ class WorkerSocketClient:
                 await asyncio.sleep(1)
                 continue
 
-            packet_type, packet_id, data = await read_packet(self._reader)
+            packet_type, pool_id, worker_id, data = await read_packet(
+                self._reader)
             if data is False:
                 self._connected = False
                 continue
 
-            if len(data):
-                data = qpack.unpackb(data, decode='utf-8')
-
-            if packet_type == 0:
-                logging.warning(
-                    "Connection lost, trying to reconnect to worker")
-                self._connected = False
-                await asyncio.sleep(5)
-            elif packet_type == HANDSHAKE_OK:
+            if packet_type == HANDSHAKE_OK:
                 logging.debug(f'Hands shaked with worker')
                 self._last_heartbeat_received = time.time()
                 self._handsshaked = True
@@ -123,45 +113,34 @@ class WorkerSocketClient:
                 logging.error(f'Worker does not recognize us')
                 await self._handshake()
             elif packet_type == WORKER_QUERY_RESULT:
+                if len(data):
+                    data = qpack.unpackb(data, decode='utf-8')
                 QueryHandler.set_query_result(
                     data.get('request_id'),
                     data.get('data'))
-            elif packet_type == WORKER_REQUEST:
-                try:
-                    series_name = data.get('series_name')
-                    config = data.get('job_config')
-                    job = EnodoJob(None, series_name,
-                                   SeriesJobConfigModel(**config))
-                    await EnodoJobManager.activate_job(job)
-                except Exception as e:
-                    logging.error("Cannot activate job")
-                    logging.debug(f"Corresponding error: {str(e)}")
-            elif packet_type == WORKER_QUERY:
-                series_name = data.get('series_name')
-                job_type = data.get('job_type')
-                config_name = data.get('job_config_name')
-                await ClientManager.query_series_state_from_worker(
-                    series_name, job_type, self)
+            elif packet_type in self._cbs:
+                await self._cbs[packet_type](data, pool_id, worker_id)
             else:
                 logging.error(
                     f'Message type not implemented: {packet_type}')
 
-    async def _send_message(self, length, message_type, data, id=1):
-        header = create_header(length, message_type, id)
+    async def _send_message(self, length, message_type, data):
+        header = create_header(length, message_type)
+        await self.send_data(header + data)
 
-        logging.debug(f"Sending type: {message_type}")
-        self._writer.write(header + data)
-        try:
-            await self._writer.drain()
-        except Exception as e:
-            self._connected = False
-
-    async def send_message(self, body, message_type, id=1, use_qpack=True):
+    async def send_message(self, body, message_type, use_qpack=True):
         if not self._connected:
             return False
         if use_qpack:
             body = qpack.packb(body)
-        await self._send_message(len(body), message_type, body, id)
+        await self._send_message(len(body), message_type, body)
+
+    async def send_data(self, data):
+        self._writer.write(data)
+        try:
+            await self._writer.drain()
+        except Exception as e:
+            self._connected = False
 
     async def _handshake(self):
         if self._read_task is not None:
