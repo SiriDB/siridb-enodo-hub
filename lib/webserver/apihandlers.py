@@ -529,7 +529,7 @@ class ApiHandlers:
             key/value pairs settings
         """
         data = await request.json()
-        resp = BaseHandler.resp_set_config(data)
+        resp = await BaseHandler.resp_set_config(data)
         return web.json_response(data=resp, status=200)
 
     @classmethod

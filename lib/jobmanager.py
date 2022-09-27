@@ -89,6 +89,7 @@ class EnodoJobManager:
 
     _max_in_queue_before_warning = None
     _update_queue_cb = None
+    _last_queue_event = None
 
     @classmethod
     def setup(cls, update_queue_cb: Callable):
@@ -347,6 +348,9 @@ class EnodoJobManager:
                 await cls._send_worker_cancel_job(job.worker_id, job.rid)
 
         if len(cls._open_jobs) > cls._max_in_queue_before_warning:
+            if cls._last_queue_event is not None and \
+                    time.time() - cls._last_queue_event < 3600:
+                return
             event = EnodoEvent(
                 'Job queue too long',
                 f'{len(cls._open_jobs)} jobs waiting \
@@ -354,6 +358,7 @@ class EnodoJobManager:
                     {cls._max_in_queue_before_warning}',
                 ENODO_EVENT_JOB_QUEUE_TOO_LONG)
             await EnodoEventManager.handle_event(event)
+            cls._last_queue_event = time.time()
 
     @classmethod
     @cls_lock()
