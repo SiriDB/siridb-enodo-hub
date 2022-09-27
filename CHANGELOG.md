@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.1.0-beta4.0.20] - 2022-09-27
+
+### Fixed
+- Settings update endpoint
+- Send queue too long event max once every hour
+
 ## [0.1.0-beta4.0.19] - 2022-09-07
 
 ### Fixed

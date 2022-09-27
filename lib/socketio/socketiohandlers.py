@@ -240,7 +240,7 @@ class SocketIoHandler:
     @classmethod
     @socketio_auth_required
     async def update_enodo_hub_settings(cls, sid, data, event):
-        resp = BaseHandler.resp_set_config(data)
+        resp = await BaseHandler.resp_set_config(data)
         return resp
 
     @classmethod
