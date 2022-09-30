@@ -2,31 +2,32 @@ import asyncio
 import logging
 from asyncio import StreamWriter
 import time
-from typing import Any, Callable, Optional, Union
+from typing import Any, Optional, Union
 from uuid import uuid4
 
 import qpack
 from enodo.jobs import *
 from enodo.model.config.series import SeriesJobConfigModel
-from enodo.protocol.package import WORKER_REQUEST, create_header
-from enodo.protocol.packagedata import EnodoJobDataModel, EnodoRequest
+from enodo.protocol.package import WORKER_REQUEST
+from enodo.protocol.packagedata import (
+    EnodoJobDataModel, EnodoRequest)
 from lib.socket.clientmanager import WorkerClient
 from lib.state.resource import StoredResource
 from lib.util import cls_lock
 
 from .series.seriesmanager import SeriesManager
-from .serverstate import ServerState
 from .socket import ClientManager
 
 
 class EnodoJob(StoredResource):
-    __slots__ = ('rid', 'series_name', 'job_config',
+    __slots__ = ('rid', 'series_name', 'job_config', 'pool_idx',
                  'job_data', 'send_at', 'error', 'worker_id')
 
     def __init__(self,
                  rid: Union[int, str],
                  series_name: str,
                  job_config: SeriesJobConfigModel,
+                 pool_idx: int,
                  job_data: Optional[dict] = None,
                  send_at: Optional[int] = None,
                  error: Optional[str] = None,
@@ -39,6 +40,7 @@ class EnodoJob(StoredResource):
         self.rid = rid
         self.series_name = series_name
         self.job_config = job_config
+        self.pool_idx = pool_idx
         self.job_data = job_data
         self.send_at = send_at
         self.error = error
@@ -70,91 +72,25 @@ class EnodoJob(StoredResource):
 
 
 class EnodoJobManager:
-    _open_jobs = []
-    _active_jobs = []
-    _active_jobs_index = {}
-    _failed_jobs = []
-    _max_job_timeout = 60 * 5
     _lock = None
     _next_job_id = 0
-    _lock = None
-
-    _max_in_queue_before_warning = None
-    _update_queue_cb = None
 
     @classmethod
-    def setup(cls, update_queue_cb: Callable):
-        cls._update_queue_cb = update_queue_cb
-        cls._lock = asyncio.Lock()
-
-    @classmethod
-    @cls_lock()
-    async def activate_job(cls, next_job: EnodoJob):
-        try:
-            series = await SeriesManager.get_config_read_only(
-                next_job.series_name)
-            if series is None:
-                logging.error(
-                    "Could not send job_type "
-                    f"{next_job.job_config.job_type} for unknown series "
-                    f"{next_job.series_name}")
-                return
-
-            worker = await ClientManager.get_worker(
-                next_job.series_name, next_job.job_config.job_type)
-            if worker is None:
-                logging.error(
-                    "Could not send job_type "
-                    f"{next_job.job_config.job_type} for series "
-                    f"{next_job.series_name}")
-                return
-
-            logging.info(
-                f"Adding series: sending {next_job.series_name} to "
-                f"Worker for job type {next_job.job_config.job_type}")
-            await cls._send_worker_job_request(worker, next_job)
-            await cls._activate_job(next_job, worker.rid)
-        except Exception as e:
+    async def send_job(cls, job):
+        worker = ClientManager.get_worker(job.pool_idx, job.series_name)
+        if worker is None:
             logging.error(
-                "Something went wrong when trying to activate job")
-            logging.debug(
-                f"Corresponding error: {e}, "
-                f'exception class: {e.__class__.__name__}')
-            import traceback
-            print(traceback.format_exc())
-
-    @classmethod
-    async def _activate_job(cls, job: EnodoJob, worker_id: str):
-        if job is None or worker_id is None:
+                "Could not send job_type "
+                f"{job.job_config.job_type_id} for series "
+                f"{job.series_name}")
             return
 
-        job.send_at = time.time()
-        job.worker_id = worker_id
+        logging.info(
+            f"Sending {job.series_name} to "
+            f"Worker for job type {job.job_config.job_type_id}")
+        await cls._send_worker_job_request(worker, job)
 
-    @classmethod
-    async def receive_request_result(cls, writer: StreamWriter, packet_type,
-                                     packet_id: int, response: Any,
-                                     client_id: str):
-        request_id = response.get('request_id')
-        if response.get('error') is not None:
-            logging.error(
-                "Error returned by worker for series "
-                f"{response.get('name')}")
-            return
-
-        job_type = response.get('job_type')
-        job = cls.get_activated_job(request_id)
-        if job is None:
-            logging.error("Received a result for a non-existing job")
-            return
-        await cls.deactivate_job(request_id)
-        config = await SeriesManager.get_config_read_only(
-            response.get('name'))
-        async with SeriesManager.get_state(response.get('name')) as state:
-            await cls.handle_job_result(response, job_type,
-                                        job, config, state)
-
-    @classmethod
+    @ classmethod
     async def handle_job_result(cls, job_response, job_type,
                                 job, series, state):
         if job_type == JOB_TYPE_FORECAST_SERIES:
@@ -206,14 +142,10 @@ class EnodoJobManager:
         try:
             series = await SeriesManager.get_config_read_only(job.series_name)
             job_data = EnodoRequest(
-                request_id=str(uuid4()),
                 request_type="run",
-                job_id=job.rid, job_config=job.job_config,
-                series_name=job.series_name,
-                series_config=series.config,
-                siridb_ts_units=ServerState.siridb_ts_unit)
-            await worker.client.send_message(job_data.serialize(),
-                                             WORKER_REQUEST)
+                config=job.job_config,
+                series_name=job.series_name)
+            await worker.client.send_message(job_data, WORKER_REQUEST)
         except Exception as e:
             logging.error(
                 f"Something went wrong when sending job request to worker")
@@ -239,30 +171,3 @@ class EnodoJobManager:
                 f"Something went wrong when sending worker to cancel job")
             logging.debug(f"Corresponding error: {e}, "
                           f'exception class: {e.__class__.__name__}')
-
-    @classmethod
-    async def receive_worker_cancelled_job(cls, writer: StreamWriter,
-                                           packet_type: int,
-                                           packet_id: int, data: Any,
-                                           client_id: str):
-        job_id = data.get('job_id')
-        worker = await ClientManager.get_worker_by_id(client_id)
-        if job_id in cls._active_jobs_index:
-            await cls.set_job_failed(
-                job_id,
-                "Worker cancelled job. Check worker logging for details")
-        logging.error(f"Worker {client_id} cancelled job {job_id}")
-        if worker is None:
-            return
-        try:
-            await ClientManager.check_for_pending_series(worker)
-        except Exception as e:
-            logging.error(
-                f"Something went wrong when"
-                f"receiving from worker to cancel job")
-            logging.debug(f"Corresponding error: {e}, "
-                          f'exception class: {e.__class__.__name__}')
-
-    @classmethod
-    def get_open_queue(cls) -> list:
-        return [EnodoJob.to_dict(job) for job in cls._open_jobs]

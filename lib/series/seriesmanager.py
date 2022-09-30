@@ -28,7 +28,6 @@ class SeriesManager:
 
     @classmethod
     def prepare(cls, update_cb=None):
-        cls._update_cb = update_cb
         cls._labels_last_update = None
         cls._srm = ServerState.series_rm
         logging.info("Loading saved series...")

@@ -7,7 +7,6 @@ from siridb.connector.lib.exceptions import QueryError, InsertError, \
     ServerError, PoolError, AuthenticationError, UserAuthError
 
 from aiohttp import web
-from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS
 from enodo.model.config.series import SeriesJobConfigModel
 
 from lib.config import Config
@@ -102,8 +101,6 @@ class BaseHandler:
 
         resp = []
         for job_config in series.config.job_config.values():
-            if job_config.job_type == JOB_TYPE_BASE_SERIES_ANALYSIS:
-                continue  # Ignore since no output
             if types is not None and job_config.job_type not in types:
                 continue  # Ignore due to filter
             points = None
@@ -326,35 +323,15 @@ class BaseHandler:
         return {'data': template}, 201
 
     @classmethod
-    def resp_get_jobs_queue(cls):
-        return {'data': EnodoJobManager.get_open_queue()}
-
-    @classmethod
-    def resp_get_open_jobs(cls):
-        return {'data': EnodoJobManager.get_open_queue()}
-
-    @classmethod
-    def resp_get_active_jobs(cls):
-        return {'data': EnodoJobManager.get_active_jobs()}
-
-    @classmethod
-    def resp_get_failed_jobs(cls):
-        return {'data': [
-            EnodoJob.to_dict(j) for j in EnodoJobManager.get_failed_jobs()]}
-
-    @classmethod
-    async def resp_resolve_failed_job(cls, series_name):
-        return {
-            'data': await EnodoJobManager.remove_failed_jobs_for_series(
-                series_name)}
-
-    @classmethod
     async def resp_run_job_for_series(cls,
                                       series_name: str,
-                                      config: dict):
+                                      config: dict,
+                                      pool_id: int):
         try:
-            job = EnodoJob(None, series_name, SeriesJobConfigModel(**config))
-            await EnodoJobManager.activate_job(job)
+            config = SeriesJobConfigModel(**config)
+            job = EnodoJob(
+                None, series_name, config, (pool_id << 8) | config.job_type_id)
+            await EnodoJobManager.send_job(job)
         except Exception as e:
             logging.error("Cannot activate job")
             logging.debug(f"Corresponding error: {str(e)}")
@@ -363,9 +340,10 @@ class BaseHandler:
         return {}, 200
 
     @classmethod
-    async def resp_query_series_state(cls, series_name: str, job_type: str):
+    async def resp_query_series_state(
+            cls, pool_id, series_name: str, job_type_id: int):
         fut, fut_id = await ClientManager.query_series_state(
-            series_name, job_type)
+            pool_id, job_type_id, series_name)
         try:
             result = await wait_for(fut, timeout=5)
         except asyncio.TimeoutError:

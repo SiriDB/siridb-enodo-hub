@@ -14,8 +14,9 @@ class SeriesConfig(dict, StoredResource):
         try:
             config = SeriesConfigModel(**config)
         except Exception as e:
-            raise Exception(
-                f"Invalid job config {rid}")
+            print(e)
+            logging.error(f"Invalid job config {rid}")
+            raise e
 
         super(SeriesConfig, self).__init__({
             "rid": rid,

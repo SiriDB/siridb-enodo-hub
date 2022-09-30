@@ -8,13 +8,11 @@ from aiojobs import create_scheduler
 from siridb.connector import SiriDBClient
 from lib.config import Config
 from lib.siridb.siridb import query_time_unit
-from lib.socketio import SUBSCRIPTION_CHANGE_TYPE_INITIAL
 from lib.state.priorityqueue import SeriesPriorityQueue
 
 
 class ServerState:
     running = None
-    sio = None
     siridb_data_client = None
     siridb_output_client = None
     siridb_data_client_lock = None
@@ -32,11 +30,10 @@ class ServerState:
     job_config_template_rm = None
 
     @classmethod
-    async def async_setup(cls, sio, storage):
+    async def async_setup(cls, storage):
         cls.running = True
         cls.job_schedule_index = SeriesPriorityQueue()
         cls.readiness = False
-        cls.sio = sio
         cls.siridb_data_client_lock = Lock()
         cls.siridb_output_client_lock = Lock()
         cls.storage = storage
@@ -182,12 +179,6 @@ class ServerState:
 
         if status != cls.siridb_conn_status:
             cls.siridb_conn_status = status
-            if cls.sio is not None:
-                await cls.sio.emit('update', {
-                    'resource': 'siridb_status',
-                    'updateType': SUBSCRIPTION_CHANGE_TYPE_INITIAL,
-                    'resourceData': cls.siridb_conn_status
-                }, room='siridb_status_updates')
 
     @classmethod
     def stop(cls):

@@ -164,17 +164,23 @@ class ResourceManager:
 
     @contextlib.asynccontextmanager
     async def create_resource(self, resource: dict):
-        rc = self.to_resource_class(resource)
+        try:
+            rc = self.to_resource_class(resource)
+        except Exception:
+            rc = False
         yield rc
-        await rc.create_save()
-        self._resources[rc.rid] = self.get_resource_index_value(
-            resource)
+        if rc is not False:
+            await rc.create_save()
+            self._resources[rc.rid] = self.get_resource_index_value(resource)
 
     async def create_and_return(self, resource: dict):
-        rc = self.to_resource_class(resource)
-        await rc.create_save()
-        self._resources[rc.rid] = self.get_resource_index_value(
-            resource)
+        try:
+            rc = self.to_resource_class(resource)
+        except Exception:
+            rc = False
+        if rc is not False:
+            await rc.create_save()
+            self._resources[rc.rid] = self.get_resource_index_value(resource)
         return rc
 
     def get_resource_index_value(self, resource: dict):
@@ -204,8 +210,7 @@ class ResourceManager:
             self._resource_type, key, value)
         if data is None:
             return None
-        resp = self.to_resource_class(data)
-        return resp
+        return self.to_resource_class(data)
 
     async def get_resource(self, rid: int,
                            use_cache: bool = True) -> StoredResource:

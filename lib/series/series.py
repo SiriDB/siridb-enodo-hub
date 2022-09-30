@@ -1,11 +1,8 @@
 import asyncio
-import time
 from typing import Optional, Union
 
-from enodo.jobs import JOB_TYPE_BASE_SERIES_ANALYSIS
 from enodo.model.config.series import SeriesConfigModel, \
     SeriesJobConfigModel
-from lib.config import Config
 from lib.serverstate import ServerState
 
 from lib.state.resource import StoredResource
@@ -46,14 +43,6 @@ class Series(StoredResource):
 
     def get_module(self, job_name: str) -> SeriesJobConfigModel:
         return self.config.get_config_for_job(job_name).module
-
-    @property
-    def base_analysis_job(self) -> SeriesJobConfigModel:
-        job_config = self.config.get_config_for_job_type(
-            JOB_TYPE_BASE_SERIES_ANALYSIS)
-        if job_config is None or job_config is False:
-            return False
-        return job_config
 
     def get_job(self, job_config_name: str) -> SeriesJobConfigModel:
         return self.config.get_config_for_job(job_config_name)

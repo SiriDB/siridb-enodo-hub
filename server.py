@@ -5,7 +5,6 @@ import logging
 import signal
 
 import aiohttp_cors
-import socketio
 from aiohttp import web
 from aiojobs.aiohttp import setup
 from enodo.protocol.packagedata import *
@@ -26,8 +25,6 @@ from lib.serverstate import ServerState
 from lib.socket import ClientManager
 from lib.socket.handler import receive_new_series_points
 from lib.socket.socketserver import SocketServer
-from lib.socketio.socketiohandlers import SocketIoHandler
-from lib.socketio.socketiorouter import SocketIoRouter
 from lib.util import print_custom_aiohttp_startup_message
 from lib.webserver.routes import setup_routes
 from lib.state.resource import ResourceManager, resource_manager_index
@@ -40,7 +37,6 @@ class Server:
         self.loop = None
         self.port = port
         self.app = None
-        self.sio = None
         self.auth = None
 
         self._config_path = config_path
@@ -75,8 +71,7 @@ class Server:
             raise e
 
         # Setup server state object
-        await ServerState.async_setup(sio=self.sio,
-                                      storage=storage)
+        await ServerState.async_setup(storage=storage)
         try:
             await UpgradeUtil.upgrade_thingsdb()
         except Exception as e:
@@ -95,17 +90,10 @@ class Server:
         self.backend_socket = SocketServer(
             Config.socket_server_host, Config.socket_server_port,
             Config.internal_security_token,
-            {LISTENER_NEW_SERIES_POINTS: receive_new_series_points,
-             WORKER_REQUEST: EnodoJobManager.receive_request_result,
-             WORKER_REQUEST_RESULT: EnodoJobManager.receive_request_result})
+            {LISTENER_NEW_SERIES_POINTS: receive_new_series_points})
 
         # Setup REST API handlers
         ApiHandlers.prepare()
-
-        # Setup websocket handlers and routes
-        if self.sio is not None:
-            SocketIoHandler.prepare(self.sio)
-            SocketIoRouter(self.sio)
 
         ServerState.series_config_rm = ResourceManager(
             'series_configs', SeriesConfig, cache_only=True)
@@ -117,11 +105,9 @@ class Server:
 
         # Setup internal managers for handling and managing series,
         # clients, jobs, events and modules
-        SeriesManager.prepare(
-            SocketIoHandler.internal_updates_series_subscribers)
+        SeriesManager.prepare()
         await ClientManager.setup(SeriesManager)
-        EnodoJobManager.setup(
-            SocketIoHandler.internal_updates_queue_subscribers)
+        EnodoJobManager.setup()
         await ClientManager.load_from_disk()
 
         scheduler = ServerState.scheduler
@@ -188,24 +174,6 @@ class Server:
         self._shutdown_trigger = True
         logging.info('Stopping Hub...')
         ServerState.readiness = False
-        if self.sio is not None:
-            clients = []
-            if '/' in self.sio.manager.rooms and \
-                    None in self.sio.manager.rooms['/']:
-                clients = [sid
-                           for sid in self.sio.manager.rooms['/']
-                           [None]]
-            for sid in clients:
-                await self.sio.disconnect(sid)
-            rooms = self.sio.manager.rooms
-            self.sio.manager.set_server(None)
-            for room in rooms:
-                print("closing room: ", room)
-                await self.sio.close_room(room)
-
-            await asyncio.sleep(1)
-            del self.sio
-            self.sio = None
 
         await SeriesManager.close()
         ServerState.running = False
@@ -264,17 +232,6 @@ class Server:
             })
             setup_routes(self.app, cors)
 
-        self.sio = None
-        if Config.enable_socket_io_api:
-            logging.info('Socket.io API enabled')
-            self.sio = socketio.AsyncServer(async_mode='aiohttp',
-                                            # ping_timeout=60,
-                                            # ping_interval=25,
-                                            # cookie=None,
-                                            cors_allowed_origins='*')
-            self.sio.attach(self.app)
-            logging.getLogger('socketio').setLevel(logging.ERROR)
-            logging.getLogger('engineio').setLevel(logging.ERROR)
         logging.getLogger('aiohttp').setLevel(logging.ERROR)
         logging.getLogger('siridb.connector').setLevel(logging.ERROR)
 

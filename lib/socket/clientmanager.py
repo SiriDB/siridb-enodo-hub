@@ -1,4 +1,5 @@
 import logging
+import struct
 import time
 from asyncio import StreamWriter
 from typing import Any, Optional
@@ -8,13 +9,12 @@ from enodo import WorkerConfigModel
 from enodo.protocol.package import (
     UPDATE_SERIES, create_header, WORKER_REQUEST, WORKER_REQUEST_RESULT)
 from enodo.protocol.packagedata import EnodoRequest
-from enodo.jobs import (JOB_TYPE_FORECAST_SERIES,
-                        JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES)
 from lib.serverstate import ServerState
 from lib.socket.queryhandler import QueryHandler
 from lib.socket.socketclient import WorkerSocketClient
 from lib.state.resource import ResourceManager, StoredResource, from_thing
-from lib.util.util import generate_worker_lookup, get_worker_for_series
+from lib.util.util import (
+    gen_pool_idx, generate_worker_lookup, get_worker_for_series)
 
 
 class ListenerClient:
@@ -51,18 +51,33 @@ class WorkerClient(StoredResource):
                  hostname: str,
                  port: int,
                  worker_config: dict,
-                 increment_id: int,
-                 pool_id: int,
+                 worker_idx: int,
                  rid: Optional[str] = None):
         self.rid = rid
-        self.increment_id = increment_id
-        self.pool_id = pool_id
+        self.worker_idx = worker_idx
+        self._idx_bytes = worker_idx.to_bytes(12, byteorder="big")
         self.hostname = hostname
         self.port = port
         self.worker_config = WorkerConfigModel(**worker_config)
         self.client = WorkerSocketClient(
             hostname, port, worker_config,
             cbs={WORKER_REQUEST, self._handle_worker_request})
+
+    @property
+    def pool_idx(self):
+        return int.from_bytes(self._idx_bytes[0:8], 'big')
+
+    @property
+    def pool_id(self):
+        return int.from_bytes(self._idx_bytes[:4], 'big')
+
+    @property
+    def job_type_id(self):
+        return int.from_bytes(self._idx_bytes[4:8], 'big')
+
+    @property
+    def worker_id(self):
+        return struct.unpack('>I', self._idx_bytes[8:12])
 
     @StoredResource.changed
     def set_config(self, worker_config: WorkerConfigModel):
@@ -92,7 +107,7 @@ class WorkerClient(StoredResource):
         data['worker_id'] = self.increment_id
         request = EnodoRequest(**data)
         await ClientManager.fetch_request_response_from_worker(
-            request.series_name, request)
+            self.pool_id, request.series_name, request)
 
     async def _handle_worker_response(self, data, pool_id, worker_id):
         header = create_header(len(data), WORKER_REQUEST_RESULT) + \
@@ -103,54 +118,20 @@ class WorkerClient(StoredResource):
     def to_dict(self) -> dict:
         return {
             'rid': self.rid,
-            'increment_id': self.increment_id,
-            'pool_id': self.pool_id,
+            'worker_idx': self.worker_idx,
             'hostname': self.hostname,
             'port': self.port,
             'worker_config': self.worker_config
         }
 
 
-class WorkerPool:
-    __slots__ = ('pool_id', '_workers', '_pool', '_lookups')
-
-    def __init__(self, pool_id, workers):
-        self.pool_id = pool_id
-        self._pool = {}
-        self._lookups = {}
-        self._build(workers)
-
-    def _build(self, workers):
-        self._pool = {
-            JOB_TYPE_FORECAST_SERIES: {},
-            JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES: {}
-        }
-        for worker in workers:
-            self._pool[
-                worker.worker_config.job_type][worker.increment_id] = worker
-        for job_type in self._pool:
-            self._lookups[job_type] = generate_worker_lookup(
-                len(self._pool[job_type]))
-
-    def add(self, worker):
-        job_type = worker.worker_config.job_type
-        increment_id = len(self._pool[job_type])
-        worker.increment_id = increment_id
-        self._pool[job_type][increment_id] = worker
-        self._lookups = generate_worker_lookup(len(self._pool[
-            worker.worker_config.job_type]))
-
-    def get_worker(self, job_type, series_name):
-        idx = get_worker_for_series(self._lookups[job_type], series_name)
-        return self._pool[job_type][idx]
-
-
 class ClientManager:
     listeners = {}
-    _worker_pools = {}
+    _workers = {}
     series_manager = None
     _crm = None
     _query_handler = None
+    _sd_lookups = {}
 
     @classmethod
     async def setup(cls, series_manager):
@@ -160,34 +141,51 @@ class ClientManager:
         cls._query_handler = QueryHandler()
 
     @classmethod
-    async def query_series_state(cls, series_name, job_type):
-        worker = cls._worker_pools[0].get_worker(job_type, series_name)
+    def get_worker(cls, pool_idx, series_name):
+        if pool_idx not in cls._sd_lookups:
+            return None
+        wid = get_worker_for_series(cls._sd_lookups[pool_idx], series_name)
+        worker_idx = int.from_bytes(
+            pool_idx.to_bytes(8, 'big') + wid.to_bytes(4, 'big'), 'big')
+        return cls._workers.get(worker_idx)
+
+    @classmethod
+    async def query_series_state(cls, pool_id, job_type_id, series_name):
+        worker = cls.get_worker((pool_id << 8) | job_type_id, series_name)
         return await cls._query_handler.do_query(worker, series_name)
 
     @classmethod
     async def fetch_request_response_from_worker(
-            cls, series_name, request: EnodoRequest):
+            cls, pool_id, series_name, request: EnodoRequest):
         if request.config is None:
             return
-        worker = cls._worker_pools[0].get_worker(
-            request.config.job_type, series_name)
+        worker = cls.get_worker(
+            (pool_id << 8) | request.config.job_type_id, series_name)
         await worker.client.send_message(request, WORKER_REQUEST)
 
     @classmethod
-    async def add_worker(cls, worker: dict):
-        worker = await cls._crm.create_and_return(worker)
-        cls._worker_pools[0].add(worker)
+    async def add_worker(cls, pool_id: int, worker: dict):
+        pool_idx = gen_pool_idx(
+            pool_id, worker['worker_config']['job_type_id'])
+        current_num = len(
+            [w.pool_idx == pool_idx for w in cls._workers.values()])
+        bpool_idx = pool_idx.to_bytes(8, 'big')
+        worker['worker_idx'] = int.from_bytes(
+            bpool_idx + current_num.to_bytes(4, 'big'), 'big')
+        cls._sd_lookups[pool_idx] = generate_worker_lookup(current_num + 1)
+        cls._workers[worker['worker_idx']] = await cls._crm.create_and_return(
+            worker)
 
     @classmethod
     def update_worker_pools(cls, workers):
-        pools = {}
-        for worker in workers:
-            if worker.pool_id not in pools:
-                pools[worker.pool_id] = []
-            pools[worker.pool_id].append(worker)
-
-        for idx, workers in pools.items():
-            cls._worker_pools[idx] = WorkerPool(idx, workers)
+        _sd_lookups = {}
+        for w in workers:
+            if w.pool_idx not in _sd_lookups:
+                _sd_lookups[w.pool_idx] = 0
+            _sd_lookups[w.pool_idx] += 1
+            cls._workers[w.worker_idx] = w
+        for pool_idx, num_workers in _sd_lookups.items():
+            cls._sd_lookups[pool_idx] = generate_worker_lookup(num_workers)
 
     @classmethod
     def get_listener_count(cls) -> int:
@@ -219,16 +217,8 @@ class ClientManager:
         return None
 
     @classmethod
-    async def get_worker_by_id(cls, client_id) -> WorkerClient:
-        if client_id in cls.workers:
-            return cls.workers.get(client_id)
-        return None
-
-    @classmethod
-    async def get_worker(cls,
-                         series_name: str,
-                         job_type: str) -> WorkerClient:
-        return cls._worker_pools[0].get_worker(job_type, series_name)
+    async def get_worker_by_idx(cls, idx: int) -> WorkerClient:
+        return cls.workers.get(idx)
 
     @classmethod
     def update_listeners(cls, data: Any):
@@ -284,21 +274,21 @@ class ClientManager:
                     f'exception class: {e.__class__.__name__}')
         cls.update_worker_pools(loaded_workers)
 
-        # await cls.add_worker({
+        # from enodo.jobs import JOB_TYPE_FORECAST_SERIES, JOB_TYPE_IDS
+        # forecast_id = JOB_TYPE_IDS[JOB_TYPE_FORECAST_SERIES]
+        # await cls.add_worker(0, {
         #     "hostname": "localhost",
         #     "port": 9104,
         #     "worker_config": {
-        #         "job_type": JOB_TYPE_FORECAST_SERIES,
+        #         "job_type_id": forecast_id,
         #         "config": {}
-        #     },
-        #     "increment_id": 0
+        #     }
         # })
-        # await cls.add_worker({
+        # await cls.add_worker(0, {
         #     "hostname": "localhost",
         #     "port": 9105,
         #     "worker_config": {
-        #         "job_type": JOB_TYPE_FORECAST_SERIES,
+        #         "job_type_id": forecast_id,
         #         "config": {}
-        #     },
-        #     "increment_id": 1
+        #     }
         # })

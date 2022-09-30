@@ -266,13 +266,3 @@ class EnodoEventManager:
                     return False
             async for output in cls._erm.itter():
                 await output.send_event(event)
-
-
-async def internal_updates_event_output_subscribers(change_type, data):
-    sio = ServerState.sio
-    if sio is not None:
-        await sio.emit('update', {
-            'resource': 'event_output',
-            'updateType': change_type,
-            'resourceData': data
-        }, room='event_output_updates')

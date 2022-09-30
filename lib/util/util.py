@@ -4,6 +4,7 @@ import functools
 import json
 import logging
 import re
+import struct
 from packaging import version
 import urllib.parse
 
@@ -212,3 +213,21 @@ def generate_worker_lookup(worker_count: int) -> dict:
 def get_worker_for_series(lookup: dict, series_name: str) -> int:
     n = sum(bytearray(series_name, encoding='utf-8'))
     return lookup[n % LOOKUP_SZ]
+
+
+def gen_worker_id(pool_id: int, job_type_id: int,  idx: int):
+    binary_data = struct.pack('>III', pool_id, job_type_id, idx)
+    return int.from_bytes(binary_data, 'big')
+
+
+def decode_worker_id(wid: int):
+    try:
+        return struct.unpack('>III', wid.to_bytes(12, byteorder="big"))
+    except Exception:
+        return False
+
+
+def gen_pool_idx(pool_id: int, job_type_id: int) -> int:
+    ba = pool_id.to_bytes(4, byteorder='big') + \
+        job_type_id.to_bytes(4, byteorder='big')
+    return int.from_bytes(ba, 'big')

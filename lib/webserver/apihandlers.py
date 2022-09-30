@@ -1,3 +1,4 @@
+from multiprocessing import pool
 import urllib.parse
 from json import JSONDecodeError
 from urllib.parse import unquote
@@ -11,6 +12,8 @@ from lib.util import safe_json_dumps
 from lib.util.util import implement_fields_query
 from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
+
+from enodo.jobs import JOB_TYPE_IDS
 
 auth = BasicAuthMiddleware(username=None, password=None, force=False)
 
@@ -133,13 +136,14 @@ class ApiHandlers:
         else:
             series_name = ServerState.series_rm.get_resource_rid_value(
                 int(rid))
+        pool_id = int(request.rel_url.query.get('poolID', 0))
         try:
             data = await request.json()
         except JSONDecodeError as e:
             resp, status = {'error': 'Invalid JSON'}, 400
         else:
             resp, status = await BaseHandler.resp_run_job_for_series(
-                series_name, data)
+                series_name, data, pool_id)
         return web.json_response(
             resp, dumps=safe_json_dumps, status=status)
 
@@ -165,10 +169,16 @@ class ApiHandlers:
             series_name = ServerState.series_rm.get_resource_rid_value(
                 int(rid))
 
+        pool_id = int(request.rel_url.query.get('poolID', 0))
+
         job_type = unquote(request.match_info['job_type'])
+        if job_type not in JOB_TYPE_IDS:
+            return web.json_response(
+                {"data": False}, dumps=safe_json_dumps, status=400)
         data, status = await BaseHandler.resp_query_series_state(
+            pool_id,
             series_name,
-            job_type)
+            JOB_TYPE_IDS[job_type])
         return web.json_response(
             data, dumps=safe_json_dumps, status=status)
 
