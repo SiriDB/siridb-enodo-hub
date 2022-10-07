@@ -69,8 +69,10 @@ class SocketServer:
                 else:
                     logging.debug(
                         f'Package type {packet_type} not implemented')
-
-            await writer.drain()
+            try:
+                await writer.drain()
+            except Exception:
+                connected = False
 
         logging.info(f'Closing socket with client {saved_client_id}')
         await ClientManager.assert_if_client_is_offline(saved_client_id)
