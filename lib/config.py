@@ -102,7 +102,7 @@ class Config:
     socket_server_port = None
     series_save_path = None
     clients_save_path = None
-    event_outputs_save_path = None
+    outputs_save_path = None
     save_to_disk_interval = None
     enable_rest_api = None
     enable_socket_io_api = None

@@ -95,7 +95,8 @@ class WorkerSocketClient:
             packet_type, pool_id, worker_id, data = await read_packet(
                 self._reader)
             if data is False:
-                self._connected = False
+                print("DATA IS FALSE")
+                # self._connected = False
                 continue
 
             if packet_type == HANDSHAKE_OK:
@@ -119,7 +120,8 @@ class WorkerSocketClient:
                     data.get('request_id'),
                     data.get('data'))
             elif packet_type in self._cbs:
-                await self._cbs[packet_type](data, pool_id, worker_id)
+                asyncio.ensure_future(
+                    self._cbs[packet_type](data, pool_id, worker_id))
             else:
                 logging.error(
                     f'Message type not implemented: {packet_type}')

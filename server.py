@@ -8,8 +8,9 @@ import aiohttp_cors
 from aiohttp import web
 from aiojobs.aiohttp import setup
 from enodo.protocol.packagedata import *
-from enodo.protocol.package import LISTENER_NEW_SERIES_POINTS, \
-    WORKER_REQUEST, WORKER_REQUEST_RESULT
+from enodo.protocol.package import (
+    LISTENER_NEW_SERIES_POINTS, WORKER_REQUEST_RESULT)
+from lib.outputmanager import EnodoOutputManager
 from lib.series.seriesconfig import SeriesConfig
 from lib.state.thingsdbstorage import ThingsDBStorage
 from lib.util.upgrade import UpgradeUtil
@@ -107,8 +108,8 @@ class Server:
         # clients, jobs, events and modules
         SeriesManager.prepare()
         await ClientManager.setup(SeriesManager)
-        EnodoJobManager.setup()
         await ClientManager.load_from_disk()
+        await EnodoOutputManager.async_setup()
 
         scheduler = ServerState.scheduler
         self._connection_management_task = await scheduler.spawn(

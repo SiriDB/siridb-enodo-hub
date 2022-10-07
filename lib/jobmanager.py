@@ -10,7 +10,9 @@ from enodo.jobs import *
 from enodo.model.config.series import SeriesJobConfigModel
 from enodo.protocol.package import WORKER_REQUEST
 from enodo.protocol.packagedata import (
-    EnodoJobDataModel, EnodoRequest)
+    EnodoJobDataModel, EnodoRequest, EnodoRequestResponse,
+    REQUEST_TYPE_EXTERNAL)
+from lib.outputmanager import EnodoOutputManager
 from lib.socket.clientmanager import WorkerClient
 from lib.state.resource import StoredResource
 from lib.util import cls_lock
@@ -76,7 +78,7 @@ class EnodoJobManager:
     _next_job_id = 0
 
     @classmethod
-    async def send_job(cls, job):
+    async def send_job(cls, job: EnodoJob, request: EnodoRequest):
         worker = ClientManager.get_worker(job.pool_idx, job.series_name)
         if worker is None:
             logging.error(
@@ -88,64 +90,25 @@ class EnodoJobManager:
         logging.info(
             f"Sending {job.series_name} to "
             f"Worker for job type {job.job_config.job_type_id}")
-        await cls._send_worker_job_request(worker, job)
+        await cls._send_worker_job_request(worker, request)
 
     @ classmethod
-    async def handle_job_result(cls, job_response, job_type,
-                                job, series, state):
-        if job_type == JOB_TYPE_FORECAST_SERIES:
-            try:
-                await SeriesManager.add_forecast_to_series(
-                    job_response.get('name'),
-                    job.job_config.config_name,
-                    job_response.get('data'))
-                state.set_job_status(
-                    job.job_config.config_name, JOB_STATUS_DONE)
-                state.set_job_meta(
-                    job.job_config.config_name,
-                    {'analyse_region': job_response.get(
-                        'analyse_region')})
-            except Exception as e:
-                logging.error(
-                    f"Something went wrong when receiving forecast job")
-                logging.debug(
-                    f"Corresponding error: {e}, "
-                    f'exception class: {e.__class__.__name__}')
-        elif job_type == JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES:
-            if isinstance(
-                    job_response.get('data'),
-                    list):
-                try:
-                    await SeriesManager.add_anomalies_to_series(
-                        job_response.get('name'),
-                        job.job_config.config_name,
-                        job_response.get('data'))
-                    state.set_job_status(
-                        job.job_config.config_name, JOB_STATUS_DONE)
-                    state.set_job_meta(
-                        job.job_config.config_name,
-                        {'analyse_region': job_response.get(
-                            'analyse_region')})
-                except Exception as e:
-                    logging.error(
-                        f"Something went wrong when receiving "
-                        f"anomaly detection job")
-                    logging.debug(
-                        f"Corresponding error: {e}, "
-                        f'exception class: {e.__class__.__name__}')
-        else:
-            logging.error(f"Received unknown job type: {job_type}")
+    async def handle_job_result(cls, data, pool_id, worker_id):
+        data = qpack.unpackb(data)
+        print(data)
+        if not isinstance(data, dict):
+            logging.error("Invalid job result, cannot handle")
+            return
+        response = EnodoRequestResponse(**data)
+
+        if response.request.request_type == REQUEST_TYPE_EXTERNAL:
+            await EnodoOutputManager.handle_result(response)
 
     @classmethod
     async def _send_worker_job_request(cls, worker: WorkerClient,
-                                       job: EnodoJob):
+                                       request: EnodoRequest):
         try:
-            series = await SeriesManager.get_config_read_only(job.series_name)
-            job_data = EnodoRequest(
-                request_type="run",
-                config=job.job_config,
-                series_name=job.series_name)
-            await worker.client.send_message(job_data, WORKER_REQUEST)
+            await worker.client.send_message(request, WORKER_REQUEST)
         except Exception as e:
             logging.error(
                 f"Something went wrong when sending job request to worker")

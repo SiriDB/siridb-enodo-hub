@@ -59,9 +59,11 @@ class WorkerClient(StoredResource):
         self.hostname = hostname
         self.port = port
         self.worker_config = WorkerConfigModel(**worker_config)
+        from lib.jobmanager import EnodoJobManager
         self.client = WorkerSocketClient(
             hostname, port, worker_config,
-            cbs={WORKER_REQUEST, self._handle_worker_request})
+            cbs={WORKER_REQUEST: self._handle_worker_request,
+                 WORKER_REQUEST_RESULT: EnodoJobManager.handle_job_result})
 
     @property
     def pool_idx(self):

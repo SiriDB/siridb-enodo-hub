@@ -161,6 +161,10 @@ class ServerState:
                         next_ts = int(
                             time.time() + int(state.interval) *
                             points_left)
+                    else:
+                        next_ts = int(time.time())
+                        # Base job
+
                 elif schedule["type"] == "TS":
                     next_ts = int(schedule["value"])
             if next_ts is not None:

@@ -8,9 +8,10 @@ from siridb.connector.lib.exceptions import QueryError, InsertError, \
 
 from aiohttp import web
 from enodo.model.config.series import SeriesJobConfigModel
+from enodo.protocol.packagedata import REQUEST_TYPE_EXTERNAL, EnodoRequest
 
 from lib.config import Config
-from lib.eventmanager import EnodoEventManager
+from lib.outputmanager import EnodoOutputManager
 from lib.jobmanager import EnodoJob, EnodoJobManager
 from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
@@ -148,19 +149,21 @@ class BaseHandler:
         return {'data': output}, 200
 
     @classmethod
-    @async_simple_fields_filter(return_index=0)
-    async def resp_get_event_outputs(cls):
+    @async_simple_fields_filter(return_index=0, is_wrapped=False)
+    async def resp_get_outputs(cls, output_type):
         """get all event output steams
 
         Returns:
             dict: dict with data
         """
-        outputs = await EnodoEventManager.get_outputs()
+        if output_type not in ['event', 'result']:
+            return {'error': "Invalid output type"}, 400
+        outputs = await EnodoOutputManager.get_outputs(output_type)
         return {'data': outputs}, 200
 
     @classmethod
-    async def resp_add_event_output(cls, output_type, data):
-        """create event output stream
+    async def resp_add_output(cls, output_type, data):
+        """create output stream
 
         Args:
             output_type (int): output type
@@ -169,27 +172,14 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        output = await EnodoEventManager.create_event_output(
+        if output_type not in ['event', 'result']:
+            return {'error': "Invalid output type"}, 400
+        output = await EnodoOutputManager.create_output(
             output_type, data)
         return {'data': output.to_dict()}, 201
 
     @classmethod
-    async def resp_update_event_output(cls, rid, data):
-        """Update event output stream
-
-        Args:
-            output_id (int): id of an existing stream
-            data (dict): data for output stream
-
-        Returns:
-            dict: dict with data
-        """
-        output = await EnodoEventManager.update_event_output(int(rid),
-                                                             data)
-        return {'data': output.to_dict()}, 201
-
-    @classmethod
-    async def resp_remove_event_output(cls, rid):
+    async def resp_remove_output(cls, output_type, rid):
         """remove output stream
 
         Args:
@@ -198,7 +188,9 @@ class BaseHandler:
         Returns:
             dict: dict with data
         """
-        await EnodoEventManager.remove_event_output(int(rid))
+        if output_type not in ['event', 'result']:
+            return {'error': "Invalid output type"}, 400
+        await EnodoOutputManager.remove_output(output_type, int(rid))
         return {'data': None}, 200
 
     @classmethod
@@ -325,13 +317,20 @@ class BaseHandler:
     @classmethod
     async def resp_run_job_for_series(cls,
                                       series_name: str,
-                                      config: dict,
-                                      pool_id: int):
+                                      data: dict,
+                                      pool_id: int,
+                                      response_output_id: int):
         try:
-            config = SeriesJobConfigModel(**config)
+            config = SeriesJobConfigModel(**data.get('config'))
             job = EnodoJob(
                 None, series_name, config, (pool_id << 8) | config.job_type_id)
-            await EnodoJobManager.send_job(job)
+            request = EnodoRequest(
+                request_type=REQUEST_TYPE_EXTERNAL,
+                config=job.job_config,
+                series_name=job.series_name,
+                response_output_id=response_output_id,
+                meta=data.get('meta'))
+            await EnodoJobManager.send_job(job, request)
         except Exception as e:
             logging.error("Cannot activate job")
             logging.debug(f"Corresponding error: {str(e)}")
@@ -414,7 +413,7 @@ class BaseHandler:
                 "no_listeners": ClientManager.get_listener_count(),
                 "no_workers": ClientManager.get_worker_count(),
                 "no_busy_workers": ClientManager.get_busy_worker_count(),
-                "no_output_streams": len(await EnodoEventManager.get_outputs())
+                "no_output_streams": len(await EnodoOutputManager.get_outputs())
         }}
 
     @classmethod

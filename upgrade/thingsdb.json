@@ -7,5 +7,8 @@
     },
     "0.1.0-beta4.0.18": {
         "upgrade": ".series_configs = .series_config_templates; .del('series_config_templates'); .del('series_states'); .hub_version = \"0.1.0-beta4.0.18\";"
+    },
+    "0.2.0-beta1.0.0": {
+        "upgrade": ".event_outputs = .outputs; .del('outputs'); .result_outputs = []; .hub_version = \"0.2.0-beta1.0.0\";"
     }
 }

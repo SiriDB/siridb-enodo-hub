@@ -137,13 +137,16 @@ class ApiHandlers:
             series_name = ServerState.series_rm.get_resource_rid_value(
                 int(rid))
         pool_id = int(request.rel_url.query.get('poolID', 0))
+        response_output_id = request.rel_url.query.get('responseOutputID')
+        if response_output_id is None:
+            resp, status = {'error': 'Invalid responseOutputID'}, 400
         try:
             data = await request.json()
         except JSONDecodeError as e:
             resp, status = {'error': 'Invalid JSON'}, 400
         else:
             resp, status = await BaseHandler.resp_run_job_for_series(
-                series_name, data, pool_id)
+                series_name, data, pool_id, int(response_output_id))
         return web.json_response(
             resp, dumps=safe_json_dumps, status=status)
 
@@ -354,7 +357,7 @@ class ApiHandlers:
     @classmethod
     @EnodoAuth.auth.required
     @implement_fields_query
-    async def get_enodo_event_outputs(cls, request, fields=None):
+    async def get_enodo_outputs(cls, request, fields=None):
         """Get all event outputs
 
         Args:
@@ -366,12 +369,14 @@ class ApiHandlers:
         Query args:
             fields (String, comma seperated): list of fields to return
         """
-        resp, status = await BaseHandler.resp_get_event_outputs(fields=fields)
+        output_type = request.match_info['output_type']
+        resp, status = await BaseHandler.resp_get_outputs(
+            output_type, fields=fields)
         return web.json_response(data=resp, status=status)
 
     @classmethod
     @EnodoAuth.auth.required
-    async def add_enodo_event_output(cls, request):
+    async def add_enodo_output(cls, request):
         """Add a new event output
 
         Args:
@@ -381,7 +386,7 @@ class ApiHandlers:
             _type_: _description_
 
         JSON POST data:
-            output_type (int): type of output stream
+            output_type (int): type of output (event/result)
             data        (Object): data for output
         """
         try:
@@ -389,16 +394,15 @@ class ApiHandlers:
         except JSONDecodeError as e:
             resp, status = {'error': 'Invalid JSON'}, 400
         else:
-            output_type = data.get('output_type')
-            output_data = data.get('data')
+            output_type = request.match_info['output_type']
 
-            resp, status = await BaseHandler.resp_add_event_output(
-                output_type, output_data)
+            resp, status = await BaseHandler.resp_add_output(
+                output_type, data)
         return web.json_response(data=resp, status=status)
 
     @classmethod
     @EnodoAuth.auth.required
-    async def remove_enodo_event_output(cls, request):
+    async def remove_enodo_output(cls, request):
         """Add a new event output
 
         Args:
@@ -408,8 +412,10 @@ class ApiHandlers:
             _type_: _description_
         """
         output_id = request.match_info['output_id']
+        output_type = request.match_info['output_type']
 
-        resp, status = await BaseHandler.resp_remove_event_output(output_id)
+        resp, status = await BaseHandler.resp_remove_output(
+            output_type, output_id)
         return web.json_response(data=resp, status=status)
 
     @classmethod

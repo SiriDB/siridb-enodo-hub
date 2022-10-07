@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import time
@@ -7,10 +6,10 @@ import uuid
 import aiohttp
 from jinja2 import Environment
 
-from lib.serverstate import ServerState
 from lib.state.resource import StoredResource
 from lib.state.resource import ResourceManager
-from lib.util import cls_lock
+
+from enodo.protocol.packagedata import EnodoRequestResponse
 
 ENODO_EVENT_ANOMALY_DETECTED = "event_anomaly_detected"
 ENODO_EVENT_JOB_QUEUE_TOO_LONG = "job_queue_too_long"
@@ -20,8 +19,8 @@ ENODO_EVENT_TYPES = [ENODO_EVENT_ANOMALY_DETECTED,
                      ENODO_EVENT_LOST_CLIENT_WITHOUT_GOODBYE]
 ENODO_SERIES_RELATED_EVENT_TYPES = [ENODO_EVENT_ANOMALY_DETECTED]
 
-ENODO_EVENT_OUTPUT_WEBHOOK = 1
-ENODO_EVENT_OUTPUT_TYPES = [ENODO_EVENT_OUTPUT_WEBHOOK]
+ENODO_OUTPUT_WEBHOOK = 1
+ENODO_OUTPUT_TYPES = [ENODO_OUTPUT_WEBHOOK]
 
 ENODO_EVENT_SEVERITY_INFO = "info"
 ENODO_EVENT_SEVERITY_WARNING = "warning"
@@ -93,14 +92,14 @@ class EnodoEventOutput(StoredResource):
     @classmethod
     @property
     def resource_type(self):
-        return "outputs"
+        return "event_outputs"
 
     @classmethod
     def create(cls, output_type, data):
-        if output_type not in ENODO_EVENT_OUTPUT_TYPES:
+        if output_type not in ENODO_OUTPUT_TYPES:
             raise Exception  # TODO nice exception
 
-        if output_type == ENODO_EVENT_OUTPUT_WEBHOOK:
+        if output_type == ENODO_OUTPUT_WEBHOOK:
             return EnodoEventOutputWebhook(**data)
         return EnodoEventOutput(**data)
 
@@ -203,60 +202,159 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
         }
 
 
-class EnodoEventManager:
-    _lock = None
+class EnodoResultOutputWebhook(StoredResource):
+    """
+    EnodoResultOutputWebhook Class. Class to describe webhook method as
+    output method of results. This method uses a template which can be
+    used {{ result.var }} will be replaced with a instance variable named var
+    on the result instance
+    """
+
+    def __init__(
+            self, url, rid=None, params=None, headers=None, payload=None):
+        """
+        Call webhook url with data of result
+        :param id: id of output
+        :param url: url to call
+        """
+        self.rid = rid
+        self.url = url
+        self.params = params
+        self.payload = payload
+        self.headers = headers
+        if not isinstance(
+                self.headers, dict) and self.headers is not None:
+            self.headers = None
+        if self.payload is None:
+            self.payload = ""
+
+    def _get_query_params(self, request, result):
+        if not isinstance(self.params, dict):
+            return self.params if isinstance(self.params, str) else ""
+
+        _params = {}
+        for key, value in self.params.items():
+            env = Environment()
+            env.filters['jsonify'] = json.dumps
+            template = env.from_string(value)
+            _params[key] = template.render(request=request, result=result)
+        _params = '&'.join('{} : {}'.format(key, value)
+                           for key, value in _params.items())
+        return f"?{_params}" if _params is not "" else _params
+
+    def _get_headers(self, request, result):
+        if not isinstance(self.headers, dict):
+            return {}
+
+        _headers = {}
+        for key, value in self.headers.items():
+            env = Environment()
+            env.filters['jsonify'] = json.dumps
+            template = env.from_string(value)
+            _headers[key] = template.render(request=request, result=result)
+        return _headers
+
+    def _get_payload(self, request, result):
+        if not isinstance(self.payload, str):
+            return self.payload
+        env = Environment()
+        env.filters['jsonify'] = json.dumps
+        template = env.from_string(self.payload)
+        return json.loads(template.render(request=request, result=result))
+
+    def _get_url(self, request, result):
+        return f"{self.url}{self._get_query_params(request, result)}"
+
+    async def trigger(self, r: EnodoRequestResponse):
+        try:
+            logging.debug(
+                'Calling result webhook '
+                f'{self._get_url(r.request, r.response)}')
+            async with aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=3),
+                    connector=aiohttp.TCPConnector(
+                        verify_ssl=False)) as session:
+                await session.post(
+                    self.url,
+                    data=self._get_payload(r.request, r.response),
+                    headers=self._get_headers(r.request, r.response))
+        except Exception as e:
+            logging.error(
+                'Calling result webhook failed')
+            logging.warning(
+                f'Corresponding error: {e}, '
+                f'exception class: {e.__class__.__name__}')
+
+    def update(self, data):
+        self.url = data.get('url') if data.get(
+            'url') is not None else self.url
+        self.payload = data.get('payload') if data.get(
+            'payload') is not None else self.payload
+        self.headers = data.get('headers') if data.get(
+            'headers') is not None else self.headers
+
+        if not isinstance(
+                self.headers, dict) and self.headers is not None:
+            self.headers = None
+        if self.payload is None:
+            self.payload = ""
+
+        super().update(data)
+
+    @classmethod
+    @property
+    def resource_type(self):
+        return "result_outputs"
+
+    def to_dict(self):
+        return {
+            'rid': self.rid,
+            'url': self.url,
+            'params': self.params,
+            'headers': self.headers,
+            'payload': self.payload
+        }
+
+
+class EnodoOutputManager:
     _erm = None
+    _rrm = None
 
     @classmethod
     async def async_setup(cls):
-        cls._lock = asyncio.Lock()
         cls._erm = ResourceManager(
-            "outputs", EnodoEventOutputWebhook, 50)
+            "event_outputs", EnodoEventOutputWebhook, 50)
         await cls._erm.load()
+        cls._rrm = ResourceManager(
+            "result_outputs", EnodoResultOutputWebhook, 50)
+        await cls._rrm.load()
 
     @classmethod
-    async def create_event_output(cls, output_type, data):
-        output = None
-        async with cls._erm.create_resource(data) as resp:
-            output = resp
-        # output = EnodoEventOutput.create(output_type, data)
-        # cls.outputs.append(output)
-        # asyncio.ensure_future(internal_updates_event_output_subscribers(
-        #     SUBSCRIPTION_CHANGE_TYPE_ADD, output.to_dict()))
+    async def create_output(cls, output_type, data):
+        if output_type == "event":
+            async with cls._erm.create_resource(data) as resp:
+                output = resp
+        elif output_type == "result":
+            async with cls._rrm.create_resource(data) as resp:
+                output = resp
         return output
 
     @classmethod
-    async def update_event_output(cls, output_id, data):
-        async for output in cls._erm.itter():
-            if output.rid == output_id:
-                await cls._update_event_output(output, data)
-                return output
-        return False
+    async def get_outputs(cls, output_type: str) -> list:
+        if output_type == "event":
+            return [output.to_dict() async for output in cls._erm.itter()]
+        elif output_type == "result":
+            return [output.to_dict() async for output in cls._rrm.itter()]
+        return []
 
     @classmethod
-    async def get_outputs(cls) -> list:
-        return [output.to_dict() async for output in cls._erm.itter()]
-
-    @classmethod
-    async def remove_event_output(cls, output_id):
-        async for output in cls._erm.itter():
+    async def remove_output(cls, output_type, output_id):
+        _rm = cls._erm if output_type == "event" else cls._rrm
+        async for output in _rm.itter():
             if output.rid == output_id:
-                await cls._remove_event_output(output)
+                await _rm.delete_resource(output)
                 return True
         return False
-
-    @classmethod
-    async def _remove_event_output(cls, output):
-        await cls._erm.delete_resource(output)
-        # asyncio.ensure_future(internal_updates_event_output_subscribers(
-        #     SUBSCRIPTION_CHANGE_TYPE_DELETE, output.rid))
-
-    @classmethod
-    @cls_lock()
-    async def _update_event_output(cls, output, data):
-        output.update(data)
-        # asyncio.ensure_future(internal_updates_event_output_subscribers(
-        #     SUBSCRIPTION_CHANGE_TYPE_UPDATE, output.to_dict()))
 
     @classmethod
     async def handle_event(cls, event, series=None):
@@ -266,3 +364,11 @@ class EnodoEventManager:
                     return False
             async for output in cls._erm.itter():
                 await output.send_event(event)
+
+    @classmethod
+    async def handle_result(cls, result: EnodoRequestResponse):
+        if isinstance(result, EnodoRequestResponse):
+            output = await cls._rrm.get_resource(
+                result.request.response_output_id)
+            if output:
+                await output.trigger(result)
