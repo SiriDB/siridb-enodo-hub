@@ -48,6 +48,7 @@ class Server:
         self._connection_management_task = None
 
         self._watch_tasks_task = None
+        self._connection_loop_task = None
         self._shutdown_trigger = False
         self._force_shutdown = False
 
@@ -117,6 +118,8 @@ class Server:
         self._watch_tasks_task = await scheduler.spawn(self.watch_tasks())
         self._cleanup_resource_managers = await scheduler.spawn(
             self.clean_resource_manager())
+        self._connection_loop_task = await scheduler.spawn(
+            ClientManager.connect_loop())
 
         # Open backend socket connection
         await self.backend_socket.create()

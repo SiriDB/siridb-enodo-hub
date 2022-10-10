@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import struct
 import time
@@ -7,11 +8,13 @@ from typing import Any, Optional
 import qpack
 from enodo import WorkerConfigModel
 from enodo.protocol.package import (
-    UPDATE_SERIES, create_header, WORKER_REQUEST, WORKER_REQUEST_RESULT)
+    UPDATE_SERIES, create_header)
+from enodo.net import Package, PROTO_REQ_HANDSHAKE, PROTO_REQ_WORKER_REQUEST
 from enodo.protocol.packagedata import EnodoRequest
+from lib.config import Config
 from lib.serverstate import ServerState
 from lib.socket.queryhandler import QueryHandler
-from lib.socket.socketclient import WorkerSocketClient
+from lib.socket.protocol import EnodoProtocol
 from lib.state.resource import ResourceManager, StoredResource, from_thing
 from lib.util.util import (
     gen_pool_idx, generate_worker_lookup, get_worker_for_series)
@@ -47,6 +50,8 @@ class ListenerClient:
 
 
 class WorkerClient(StoredResource):
+    MAX_RETRY_STEP = 120
+
     def __init__(self,
                  hostname: str,
                  port: int,
@@ -59,11 +64,12 @@ class WorkerClient(StoredResource):
         self.hostname = hostname
         self.port = port
         self.worker_config = WorkerConfigModel(**worker_config)
-        from lib.jobmanager import EnodoJobManager
-        self.client = WorkerSocketClient(
-            hostname, port, worker_config,
-            cbs={WORKER_REQUEST: self._handle_worker_request,
-                 WORKER_REQUEST_RESULT: EnodoJobManager.handle_job_result})
+
+        self._connecting = False
+        self._auth = False
+        self._protocol = None
+        self._retry_next = 0
+        self._retry_step = 1
 
     @property
     def pool_idx(self):
@@ -80,6 +86,83 @@ class WorkerClient(StoredResource):
     @property
     def worker_id(self):
         return struct.unpack('>I', self._idx_bytes[8:12])
+
+    def close(self):
+        if self._protocol and self._protocol.transport:
+            self._protocol.transport.close()
+        self._protocol = None
+
+    def set_protocol(self, protocol: EnodoProtocol):
+        self._protocol = protocol
+        protocol.set_connection_lost(self.connection_lost)
+
+    def set_status(self, status: int):
+        self.status = status
+
+    def is_connected(self) -> bool:
+        return \
+            self._protocol is not None and self._protocol.is_connected() and \
+            self._auth
+
+    def is_connecting(self) -> bool:
+        return self._connecting
+
+    def next_retry(self) -> int:
+        return self._retry_next
+
+    def set_next_retry(self, counter: int):
+        self._retry_step = min(self._retry_step * 2, self.MAX_RETRY_STEP)
+        self._retry_next = counter + self._retry_step
+
+    def connection_lost(self):
+        self._retry_next = 0
+        self._retry_step = 1
+
+    async def _connect(self):
+        loop = asyncio.get_event_loop()
+        conn = loop.create_connection(
+            lambda: EnodoProtocol(self, self.connection_lost),
+            host=self.hostname,
+            port=int(self.port)
+        )
+        self._auth = False
+
+        try:
+            _, self._protocol = await asyncio.wait_for(conn, timeout=10)
+        except Exception as e:
+            logging.error(f'connecting to node {self.hostname} failed: {e}')
+        else:
+            pkg = Package.make(
+                PROTO_REQ_HANDSHAKE,
+                data={
+                    'worker_config': self.worker_config,
+                    'hub_id': Config.hub_id
+                }
+            )
+            print("jjeeerere", pkg.data)
+            if self._protocol and self._protocol.transport:
+                try:
+                    self._protocol.write(pkg)
+                except Exception as e:
+                    logging.error(
+                        f'auth request to node {self.hostname} failed: {e}')
+                else:
+                    self._auth = True
+        finally:
+            self._connecting = False
+
+    def send_message(self, data, pt):
+        if data is None:
+            data = ""
+        pkg = Package.make(
+            pt,
+            data=data
+        )
+        self._protocol.write(pkg)
+
+    def connect(self) -> asyncio.Future:
+        self._connecting = True
+        return self._connect()
 
     @StoredResource.changed
     def set_config(self, worker_config: WorkerConfigModel):
@@ -103,19 +186,15 @@ class WorkerClient(StoredResource):
             del data["rid"]
         return data
 
-    async def _handle_worker_request(self, data, *args):
-        data = qpack.unpackb(data)
+    async def handle_worker_request(self, data, *args):
         data['pool_id'] = self.pool_id
         data['worker_id'] = self.increment_id
         request = EnodoRequest(**data)
         await ClientManager.fetch_request_response_from_worker(
             self.pool_id, request.series_name, request)
 
-    async def _handle_worker_response(self, data, pool_id, worker_id):
-        header = create_header(len(data), WORKER_REQUEST_RESULT) + \
-            pool_id.to_bytes(4, byteorder='big') + \
-            worker_id.to_bytes(1, byteorder='big')
-        await self.client.send_data(header + data)
+    async def redirect_response(self, data, worker_id):
+        pass
 
     def to_dict(self) -> dict:
         return {
@@ -163,7 +242,7 @@ class ClientManager:
             return
         worker = cls.get_worker(
             (pool_id << 8) | request.config.job_type_id, series_name)
-        await worker.client.send_message(request, WORKER_REQUEST)
+        await worker.send_message(request, PROTO_REQ_WORKER_REQUEST)
 
     @classmethod
     async def add_worker(cls, pool_id: int, worker: dict):
@@ -245,6 +324,25 @@ class ClientManager:
                 listener.online = False
 
     @classmethod
+    async def connect_loop(cls):
+        logging.info(f'Connect loop started')
+        counter = 0
+        while True:
+            counter += 1
+
+            for worker in cls._workers.values():
+                if (
+                    worker.is_connected() or
+                    worker.is_connecting() or
+                    worker.next_retry() > counter
+                ):
+                    continue
+                asyncio.ensure_future(worker.connect())
+                worker.set_next_retry(counter)
+
+            await asyncio.sleep(1)
+
+    @classmethod
     async def set_listener_offline(cls, client_id: str):
         cls.listeners[client_id].online = False
 
@@ -267,7 +365,9 @@ class ClientManager:
         for w in workers:
             try:
                 from_thing(w)
-                loaded_workers.append(WorkerClient(**w))
+                _worker = WorkerClient(**w)
+                await _worker.connect()
+                loaded_workers.append(_worker)
             except Exception as e:
                 logging.warning(
                     "Tried loading invalid data when loading worker")

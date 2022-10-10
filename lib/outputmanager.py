@@ -228,7 +228,7 @@ class EnodoResultOutputWebhook(StoredResource):
         if self.payload is None:
             self.payload = ""
 
-    def _get_query_params(self, request, result):
+    def _get_query_params(self, response: EnodoRequestResponse):
         if not isinstance(self.params, dict):
             return self.params if isinstance(self.params, str) else ""
 
@@ -237,12 +237,16 @@ class EnodoResultOutputWebhook(StoredResource):
             env = Environment()
             env.filters['jsonify'] = json.dumps
             template = env.from_string(value)
-            _params[key] = template.render(request=request, result=result)
-        _params = '&'.join('{} : {}'.format(key, value)
+            _params[key] = template.render(
+                request=dict(response.request),
+                response=response,
+                result=response.result,
+                error=response.error)
+        _params = '&'.join('{}={}'.format(key, value)
                            for key, value in _params.items())
-        return f"?{_params}" if _params is not "" else _params
+        return f"?{_params}" if _params != "" else _params
 
-    def _get_headers(self, request, result):
+    def _get_headers(self, response: EnodoRequestResponse):
         if not isinstance(self.headers, dict):
             return {}
 
@@ -251,34 +255,45 @@ class EnodoResultOutputWebhook(StoredResource):
             env = Environment()
             env.filters['jsonify'] = json.dumps
             template = env.from_string(value)
-            _headers[key] = template.render(request=request, result=result)
+            _headers[key] = template.render(
+                request=dict(response.request),
+                response=response,
+                result=response.result,
+                error=response.error
+            )
         return _headers
 
-    def _get_payload(self, request, result):
+    def _get_payload(self, response: EnodoRequestResponse):
         if not isinstance(self.payload, str):
             return self.payload
         env = Environment()
         env.filters['jsonify'] = json.dumps
         template = env.from_string(self.payload)
-        return json.loads(template.render(request=request, result=result))
+        return template.render(
+            request=dict(response.request),
+            response=response,
+            result=response.result,
+            error=response.error
+        )
 
-    def _get_url(self, request, result):
-        return f"{self.url}{self._get_query_params(request, result)}"
+    def _get_url(self, response: EnodoRequestResponse):
+        return f"{self.url}{self._get_query_params(response)}"
 
     async def trigger(self, r: EnodoRequestResponse):
         try:
             logging.debug(
                 'Calling result webhook '
-                f'{self._get_url(r.request, r.response)}')
+                f'{self._get_url(r)}')
             async with aiohttp.ClientSession(
                     timeout=aiohttp.ClientTimeout(total=3),
                     connector=aiohttp.TCPConnector(
                         verify_ssl=False)) as session:
                 await session.post(
                     self.url,
-                    data=self._get_payload(r.request, r.response),
-                    headers=self._get_headers(r.request, r.response))
+                    data=self._get_payload(r),
+                    headers=self._get_headers(r))
         except Exception as e:
+            raise e
             logging.error(
                 'Calling result webhook failed')
             logging.warning(

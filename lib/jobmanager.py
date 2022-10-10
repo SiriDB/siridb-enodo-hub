@@ -1,23 +1,17 @@
-import asyncio
 import logging
-from asyncio import StreamWriter
-import time
 from typing import Any, Optional, Union
 from uuid import uuid4
 
 import qpack
 from enodo.jobs import *
 from enodo.model.config.series import SeriesJobConfigModel
-from enodo.protocol.package import WORKER_REQUEST
+from enodo.net import PROTO_REQ_WORKER_REQUEST
 from enodo.protocol.packagedata import (
     EnodoJobDataModel, EnodoRequest, EnodoRequestResponse,
     REQUEST_TYPE_EXTERNAL)
 from lib.outputmanager import EnodoOutputManager
 from lib.socket.clientmanager import WorkerClient
 from lib.state.resource import StoredResource
-from lib.util import cls_lock
-
-from .series.seriesmanager import SeriesManager
 from .socket import ClientManager
 
 
@@ -93,9 +87,7 @@ class EnodoJobManager:
         await cls._send_worker_job_request(worker, request)
 
     @ classmethod
-    async def handle_job_result(cls, data, pool_id, worker_id):
-        data = qpack.unpackb(data)
-        print(data)
+    async def handle_job_result(cls, data):
         if not isinstance(data, dict):
             logging.error("Invalid job result, cannot handle")
             return
@@ -108,7 +100,7 @@ class EnodoJobManager:
     async def _send_worker_job_request(cls, worker: WorkerClient,
                                        request: EnodoRequest):
         try:
-            await worker.client.send_message(request, WORKER_REQUEST)
+            worker.send_message(request, PROTO_REQ_WORKER_REQUEST)
         except Exception as e:
             logging.error(
                 f"Something went wrong when sending job request to worker")

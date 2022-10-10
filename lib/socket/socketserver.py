@@ -34,7 +34,7 @@ class SocketServer:
 
     async def stop(self):
         self._server_running = False
-        await self._server.close()
+        # await self._server.close()
 
     async def _handle_client_connection(self, reader, writer):
         connected = True
