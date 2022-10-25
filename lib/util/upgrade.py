@@ -11,8 +11,11 @@ class UpgradeUtil:
     @staticmethod
     async def upgrade_thingsdb():
         logging.info("Looking for upgrades for thingsdb collection...")
-        thingsdb_hub_version = await ServerState.storage.\
-            get_registered_hub_version()
+        try:
+            thingsdb_hub_version = await ServerState.thingsdb_client.query(
+                ".hub_version")
+        except Exception:
+            thingsdb_hub_version = None
         path_to_upgrade_file = os.path.join(
             pathlib.Path(__file__).parent.resolve(),
             "..", "..", "upgrade", "thingsdb.json")
@@ -27,29 +30,23 @@ class UpgradeUtil:
             upgrade_dict = json.loads(f.read())
 
         index_of_current_version = None
-        index_of_thingsdb_hub_version = 0
+        index_of_thingsdb_hub_version = -1
         for idx, version in enumerate(upgrade_dict.keys()):
             if version == VERSION:
                 index_of_current_version = idx
             if version == thingsdb_hub_version:
                 index_of_thingsdb_hub_version = idx
 
-        # if index_of_current_version is None:
-        #     return
-        found_first = False
         updates_ran = 0
-        if index_of_thingsdb_hub_version == 0:
-            found_first = True
         for idx, upgrade_data in enumerate(upgrade_dict.values()):
-            if found_first is True:
+            if index_of_thingsdb_hub_version < idx or \
+                    index_of_thingsdb_hub_version == -1:
                 updates_ran += 1
-                await ServerState.storage.run_code(
-                    upgrade_data.get("upgrade"))
+                await ServerState.thingsdb_client.query(
+                    upgrade_data)
                 if idx == index_of_current_version:
                     logging.info(
                         f"Ran {updates_ran} updates to ThingsDB collection...")
                     return
-            elif idx == index_of_thingsdb_hub_version:
-                found_first = True
         logging.info(
             f"Ran {updates_ran} updates to ThingsDB collection...")

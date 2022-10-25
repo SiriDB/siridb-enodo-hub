@@ -15,7 +15,6 @@ from lib.config import Config
 from lib.serverstate import ServerState
 from lib.socket.queryhandler import QueryHandler
 from lib.socket.protocol import EnodoProtocol
-from lib.state.resource import ResourceManager, StoredResource, from_thing
 from lib.util.util import (
     gen_pool_idx, generate_worker_lookup, get_worker_for_series)
 
@@ -49,7 +48,7 @@ class ListenerClient:
                 'online': self.online}
 
 
-class WorkerClient(StoredResource):
+class WorkerClient:
     MAX_RETRY_STEP = 120
 
     def __init__(self,
@@ -139,7 +138,6 @@ class WorkerClient(StoredResource):
                     'hub_id': Config.hub_id
                 }
             )
-            print("jjeeerere", pkg.data)
             if self._protocol and self._protocol.transport:
                 try:
                     self._protocol.write(pkg)
@@ -164,7 +162,6 @@ class WorkerClient(StoredResource):
         self._connecting = True
         return self._connect()
 
-    @StoredResource.changed
     def set_config(self, worker_config: WorkerConfigModel):
         if isinstance(worker_config, WorkerConfigModel):
             self.worker_config = worker_config
@@ -209,16 +206,14 @@ class WorkerClient(StoredResource):
 class ClientManager:
     listeners = {}
     _workers = {}
-    series_manager = None
-    _crm = None
+    _ws = None
     _query_handler = None
     _sd_lookups = {}
 
     @classmethod
-    async def setup(cls, series_manager):
-        cls.series_manager = series_manager
-        cls._crm = ResourceManager("workers", WorkerClient)
-        await cls._crm.load()
+    async def setup(cls):
+        from lib.state.stores import WorkerStore  # Circular import
+        cls._ws = await WorkerStore.setup(ServerState.thingsdb_client)
         cls._query_handler = QueryHandler()
 
     @classmethod
@@ -254,8 +249,7 @@ class ClientManager:
         worker['worker_idx'] = int.from_bytes(
             bpool_idx + current_num.to_bytes(4, 'big'), 'big')
         cls._sd_lookups[pool_idx] = generate_worker_lookup(current_num + 1)
-        cls._workers[worker['worker_idx']] = await cls._crm.create_and_return(
-            worker)
+        cls._workers[worker['worker_idx']] = await cls._ws.create(worker)
 
     @classmethod
     def update_worker_pools(cls, workers):
@@ -360,14 +354,12 @@ class ClientManager:
 
     @classmethod
     async def load_from_disk(cls):
-        workers = await ServerState.storage.load_by_type("workers")
+        workers = cls._ws.workers.values()
         loaded_workers = []
         for w in workers:
             try:
-                from_thing(w)
-                _worker = WorkerClient(**w)
-                await _worker.connect()
-                loaded_workers.append(_worker)
+                await w.connect()
+                loaded_workers.append(w)
             except Exception as e:
                 logging.warning(
                     "Tried loading invalid data when loading worker")

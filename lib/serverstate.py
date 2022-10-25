@@ -3,6 +3,7 @@ import logging
 import time
 
 from enodo.jobs import JOB_STATUS_FAILED, JOB_STATUS_OPEN, JOB_STATUS_PENDING
+from thingsdb.client import Client
 
 from aiojobs import create_scheduler
 from siridb.connector import SiriDBClient
@@ -22,21 +23,26 @@ class ServerState:
     siridb_ts_unit = {}
     readiness = None
     scheduler = None
-    storage = None
     job_schedule_index = None
 
     series_rm = None
     series_config_rm = None
     job_config_template_rm = None
+    thingsdb_client = None
 
     @classmethod
-    async def async_setup(cls, storage):
+    async def async_setup(cls):
         cls.running = True
         cls.job_schedule_index = SeriesPriorityQueue()
         cls.readiness = False
         cls.siridb_data_client_lock = Lock()
         cls.siridb_output_client_lock = Lock()
-        cls.storage = storage
+
+        try:
+            await cls._setup_storage()
+        except Exception:
+            logging.error("Cannot connect with thingsdb...")
+            exit()
 
         cls.tasks_last_runs = {
             'check_jobs': None,
@@ -57,6 +63,14 @@ class ServerState:
         await cls.setup_siridb_output_connection()
         cls.scheduler = await create_scheduler()
         await cls.refresh_siridb_status()
+
+    @classmethod
+    async def _setup_storage(cls):
+        cls.thingsdb_client = Client()
+        await cls.thingsdb_client.connect(Config.thingsdb_host,
+                                          port=Config.thingsdb_port)
+        await cls.thingsdb_client.authenticate(Config.thingsdb_auth_token)
+        cls.thingsdb_client.set_default_scope(Config.thingsdb_scope)
 
     @classmethod
     def get_readiness(cls):

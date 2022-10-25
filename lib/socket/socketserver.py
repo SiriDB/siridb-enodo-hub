@@ -8,7 +8,6 @@ from enodo.protocol.package import create_header, read_packet, HEARTBEAT, \
     HANDSHAKE, HANDSHAKE_FAIL, UNKNOWN_CLIENT, CLIENT_SHUTDOWN, \
     HANDSHAKE_OK, UPDATE_SERIES
 
-from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
 from . import ClientManager
 
@@ -160,8 +159,9 @@ class SocketServer:
             return client_id, True
 
         if client_data.get('client_type') == 'listener':
-            update = qpack.packb(
-                await SeriesManager.get_listener_series_info())
-            header = create_header(len(update), UPDATE_SERIES)
-            writer.write(header + update)
+            # TODO: implement
+            # update = qpack.packb(
+            #     await SeriesManager.get_listener_series_info())
+            # header = create_header(len(update), UPDATE_SERIES)
+            # writer.write(header + update)
             return client_id, True

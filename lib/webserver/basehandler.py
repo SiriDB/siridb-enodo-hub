@@ -1,131 +1,29 @@
 from asyncio import wait_for
 import asyncio
 import logging
-from aiohttp import web
 
 from siridb.connector.lib.exceptions import QueryError, InsertError, \
     ServerError, PoolError, AuthenticationError, UserAuthError
 
-from aiohttp import web
 from enodo.model.config.series import SeriesJobConfigModel
 from enodo.protocol.packagedata import REQUEST_TYPE_EXTERNAL, EnodoRequest
 
 from lib.config import Config
 from lib.outputmanager import EnodoOutputManager
 from lib.jobmanager import EnodoJob, EnodoJobManager
-from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
-from lib.siridb.siridb import query_all_series_results
 from lib.socket.clientmanager import ClientManager
 from lib.socket.queryhandler import QueryHandler
-from lib.util import regex_valid
 from siridb.connector.lib.exceptions import (
     AuthenticationError, InsertError, PoolError, QueryError,
     ServerError, UserAuthError)
 from lib.util.util import (
-    get_job_config_output_series_name,
-    apply_fields_filter,
     async_simple_fields_filter,
     sync_simple_fields_filter)
 from version import VERSION
 
 
 class BaseHandler:
-
-    @classmethod
-    def resp_get_monitored_series(cls, regex_filter=None):
-        """Get monitored series
-
-        Args:
-            regex_filter (string, optional): filter by regex. Defaults to None.
-
-        Returns:
-            dict: dict with data
-        """
-        if regex_filter is not None and not regex_valid(regex_filter):
-            return {'data': []}
-        return {'data': list(
-            SeriesManager.get_all_series_names(regex_filter))}
-
-    @classmethod
-    @async_simple_fields_filter(is_list=False, return_index=0)
-    async def resp_get_single_monitored_series(cls, series_name_rid,
-                                               by_rid=True):
-        """Get monitored series details
-
-        Args:
-            series_name (string): name of series
-
-        Returns:
-            dict: dict with data
-        """
-        if by_rid:
-            series = await ServerState.series_rm.get_resource(
-                int(series_name_rid))
-        else:
-            series = await SeriesManager.get_config_read_only(series_name_rid)
-        if series is None:
-            return {'data': {}}, 404
-        series_data = series.to_dict()
-        return {'data': series_data}, 200
-
-    @classmethod
-    async def resp_get_all_series_output(cls, rid,
-                                         fields=None,
-                                         forecast_future_only=False,
-                                         types=None,
-                                         by_name=False):
-        """Get all series results
-
-        Args:
-            series_name (string): name of series
-
-        Returns:
-            dict: dict with data
-        """
-        if by_name:
-            series_name = rid
-        else:
-            series_name = ServerState.series_rm.get_resource_rid_value(
-                int(rid))
-        series, state = await SeriesManager.get_series_read_only(series_name)
-        if series is None:
-            return web.json_response(data={'data': ''}, status=404)
-
-        should_fetch_data = True if fields is None or \
-            (fields is not None and "data" in fields) else False
-
-        data = None
-        if should_fetch_data and not forecast_future_only and types is None:
-            data = await query_all_series_results(
-                ServerState.get_siridb_output_conn(), series_name)
-
-        resp = []
-        for job_config in series.config.job_config.values():
-            if types is not None and job_config.job_type not in types:
-                continue  # Ignore due to filter
-            points = None
-            output_series_name = get_job_config_output_series_name(
-                series_name, job_config.job_type, job_config.config_name)
-            if data is not None:
-                points = data.get(output_series_name)
-            elif should_fetch_data:
-                points = (await SeriesManager.get_series_output_by_job_type(
-                    series_name, job_config.job_type,
-                    forecast_future_only=forecast_future_only)).get(
-                        output_series_name)
-            if points is None:
-                points = []
-            resp.append({
-                "output_series_name": output_series_name,
-                "config_name": job_config.config_name,
-                "job_type": job_config.job_type,
-                "job_meta": state.get_job_meta(job_config.config_name),
-                "data": points
-            })
-        if fields is not None:
-            resp = apply_fields_filter(resp, fields)
-        return {'data': resp}
 
     @classmethod
     async def resp_run_siridb_query(cls, query):
@@ -194,53 +92,6 @@ class BaseHandler:
         return {'data': None}, 200
 
     @classmethod
-    async def resp_add_series(cls, data):
-        """Add series for monitoring
-
-        Args:
-            data (dict): config of series
-
-        Returns:
-            dict: dict with data
-        """
-        config = ServerState.series_config_rm.get_cached_resource(
-            int(data.get('config')))
-        if config is None:
-            return {'error': 'Series config template not found'}, 404
-        if 'meta' in data and (data.get('meta') is not None and
-                               not isinstance(data.get('meta'), dict)):
-            return {'error': 'Something went wrong when adding '
-                    'the series. Meta data must be a dict'}, 400
-        is_added = await SeriesManager.add_series(data)
-        if is_added is False:
-            return {'error': 'Something went wrong when adding the series. '
-                    'Series already added'}, 400
-        if is_added is None:
-            return {'error': 'Something went wrong when adding the series. '
-                    'Series does not exists'}, 400
-
-        return {'data': True}, 201
-
-    @classmethod
-    async def resp_remove_series(cls, rid, by_name=False):
-        """Remove series
-
-        Args:
-            series_name (string): name of series
-
-        Returns:
-            dict: dict with data
-        """
-        if by_name:
-            series_name = rid
-        else:
-            series_name = ServerState.series_rm.get_resource_rid_value(
-                int(rid))
-        if await SeriesManager.remove_series(series_name):
-            return 200
-        return 404
-
-    @classmethod
     @sync_simple_fields_filter(return_index=0)
     def resp_get_series_configs(cls):
         scrm = ServerState.series_config_rm
@@ -307,10 +158,10 @@ class BaseHandler:
             return {'error', 'no config given', 400}
         template['config'] = config
         await template.store()
-        async for series in ServerState.series_rm.itter(update=True):
-            if series._config_from_template:
-                async with SeriesManager.get_state(series.name) as state:
-                    ServerState.index_series_schedules(series, state)
+        # async for series in ServerState.series_rm.itter(update=True):
+        #     if series._config_from_template:
+        #         async with SeriesManager.get_state(series.name) as state:
+        #             ServerState.index_series_schedules(series, state)
 
         return {'data': template}, 201
 
@@ -395,7 +246,7 @@ class BaseHandler:
         for key in keys_and_values:
             if Config.is_runtime_configurable(key):
                 Config.update_settings(
-                    ServerState.storage.client,
+                    ServerState.thingsdb_client,
                     key, keys_and_values[key])
 
         return {'data': True}
@@ -403,34 +254,10 @@ class BaseHandler:
     @classmethod
     @async_simple_fields_filter(is_list=False)
     async def resp_get_enodo_stats(cls):
-        return {'data': {
-            "no_series": SeriesManager.get_series_count(),
-            "no_ignored_series":
-                await SeriesManager.get_ignored_series_count(),
-                "no_open_jobs": EnodoJobManager.get_open_jobs_count(),
-                "no_active_jobs": EnodoJobManager.get_active_jobs_count(),
-                "no_failed_jobs": EnodoJobManager.get_failed_jobs_count(),
+        return {
+            'data': {
                 "no_listeners": ClientManager.get_listener_count(),
                 "no_workers": ClientManager.get_worker_count(),
-                "no_busy_workers": ClientManager.get_busy_worker_count(),
-                "no_output_streams": len(await EnodoOutputManager.get_outputs())
-        }}
-
-    @classmethod
-    def resp_get_enodo_labels(cls):
-        data = SeriesManager.get_labels_data()
-        return {'data': data}
-
-    @classmethod
-    async def resp_add_enodo_label(cls, data):
-        await SeriesManager.add_label(data.get('description'),
-                                      data.get('name'),
-                                      data.get('series_config'))
-        return {'data': True}, 201
-
-    @classmethod
-    async def resp_remove_enodo_label(cls, data):
-        data = await SeriesManager.remove_label(data.get('name'))
-        if not data:
-            return {'error': "Cannot remove label"}, 400
-        return {'data': data}, 200
+                "no_output_streams": len(
+                    await EnodoOutputManager.get_outputs())
+            }}

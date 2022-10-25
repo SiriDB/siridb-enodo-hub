@@ -1,13 +1,10 @@
-import json
 import logging
 import time
 import uuid
 
 import aiohttp
-from jinja2 import Environment
-
-from lib.state.resource import StoredResource
-from lib.state.resource import ResourceManager
+from lib.serverstate import ServerState
+from lib.util import Template
 
 from enodo.protocol.packagedata import EnodoRequestResponse
 
@@ -61,7 +58,7 @@ class EnodoEvent:
         }
 
 
-class EnodoEventOutput(StoredResource):
+class EnodoEventOutput:
     """
     EnodoEventOutput Class. Class to describe base output method of events
     """
@@ -103,7 +100,6 @@ class EnodoEventOutput(StoredResource):
             return EnodoEventOutputWebhook(**data)
         return EnodoEventOutput(**data)
 
-    @StoredResource.changed
     def update(self, data):
         self.custom_name = data.get('custom_name') if data.get(
             'custom_name') is not None else self.custom_name
@@ -150,10 +146,12 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
             self.payload = ""
 
     def _get_payload(self, event):
-        env = Environment()
-        env.filters['jsonify'] = json.dumps
-        template = env.from_string(self.payload)
-        return template.render(event=event, severity=self.severity)
+        _sub_data = {
+            "event": event,
+            "severity": self.severity
+        }
+        template = Template(self.payload)
+        return template.safe_substitute(**_sub_data)
 
     async def send_event(self, event):
         if event.event_type in self.for_event_types:
@@ -202,7 +200,7 @@ class EnodoEventOutputWebhook(EnodoEventOutput):
         }
 
 
-class EnodoResultOutputWebhook(StoredResource):
+class EnodoResultOutputWebhook:
     """
     EnodoResultOutputWebhook Class. Class to describe webhook method as
     output method of results. This method uses a template which can be
@@ -232,16 +230,14 @@ class EnodoResultOutputWebhook(StoredResource):
         if not isinstance(self.params, dict):
             return self.params if isinstance(self.params, str) else ""
 
+        _sub_data = {
+            "request": response.request,
+            "response": response
+        }
         _params = {}
         for key, value in self.params.items():
-            env = Environment()
-            env.filters['jsonify'] = json.dumps
-            template = env.from_string(value)
-            _params[key] = template.render(
-                request=dict(response.request),
-                response=response,
-                result=response.result,
-                error=response.error)
+            template = Template(value)
+            _params[key] = template.safe_substitute(**_sub_data)
         _params = '&'.join('{}={}'.format(key, value)
                            for key, value in _params.items())
         return f"?{_params}" if _params != "" else _params
@@ -250,31 +246,25 @@ class EnodoResultOutputWebhook(StoredResource):
         if not isinstance(self.headers, dict):
             return {}
 
+        _sub_data = {
+            "request": response.request,
+            "response": response
+        }
         _headers = {}
         for key, value in self.headers.items():
-            env = Environment()
-            env.filters['jsonify'] = json.dumps
-            template = env.from_string(value)
-            _headers[key] = template.render(
-                request=dict(response.request),
-                response=response,
-                result=response.result,
-                error=response.error
-            )
+            template = Template(value)
+            _headers[key] = template.safe_substitute(**_sub_data)
         return _headers
 
     def _get_payload(self, response: EnodoRequestResponse):
         if not isinstance(self.payload, str):
             return self.payload
-        env = Environment()
-        env.filters['jsonify'] = json.dumps
-        template = env.from_string(self.payload)
-        return template.render(
-            request=dict(response.request),
-            response=response,
-            result=response.result,
-            error=response.error
-        )
+        _sub_data = {
+            "request": response.request,
+            "response": response
+        }
+        template = Template(self.payload)
+        return template.safe_substitute(**_sub_data)
 
     def _get_url(self, response: EnodoRequestResponse):
         return f"{self.url}{self._get_query_params(response)}"
@@ -282,18 +272,16 @@ class EnodoResultOutputWebhook(StoredResource):
     async def trigger(self, r: EnodoRequestResponse):
         try:
             logging.debug(
-                'Calling result webhook '
-                f'{self._get_url(r)}')
+                f'Calling result webhook {self._get_url(r)}')
             async with aiohttp.ClientSession(
                     timeout=aiohttp.ClientTimeout(total=3),
                     connector=aiohttp.TCPConnector(
                         verify_ssl=False)) as session:
                 await session.post(
-                    self.url,
+                    self._get_url(r),
                     data=self._get_payload(r),
                     headers=self._get_headers(r))
         except Exception as e:
-            raise e
             logging.error(
                 'Calling result webhook failed')
             logging.warning(
@@ -332,58 +320,53 @@ class EnodoResultOutputWebhook(StoredResource):
 
 
 class EnodoOutputManager:
-    _erm = None
-    _rrm = None
+    _eos = None
+    _ros = None
 
     @classmethod
     async def async_setup(cls):
-        cls._erm = ResourceManager(
-            "event_outputs", EnodoEventOutputWebhook, 50)
-        await cls._erm.load()
-        cls._rrm = ResourceManager(
-            "result_outputs", EnodoResultOutputWebhook, 50)
-        await cls._rrm.load()
+        # circular import
+        from lib.state.stores import EventOutputStore, ResultOutputStore
+        cls._eos = await EventOutputStore.setup(ServerState.thingsdb_client)
+        cls._ros = await ResultOutputStore.setup(ServerState.thingsdb_client)
 
     @classmethod
     async def create_output(cls, output_type, data):
         if output_type == "event":
-            async with cls._erm.create_resource(data) as resp:
-                output = resp
+            return await cls._eos.create(data)
         elif output_type == "result":
-            async with cls._rrm.create_resource(data) as resp:
-                output = resp
-        return output
+            return await cls._ros.create(data)
+
+        logging.error("Cannot create output: Invalid output type")
+        return False
 
     @classmethod
     async def get_outputs(cls, output_type: str) -> list:
         if output_type == "event":
-            return [output.to_dict() async for output in cls._erm.itter()]
+            return [o.to_dict() for o in cls._eos.outputs.values()]
         elif output_type == "result":
-            return [output.to_dict() async for output in cls._rrm.itter()]
+            return [o.to_dict() for o in cls._ros.outputs.values()]
+        logging.error("Cannot return outputs: Invalid output type")
         return []
 
     @classmethod
     async def remove_output(cls, output_type, output_id):
-        _rm = cls._erm if output_type == "event" else cls._rrm
-        async for output in _rm.itter():
-            if output.rid == output_id:
-                await _rm.delete_resource(output)
-                return True
-        return False
+        if output_type == "event":
+            await cls._eos.delete_output(output_id)
+        elif output_type == "result":
+            await cls._ros.delete_output(output_id)
+        else:
+            logging.error("Cannot delete output: Invalid output type")
 
     @classmethod
     async def handle_event(cls, event, series=None):
         if isinstance(event, EnodoEvent):
-            if event.event_type in ENODO_SERIES_RELATED_EVENT_TYPES:
-                if series is not None and series.is_ignored() is True:
-                    return False
-            async for output in cls._erm.itter():
+            for output in cls._eos.outputs.values():
                 await output.send_event(event)
 
     @classmethod
     async def handle_result(cls, result: EnodoRequestResponse):
         if isinstance(result, EnodoRequestResponse):
-            output = await cls._rrm.get_resource(
-                result.request.response_output_id)
+            output = cls._ros.outputs.get(result.request.response_output_id)
             if output:
                 await output.trigger(result)

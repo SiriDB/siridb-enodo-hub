@@ -8,27 +8,21 @@ import aiohttp_cors
 from aiohttp import web
 from aiojobs.aiohttp import setup
 from enodo.protocol.packagedata import *
-from enodo.protocol.package import (
-    LISTENER_NEW_SERIES_POINTS, WORKER_REQUEST_RESULT)
+from enodo.protocol.package import LISTENER_NEW_SERIES_POINTS
 from lib.outputmanager import EnodoOutputManager
-from lib.series.seriesconfig import SeriesConfig
-from lib.state.thingsdbstorage import ThingsDBStorage
 from lib.util.upgrade import UpgradeUtil
 
 from lib.webserver.apihandlers import ApiHandlers, auth
 from lib.config import Config
-from lib.jobmanager import EnodoJobManager
 
 from lib.logging import prepare_logger
-from lib.series.series import Series
-from lib.series.seriesmanager import SeriesManager
 from lib.serverstate import ServerState
 from lib.socket import ClientManager
 from lib.socket.handler import receive_new_series_points
 from lib.socket.socketserver import SocketServer
 from lib.util import print_custom_aiohttp_startup_message
 from lib.webserver.routes import setup_routes
-from lib.state.resource import ResourceManager, resource_manager_index
+from lib.state.resource import resource_manager_index
 from version import VERSION
 
 
@@ -63,17 +57,8 @@ class Server:
                 getattr(signal, signame),
                 lambda: asyncio.ensure_future(self.stop_server()))
 
-        storage = ThingsDBStorage()
-        try:
-            await storage.startup()
-        except Exception as e:
-            logging.error(
-                "Cannot startup, not able to connect to ThingsDB")
-            logging.debug(f"Corresponding error: {e}")
-            raise e
-
         # Setup server state object
-        await ServerState.async_setup(storage=storage)
+        await ServerState.async_setup()
         try:
             await UpgradeUtil.upgrade_thingsdb()
         except Exception as e:
@@ -81,7 +66,7 @@ class Server:
             logging.debug(f"Corresponding error: {e}")
             raise e
 
-        await Config.read_settings(ServerState.storage.client)
+        await Config.read_settings(ServerState.thingsdb_client)
 
         # Setup internal security token for authenticating
         # backend socket connections
@@ -97,18 +82,9 @@ class Server:
         # Setup REST API handlers
         ApiHandlers.prepare()
 
-        ServerState.series_config_rm = ResourceManager(
-            'series_configs', SeriesConfig, cache_only=True)
-        await ServerState.series_config_rm.load()
-        ServerState.series_rm = ResourceManager(
-            'series', Series, extra_index_field="name",
-            keep_in_memory=-1)
-        await ServerState.series_rm.load()
-
         # Setup internal managers for handling and managing series,
         # clients, jobs, events and modules
-        SeriesManager.prepare()
-        await ClientManager.setup(SeriesManager)
+        await ClientManager.setup()
         await ClientManager.load_from_disk()
         await EnodoOutputManager.async_setup()
 
@@ -128,7 +104,6 @@ class Server:
     async def clean_up(self):
         """Cleans up before shutdown
         """
-        await ServerState.storage.close()
         await ServerState.scheduler.close()
         await self.backend_socket.stop()
 
@@ -179,13 +154,12 @@ class Server:
         logging.info('Stopping Hub...')
         ServerState.readiness = False
 
-        await SeriesManager.close()
         ServerState.running = False
         logging.info('...Doing clean up')
         await self.clean_up()
 
-        if ServerState.storage is not None:
-            await ServerState.storage.close()
+        if ServerState.thingsdb_client is not None:
+            ServerState.thingsdb_client.close()
         ServerState.stop()
 
         logging.info('...Stopping all running tasks')

@@ -9,22 +9,6 @@ def setup_routes(app, cors):
         cors (CorsConfig): cors
     """
     # Add rest api routes
-    app.router.add_get(
-        "/api/series", ApiHandlers.get_monitored_series,
-        allow_head=False)
-    app.router.add_post(
-        "/api/series", ApiHandlers.add_series)
-    app.router.add_get(
-        "/api/series/{series_name}", ApiHandlers.get_single_monitored_series,
-        allow_head=False)
-
-    app.router.add_get(
-        "/api/series/{rid}/output",
-        ApiHandlers.get_all_series_output,
-        allow_head=False)
-
-    app.router.add_delete(
-        "/api/series/{rid}", ApiHandlers.remove_series)
     app.router.add_post(
         "/api/series/{rid}/run", ApiHandlers.run_job_for_series)
     app.router.add_get(
@@ -52,12 +36,6 @@ def setup_routes(app, cors):
         "/api/enodo/output/{output_type}", ApiHandlers.add_enodo_output)
     app.router.add_get(
         "/api/enodo/stats", ApiHandlers.get_enodo_stats)
-    app.router.add_get(
-        "/api/enodo/label", ApiHandlers.get_enodo_labels, allow_head=False)
-    app.router.add_post(
-        "/api/enodo/label", ApiHandlers.add_enodo_label)
-    app.router.add_delete(
-        "/api/enodo/label", ApiHandlers.remove_enodo_label)
 
     # Add internal api routes
     app.router.add_get(

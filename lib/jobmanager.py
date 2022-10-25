@@ -11,11 +11,10 @@ from enodo.protocol.packagedata import (
     REQUEST_TYPE_EXTERNAL)
 from lib.outputmanager import EnodoOutputManager
 from lib.socket.clientmanager import WorkerClient
-from lib.state.resource import StoredResource
 from .socket import ClientManager
 
 
-class EnodoJob(StoredResource):
+class EnodoJob:
     __slots__ = ('rid', 'series_name', 'job_config', 'pool_idx',
                  'job_data', 'send_at', 'error', 'worker_id')
 
@@ -41,19 +40,6 @@ class EnodoJob(StoredResource):
         self.send_at = send_at
         self.error = error
         self.worker_id = worker_id
-
-    @property
-    def should_be_stored(self):
-        return self.error is None
-
-    @property
-    def to_store_data(self):
-        return EnodoJob.to_dict(self)
-
-    @classmethod
-    @property
-    def resource_type(self):
-        return "failed_jobs"
 
     @classmethod
     def to_dict(cls, job: 'EnodoJob') -> dict:
@@ -92,7 +78,6 @@ class EnodoJobManager:
             logging.error("Invalid job result, cannot handle")
             return
         response = EnodoRequestResponse(**data)
-
         if response.request.request_type == REQUEST_TYPE_EXTERNAL:
             await EnodoOutputManager.handle_result(response)
 
@@ -104,8 +89,6 @@ class EnodoJobManager:
         except Exception as e:
             logging.error(
                 f"Something went wrong when sending job request to worker")
-            import traceback
-            traceback.print_exc()
             logging.debug(f"Corresponding error: {e}, "
                           f'exception class: {e.__class__.__name__}')
 
