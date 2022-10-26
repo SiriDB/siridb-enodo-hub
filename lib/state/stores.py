@@ -1,6 +1,5 @@
 from abc import abstractmethod
 from functools import partial
-from threading import current_thread
 from thingsdb.room import Room, event
 
 from lib.outputmanager import EnodoEventOutputWebhook, EnodoResultOutputWebhook

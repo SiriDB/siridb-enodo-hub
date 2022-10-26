@@ -4,11 +4,6 @@ import logging
 from typing import Callable, Optional
 from enodo.net import *
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from lib.socket.clientmanager import WorkerClient
-
 
 class EnodoProtocol(BaseProtocol):
 

@@ -1,5 +1,4 @@
 import datetime
-
 import asyncio
 import logging
 import signal
@@ -9,12 +8,11 @@ from aiohttp import web
 from aiojobs.aiohttp import setup
 from enodo.protocol.packagedata import *
 from enodo.protocol.package import LISTENER_NEW_SERIES_POINTS
+
 from lib.outputmanager import EnodoOutputManager
 from lib.util.upgrade import UpgradeUtil
-
 from lib.webserver.apihandlers import ApiHandlers, auth
 from lib.config import Config
-
 from lib.logging import prepare_logger
 from lib.serverstate import ServerState
 from lib.socket import ClientManager
@@ -22,7 +20,6 @@ from lib.socket.handler import receive_new_series_points
 from lib.socket.socketserver import SocketServer
 from lib.util import print_custom_aiohttp_startup_message
 from lib.webserver.routes import setup_routes
-from lib.state.resource import resource_manager_index
 from version import VERSION
 
 
@@ -92,8 +89,6 @@ class Server:
         self._connection_management_task = await scheduler.spawn(
             self._manage_connections())
         self._watch_tasks_task = await scheduler.spawn(self.watch_tasks())
-        self._cleanup_resource_managers = await scheduler.spawn(
-            self.clean_resource_manager())
         self._connection_loop_task = await scheduler.spawn(
             ClientManager.connect_loop())
 
@@ -106,13 +101,6 @@ class Server:
         """
         await ServerState.scheduler.close()
         await self.backend_socket.stop()
-
-    async def clean_resource_manager(self):
-        while ServerState.running:
-            logging.debug("Cleaning resource manager caches")
-            for manager in resource_manager_index.values():
-                manager.cleanup()
-            await asyncio.sleep(10)
 
     async def _manage_connections(self):
         """Background task to check if all connections are up

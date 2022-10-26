@@ -10,9 +10,10 @@ def setup_routes(app, cors):
     """
     # Add rest api routes
     app.router.add_post(
-        "/api/series/{rid}/run", ApiHandlers.run_job_for_series)
+        "/api/series/{series_name}/run", ApiHandlers.run_job_for_series)
     app.router.add_get(
-        "/api/series/{rid}/state/{job_type}", ApiHandlers.query_series_state)
+        "/api/series/{series_name}/state/{job_type}",
+        ApiHandlers.query_series_state)
     app.router.add_get(
         "/api/config/series", ApiHandlers.get_series_configs)
     app.router.add_post(

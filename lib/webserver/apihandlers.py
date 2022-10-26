@@ -35,17 +35,7 @@ class ApiHandlers:
         Returns:
             dict with siridb response
         """
-        rid = unquote(request.match_info['rid'])
-        by_name = False
-        if 'byName' in request.rel_url.query:
-            q_by_name = request.rel_url.query['byName']
-            if q_by_name == "1" or q_by_name.lower() == "true":
-                by_name = True
-        if by_name:
-            series_name = rid
-        else:
-            series_name = ServerState.series_rm.get_resource_rid_value(
-                int(rid))
+        series_name = unquote(request.match_info['series_name'])
         pool_id = int(request.rel_url.query.get('poolID', 0))
         response_output_id = request.rel_url.query.get('responseOutputID')
         if response_output_id is None:
@@ -70,18 +60,7 @@ class ApiHandlers:
         Returns:
             dict with state response
         """
-        rid = unquote(request.match_info['rid'])
-        by_name = False
-        if 'byName' in request.rel_url.query:
-            q_by_name = request.rel_url.query['byName']
-            if q_by_name == "1" or q_by_name.lower() == "true":
-                by_name = True
-        if by_name:
-            series_name = rid
-        else:
-            series_name = ServerState.series_rm.get_resource_rid_value(
-                int(rid))
-
+        series_name = unquote(request.match_info['series_name'])
         pool_id = int(request.rel_url.query.get('poolID', 0))
 
         job_type = unquote(request.match_info['job_type'])

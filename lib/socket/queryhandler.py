@@ -1,9 +1,8 @@
 from asyncio import Future
-import functools
 import logging
 from uuid import uuid4
 
-from enodo.protocol.package import WORKER_QUERY, WORKER_QUERY_RESULT
+from enodo.protocol.package import WORKER_QUERY
 from enodo.protocol.packagedata import EnodoRequest
 
 

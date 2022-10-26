@@ -6,7 +6,7 @@ from packaging import version
 import qpack
 from enodo.protocol.package import create_header, read_packet, HEARTBEAT, \
     HANDSHAKE, HANDSHAKE_FAIL, UNKNOWN_CLIENT, CLIENT_SHUTDOWN, \
-    HANDSHAKE_OK, UPDATE_SERIES
+    HANDSHAKE_OK
 
 from lib.serverstate import ServerState
 from . import ClientManager
