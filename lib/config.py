@@ -39,11 +39,6 @@ EMPTY_CONFIG_FILE = {
     }
 }
 
-EMPTY_SETTINGS_FILE = {
-    'max_in_queue_before_warning': '25',
-    'min_data_points': '100'
-}
-
 
 class EnodoConfigParser(RawConfigParser):
     def __init__(self, env_support=True, **kwargs):
@@ -75,7 +70,6 @@ class EnodoConfigParser(RawConfigParser):
 class Config:
     _config = None
     _path = None
-    min_data_points = None
     watcher_interval = None
     hub_id = None
 
@@ -115,9 +109,6 @@ class Config:
     thingsdb_port = None
     thingsdb_auth_token = None
     thingsdb_scope = None
-
-    # Enodo Events
-    max_in_queue_before_warning = None
 
     @classmethod
     def create_standard_config_file(cls, path):
@@ -160,23 +151,6 @@ class Config:
             cls._config.read(path)
 
         cls.setup_config_variables()
-
-    @classmethod
-    async def read_settings(cls, client):
-        convert_to = {
-            'max_in_queue_before_warning': int,
-            'min_data_points': int
-        }
-        for option in EMPTY_SETTINGS_FILE:
-            resp = await client.query("""
-                if (.settings.has(option) == false) {
-                    .settings.set(option, default)
-                }
-                .settings.get(option)
-            """, option=option, default=EMPTY_SETTINGS_FILE[option])
-            if option in convert_to:
-                resp = convert_to[option](resp)
-            setattr(cls, option, resp)
 
     @classmethod
     def get_siridb_settings(cls):
@@ -302,13 +276,6 @@ class Config:
             keys[1:]) if len(keys) > 1 else data.pop(
             keys[0],
             None)
-
-    @classmethod
-    def get_settings(cls, include_secrets=True):
-        return {
-            'max_in_queue_before_warning': cls.max_in_queue_before_warning,
-            'min_data_points': cls.min_data_points
-        }
 
     @staticmethod
     def is_runtime_configurable(key):

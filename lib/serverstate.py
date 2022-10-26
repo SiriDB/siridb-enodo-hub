@@ -24,6 +24,7 @@ class ServerState:
     series_config_rm = None
     job_config_template_rm = None
     thingsdb_client = None
+    settings = None
 
     @classmethod
     async def async_setup(cls):
@@ -65,6 +66,11 @@ class ServerState:
                                           port=Config.thingsdb_port)
         await cls.thingsdb_client.authenticate(Config.thingsdb_auth_token)
         cls.thingsdb_client.set_default_scope(Config.thingsdb_scope)
+
+    @classmethod
+    async def setup_settings(cls):
+        from lib.state.stores import SettingStore  # Circular import
+        cls.settings = await SettingStore.setup(cls.thingsdb_client)
 
     @classmethod
     def get_readiness(cls):

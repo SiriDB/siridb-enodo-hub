@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.2.0-beta1.0.0] - 2022-10-27
+
+### Changed
+- Scheduling is removed for this version and will be brought back in a later version
+
+### Added
+- Support for fetching job results via the API, by providing the module config
+- The basis for realtime anomaly detection and realtime workers which can hold state for later use
+
 ## [0.1.0-beta4.0.17] - 2022-08-23
 
 ### Fixed

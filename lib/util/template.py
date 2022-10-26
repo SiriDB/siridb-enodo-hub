@@ -1,3 +1,4 @@
+import logging
 from string import Template
 from collections import ChainMap as _ChainMap
 
@@ -15,7 +16,7 @@ class CTemplate(Template):
             value = value[1:]
         if conditional and not self._get_value(mapping, value):
             return ""
-        return f'"{key}": "{self._get_value(mapping, value)}",'
+        return f'"{key}": "{str(self._get_value(mapping, value))}",'
 
     def _get_value(self, mapping, path) -> str:
         path = path.split(".")
@@ -23,9 +24,11 @@ class CTemplate(Template):
         for path_item in path:
             if hasattr(curr_val, path_item):
                 curr_val = getattr(curr_val, path_item)
-            else:
+            elif path_item in curr_val:
                 curr_val = curr_val[path_item]
-        return str(curr_val)
+            else:
+                return None
+        return curr_val
 
     def safe_substitute(self, mapping=_sentinel_dict, /, **kws):
         if mapping is _sentinel_dict:
@@ -40,7 +43,7 @@ class CTemplate(Template):
                 try:
                     if "," in named:
                         return self._print_key_value(named, mapping)
-                    return self._get_value(mapping, named)
+                    return str(self._get_value(mapping, named))
                 except Exception as _:
                     return mo.group()
             if mo.group('escaped') is not None:

@@ -34,7 +34,6 @@ if (!has_type('EventOutput')) {
     .event_output_store = {};
     .event_output_store.to_type('EventOutputStore');
 };
-.event_output_store.ev.id();  // Return the event room id
 
 if (!has_type('ResultOutput')) {
     new_procedure('add_result_output', |output| {
@@ -63,7 +62,6 @@ if (!has_type('ResultOutput')) {
     .result_output_store = {};
     .result_output_store.to_type('ResultOutputStore');
 };
-.result_output_store.ev.id();  // Return the event room id
 
 if (!has_type('Worker')) {
     new_procedure('add_worker', |worker| {
@@ -92,8 +90,26 @@ if (!has_type('Worker')) {
     .worker_store = {};
     .worker_store.to_type('WorkerStore');
 };
-.worker_store.ev.id();  // Return the event room id
-.settings = {};
+
+if (!has_type('SettingStore')) {
+    new_procedure('update_setting', |key, value| {
+        if (.setting_store.settings.has(key)) {
+            .setting_store.settings.set(key, value);
+            .setting_store.ev.emit('update-setting', key, value);
+        }
+    });
+    set_type('SettingStore', {
+        settings: 'thing',
+        ev: 'room',
+    });
+    .setting_store = {
+        settings: {
+            max_in_queue_before_warning: 25,
+            min_data_points: 100
+        }
+    };
+    .setting_store.to_type('SettingStore');
+};
 .hub_version = "0.2.0-beta1.0.0";"""
 }
 

@@ -205,7 +205,6 @@ class WorkerClient:
 
 class ClientManager:
     listeners = {}
-    _workers = {}
     _ws = None
     _query_handler = None
     _sd_lookups = {}
@@ -213,7 +212,8 @@ class ClientManager:
     @classmethod
     async def setup(cls):
         from lib.state.stores import WorkerStore  # Circular import
-        cls._ws = await WorkerStore.setup(ServerState.thingsdb_client)
+        cls._ws = await WorkerStore.setup(ServerState.thingsdb_client,
+                                          cls.update_worker_pools)
         cls._query_handler = QueryHandler()
 
     @classmethod
@@ -223,7 +223,7 @@ class ClientManager:
         wid = get_worker_for_series(cls._sd_lookups[pool_idx], series_name)
         worker_idx = int.from_bytes(
             pool_idx.to_bytes(8, 'big') + wid.to_bytes(4, 'big'), 'big')
-        return cls._workers.get(worker_idx)
+        return cls._ws.lookup_workers.get(worker_idx)
 
     @classmethod
     async def query_series_state(cls, pool_id, job_type_id, series_name):
@@ -244,12 +244,12 @@ class ClientManager:
         pool_idx = gen_pool_idx(
             pool_id, worker['worker_config']['job_type_id'])
         current_num = len(
-            [w.pool_idx == pool_idx for w in cls._workers.values()])
+            [w.pool_idx == pool_idx for w in cls._ws.lookup_workers.values()])
         bpool_idx = pool_idx.to_bytes(8, 'big')
         worker['worker_idx'] = int.from_bytes(
             bpool_idx + current_num.to_bytes(4, 'big'), 'big')
         cls._sd_lookups[pool_idx] = generate_worker_lookup(current_num + 1)
-        cls._workers[worker['worker_idx']] = await cls._ws.create(worker)
+        await cls._ws.create(worker)
 
     @classmethod
     def update_worker_pools(cls, workers):
@@ -258,7 +258,7 @@ class ClientManager:
             if w.pool_idx not in _sd_lookups:
                 _sd_lookups[w.pool_idx] = 0
             _sd_lookups[w.pool_idx] += 1
-            cls._workers[w.worker_idx] = w
+            cls._ws.lookup_workers[w.worker_idx] = w
         for pool_idx, num_workers in _sd_lookups.items():
             cls._sd_lookups[pool_idx] = generate_worker_lookup(num_workers)
 
@@ -309,6 +309,10 @@ class ClientManager:
         listener.writer.write(series_update + update)
 
     @classmethod
+    def get_workers(cls):
+        return cls._ws.workers.values()
+
+    @classmethod
     async def check_clients_alive(cls, max_timeout: int):
         for client in cls.listeners:
             listener = cls.listeners.get(client)
@@ -323,8 +327,7 @@ class ClientManager:
         counter = 0
         while True:
             counter += 1
-
-            for worker in cls._workers.values():
+            for worker in cls._ws.workers.values():
                 if (
                     worker.is_connected() or
                     worker.is_connecting() or

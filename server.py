@@ -62,8 +62,7 @@ class Server:
             logging.error("Upgrade of thingsdb collection failed")
             logging.debug(f"Corresponding error: {e}")
             raise e
-
-        await Config.read_settings(ServerState.thingsdb_client)
+        await ServerState.setup_settings()
 
         # Setup internal security token for authenticating
         # backend socket connections
@@ -165,7 +164,7 @@ class Server:
         await asyncio.gather(*tasks, return_exceptions=True)
 
         self.loop.stop()
-        print('Bye!')
+        logging.info('Bye!')
 
     async def _stop_server_from_aiohttp_cleanup(self, *args, **kwargs):
         """Stop server when aiohttp can exit

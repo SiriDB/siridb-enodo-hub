@@ -15,7 +15,6 @@ class EnodoProtocol(BaseProtocol):
 
     def connection_lost(self, exc: Optional[Exception]):
         super().connection_lost(exc)
-        print(exc)
         if self._connection_lost:
             self._connection_lost()
 

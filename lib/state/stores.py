@@ -1,5 +1,7 @@
 from abc import abstractmethod
+from asyncio import ensure_future
 from functools import partial
+from typing import Any
 from thingsdb.room import Room, event
 
 from lib.outputmanager import EnodoEventOutputWebhook, EnodoResultOutputWebhook
@@ -26,10 +28,6 @@ class BaseStore(Room):
 
     @abstractmethod
     async def setup(cls):
-        pass
-
-    @abstractmethod
-    async def create(cls):
         pass
 
 
@@ -112,14 +110,17 @@ class ResultOutputStore(BaseStore):
 
 
 class WorkerStore(BaseStore):
+    worker_update_cb = None
 
     def on_init(self):
         self.workers = {}
+        self.lookup_workers = {}
         self.add_worker = partial(self.client.run, 'add_worker')
         self.delete_worker = partial(self.client.run, 'delete_worker')
 
     @classmethod
-    async def setup(cls, client):
+    async def setup(cls, client, update_cb):
+        cls.worker_update_cb = update_cb
         room_id = await client.query("""//ti
                     .worker_store.ev.id();
                 """)
@@ -142,9 +143,46 @@ class WorkerStore(BaseStore):
     def on_add_worker(self, worker):
         worker = self.to_rc(worker, WorkerClient)
         self.workers[worker.rid] = worker
+        self.lookup_workers[worker.worker_idx] = worker
+        ensure_future(worker.connect())
+        if WorkerStore.worker_update_cb is not None:
+            WorkerStore.worker_update_cb(self.workers.values())
 
-    @event('delete-rworker')
+    @event('delete-worker')
     def on_delete_worker(self, worker):
         worker = self.to_rc(worker, WorkerClient)
         if worker.rid in self.workers:
             del self.workers[worker.rid]
+            del self.lookup_workers[worker.worker_idx]
+        if WorkerStore.worker_update_cb is not None:
+            WorkerStore.worker_update_cb(self.workers.values())
+
+
+class SettingStore(BaseStore):
+
+    def on_init(self):
+        self.settings = {}
+        self.update_setting = partial(self.client.run, 'update_setting')
+
+    @classmethod
+    async def setup(cls, client):
+        room_id = await client.query("""//ti
+                    .setting_store.ev.id();
+                """)
+        s = cls(room_id)
+        await s.join(client)
+        return s
+
+    async def update(self, key: str, value: Any):
+        await self.update_setting(key, value)
+
+    async def on_join(self):
+        _settings = await self.client.query("""//ti
+            .setting_store.settings;
+        """)
+        del _settings['#']
+        self.settings = _settings
+
+    @event('update-setting')
+    def on_update_setting(self, key, value):
+        self.settings[key] = value

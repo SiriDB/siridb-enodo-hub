@@ -224,10 +224,10 @@ class BaseHandler:
     @classmethod
     @sync_simple_fields_filter(is_list=False)
     def resp_get_enodo_config(cls):
-        return {'data': Config.get_settings(include_secrets=False)}
+        return {'data': ServerState.settings.settings}
 
     @classmethod
-    def resp_set_config(cls, data):
+    async def resp_set_config(cls, data):
         """Update config
 
         Args:
@@ -239,8 +239,7 @@ class BaseHandler:
         keys_and_values = data.get('entries')
         for key in keys_and_values:
             if Config.is_runtime_configurable(key):
-                Config.update_settings(
-                    ServerState.thingsdb_client,
+                await ServerState.settings.update_setting(
                     key, keys_and_values[key])
 
         return {'data': True}

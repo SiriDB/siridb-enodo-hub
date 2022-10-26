@@ -377,7 +377,7 @@ class ApiHandlers:
             key/value pairs settings
         """
         data = await request.json()
-        resp = BaseHandler.resp_set_config(data)
+        resp = await BaseHandler.resp_set_config(data)
         return web.json_response(data=resp, status=200)
 
     @classmethod
@@ -396,7 +396,7 @@ class ApiHandlers:
                 'listeners': [
                     li.to_dict() for li in ClientManager.listeners.values()],
                 'workers': [
-                    wo.to_dict() for wo in ClientManager.workers.values()]
+                    wo.to_dict() for wo in ClientManager.get_workers()]
             }
         },
             status=200,
