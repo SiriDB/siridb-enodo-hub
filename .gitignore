@@ -20,3 +20,4 @@ connector/python/dist
 *.txt
 .pylintrc
 unittests
+local.sh

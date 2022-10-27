@@ -1,4 +1,3 @@
-from multiprocessing import pool
 import urllib.parse
 from json import JSONDecodeError
 from urllib.parse import unquote

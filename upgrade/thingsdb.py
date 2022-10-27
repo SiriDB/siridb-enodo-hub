@@ -3,7 +3,7 @@ import os
 
 
 upgrade = {
-    "0.2.0-beta1.0.0": """//ti
+    "0.2.0-beta0.1.0": """//ti
 if (!has_type('EventOutput')) {
     new_procedure('add_event_output', |output| {
         output = EventOutput(output);

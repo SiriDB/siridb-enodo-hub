@@ -1,4 +1,3 @@
-import logging
 from string import Template
 from collections import ChainMap as _ChainMap
 

@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional, Union
+from typing import Optional, Union
 from uuid import uuid4
 
 import qpack

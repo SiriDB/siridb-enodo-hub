@@ -1,11 +1,9 @@
-from configparser import NoOptionError, NoSectionError, \
-    RawConfigParser, ConfigParser
+from configparser import (NoOptionError, NoSectionError,
+                          RawConfigParser, ConfigParser)
 import os
-import logging
 from secrets import token_urlsafe
 
-from lib.exceptions.enodoexception import EnodoInvalidConfigException, \
-    EnodoException
+from lib.exceptions.enodoexception import EnodoInvalidConfigException
 
 EMPTY_CONFIG_FILE = {
     'hub': {
