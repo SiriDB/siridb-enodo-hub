@@ -15,20 +15,13 @@ EMPTY_CONFIG_FILE = {
         'base_path': '',
         'save_to_disk_interval': '20',
         'enable_rest_api': 'true',
-        'enable_socket_io_api': 'false',
-        'disable_safe_mode': 'false'
+        'log_level': 'info',
+        'webserver_port': '80'
     },
     'analyser': {
         'watcher_interval': '2',
     },
     'siridb_data': {
-        'host': '',
-        'port': '',
-        'user': '',
-        'password': '',
-        'database': '',
-    },
-    'siridb_output': {
         'host': '',
         'port': '',
         'user': '',
@@ -92,15 +85,11 @@ class Config:
     client_max_timeout = None
     socket_server_host = None
     socket_server_port = None
-    series_save_path = None
     clients_save_path = None
-    outputs_save_path = None
     save_to_disk_interval = None
     enable_rest_api = None
-    enable_socket_io_api = None
-    internal_security_token = None
-    jobs_save_path = None
-    disable_safe_mode = None
+    log_level = None
+    webserver_port = None
 
     # ThingsDB
     thingsdb_host = None
@@ -121,20 +110,6 @@ class Config:
 
         with open(path, "w") as fh:
             _config.write(fh)
-
-    @classmethod
-    def setup_internal_security_token(cls):
-        """
-        Method checks if a token is already setup,
-        if not, it will generate one.
-        (used for handshakes in internal communication)
-
-        This method can only be called after the configfile is parsed
-        :return:
-        """
-        cls.internal_security_token = None
-        if cls.disable_safe_mode is False:
-            cls.internal_security_token = token_urlsafe(16)
 
     @classmethod
     def read_config(cls, path):
@@ -198,26 +173,18 @@ class Config:
                 required=False,
                 default='true'),
             True)
-        cls.enable_socket_io_api = cls.to_bool(
-            cls._config.get_r(
-                'hub', 'enable_socket_io_api',
-                required=False,
-                default='false'),
-            False)
-        cls.base_dir = cls._config.get_r(
-            'hub', 'base_path')
-        cls.disable_safe_mode = cls.to_bool(
-            cls._config.get_r('hub', 'disable_safe_mode'), False)
+        cls.base_dir = cls._config.get_r('hub', 'base_path')
+        cls.log_level = cls._config.get_r('hub', 'log_level')
+        cls.webserver_port = cls.to_int(
+            cls._config.get_r('hub', 'webserver_port', False, default=80))
 
         # ThingsDB
-        cls.thingsdb_host = cls._config.get_r(
-            'thingsdb', 'host', True)
+        cls.thingsdb_host = cls._config.get_r('thingsdb', 'host', True)
         cls.thingsdb_port = cls.to_int(
             cls._config.get_r('thingsdb', 'port', True))
         cls.thingsdb_auth_token = cls._config.get_r(
             'thingsdb', 'auth_token', True)
-        cls.thingsdb_scope = cls._config.get_r(
-            'thingsdb', 'scope', True)
+        cls.thingsdb_scope = cls._config.get_r('thingsdb', 'scope', True)
 
         # SiriDB
         cls.siridb_host = cls._config.get_r('siridb_data', 'host')
@@ -228,22 +195,6 @@ class Config:
             'siridb_data', 'password')
         cls.siridb_database = cls._config.get_r(
             'siridb_data', 'database')
-
-        # SiriDB Forecast
-        cls.siridb_output_host = cls._config.get_r(
-            'siridb_output',
-            'host')
-        cls.siridb_output_port = cls.to_int(
-            cls._config.get_r('siridb_output', 'port'))
-        cls.siridb_output_user = cls._config.get_r(
-            'siridb_output',
-            'user')
-        cls.siridb_output_password = cls._config.get_r(
-            'siridb_output',
-            'password')
-        cls.siridb_output_database = cls._config.get_r(
-            'siridb_output',
-            'database')
 
         cls.hub_id = cls._config.get_r('hub', 'id')
 

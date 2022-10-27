@@ -25,15 +25,13 @@ from version import VERSION
 
 class Server:
 
-    def __init__(self, port, config_path, log_level='info'):
+    def __init__(self, config_path):
         self.loop = None
-        self.port = port
         self.app = None
         self.auth = None
 
         self._config_path = config_path
         self.backend_socket = None
-        self._log_level = log_level
 
         self._check_jobs_task = None
         self._connection_management_task = None
@@ -64,15 +62,9 @@ class Server:
             raise e
         await ServerState.setup_settings()
 
-        # Setup internal security token for authenticating
-        # backend socket connections
-        logging.info('Setting up internal communications token...')
-        Config.setup_internal_security_token()
-
         # Setup backend socket connection
         self.backend_socket = SocketServer(
             Config.socket_server_host, Config.socket_server_port,
-            Config.internal_security_token,
             {LISTENER_NEW_SERIES_POINTS: receive_new_series_points})
 
         # Setup REST API handlers
@@ -179,8 +171,8 @@ class Server:
     def start_server(self):
         """Start server by loading config and calling other startup functions
         """
-        prepare_logger(self._log_level)
         Config.read_config(self._config_path)
+        prepare_logger(Config.log_level)
         logging.info(f'Starting Hub V{VERSION}...')
         logging.info('Loaded Config...')
         logging.info('Running API\'s in secure mode...')
@@ -211,6 +203,6 @@ class Server:
         try:
             web.run_app(
                 self.app, print=print_custom_aiohttp_startup_message,
-                port=self.port)
+                port=Config.webserver_port)
         except (asyncio.CancelledError, RuntimeError):
             pass

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.2.0-beta0.1.1] - 2022-10-27
+
+### Changed
+- Moved log level and webserver port from args to config/env vars
+
 ## [0.2.0-beta0.1.0] - 2022-10-27
 
 ### Changed

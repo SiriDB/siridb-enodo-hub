@@ -15,10 +15,9 @@ ENODO_HUB_WORKER_MIN_VERSION = "0.1.0-beta3.0"
 
 
 class SocketServer:
-    def __init__(self, hostname, port, token, cbs=None):
+    def __init__(self, hostname, port, cbs=None):
         self._hostname = hostname
         self._port = port
-        self._token = token
         self._cbs = cbs or {}
         self._server = None
         self._server_coro = None
@@ -113,15 +112,6 @@ class SocketServer:
     async def _handle_handshake(self, writer, packet_id, data):
         client_data = data
         client_id = client_data.get('client_id')
-        client_token = client_data.get('token')
-
-        if self._token is not None and (
-                client_token
-                is None or client_token
-                != self._token):
-            response = create_header(0, HANDSHAKE_FAIL)
-            writer.write(response)
-            return client_id, False
 
         if 'client_type' not in client_data:
             response = create_header(0, HANDSHAKE_FAIL)
