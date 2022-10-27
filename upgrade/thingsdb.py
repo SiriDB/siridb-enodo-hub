@@ -9,10 +9,10 @@ if (!has_type('EventOutput')) {
         output = EventOutput(output);
         .event_output_store.outputs.push(output);
         .event_output_store.ev.emit('add-event-output', output);
-        return output
+        return output;
     });
     new_procedure('delete_event_output', |output_rid| {
-        output = thing(output_rid)
+        output = thing(output_rid);
         if (type(output) == "EventOutput") {
             .event_output_store.outputs.remove(|o| o.id() == output_rid)
             .event_output_store.ev.emit('delete-event-output', output);
@@ -40,14 +40,14 @@ if (!has_type('ResultOutput')) {
         output = ResultOutput(output);
         .result_output_store.outputs.push(output);
         .result_output_store.ev.emit('add-result-output', output);
-        return output
+        return output;
     });
     new_procedure('delete_result_output', |output_rid| {
         output = thing(output_rid)
         if (type(output) == "ResultOutput") {
             .result_output_store.outputs.remove(|o| o.id() == output_rid)
             .result_output_store.ev.emit('delete-result-output', output);
-        }
+        };
     });
     set_type('ResultOutput', {
         url: 'str',
@@ -68,14 +68,14 @@ if (!has_type('Worker')) {
         worker = Worker(worker);
         .worker_store.workers.push(worker);
         .worker_store.ev.emit('add-worker', worker);
-        return worker
+        return worker;
     });
     new_procedure('delete_worker', |worker_rid| {
-        worker = thing(worker_rid)
+        worker = thing(worker_rid);
         if (type(worker) == "Worker") {
             .worker_store.workers.remove(|o| o.id() == worker_rid)
             .worker_store.ev.emit('delete-worker', worker);
-        }
+        };
     });
     set_type('Worker', {
         worker_idx: 'int',
@@ -96,7 +96,7 @@ if (!has_type('SettingStore')) {
         if (.setting_store.settings.has(key)) {
             .setting_store.settings.set(key, value);
             .setting_store.ev.emit('update-setting', key, value);
-        }
+        };
     });
     set_type('SettingStore', {
         settings: 'thing',
