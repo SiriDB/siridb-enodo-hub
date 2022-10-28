@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.2.0-beta0.1.2] - 2022-10-27
+
+### Added
+- Add worker endpoint
+
 ## [0.2.0-beta0.1.1] - 2022-10-27
 
 ### Changed

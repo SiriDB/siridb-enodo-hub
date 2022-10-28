@@ -251,6 +251,7 @@ class ClientManager:
         cls._sd_lookups[pool_idx] = generate_worker_lookup(current_num + 1)
         await cls._ws.create(worker)
 
+
     @classmethod
     def update_worker_pools(cls, workers):
         _sd_lookups = {}

@@ -7,6 +7,7 @@ from siridb.connector.lib.exceptions import QueryError, InsertError, \
 
 from enodo.model.config.series import SeriesJobConfigModel
 from enodo.protocol.packagedata import REQUEST_TYPE_EXTERNAL, EnodoRequest
+from enodo.jobs import JOB_TYPE_FORECAST_SERIES, JOB_TYPE_IDS
 
 from lib.config import Config
 from lib.outputmanager import EnodoOutputManager
@@ -254,3 +255,19 @@ class BaseHandler:
                 "no_output_streams": len(
                     await EnodoOutputManager.get_outputs())
             }}
+
+    @classmethod
+    async def resp_add_worker(cls, worker_data):
+        try:
+            await ClientManager.add_worker(0, worker_data)
+        except Exception:
+            return 400, {"error": "Cannot create worker. Invalid data"}
+        return 201, {}
+
+    @classmethod
+    async def resp_delete_worker(cls, worker_id):
+        try:
+            await ClientManager
+        except Exception:
+            return 400, {"error": "Cannot create worker. Invalid data"}
+        return 201, {}

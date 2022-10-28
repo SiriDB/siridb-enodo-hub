@@ -418,3 +418,19 @@ class ApiHandlers:
         """
         resp = await BaseHandler.resp_get_enodo_stats(fields=fields)
         return web.json_response(data=resp, status=200)
+
+    
+    @classmethod
+    @EnodoAuth.auth.required
+    async def add_worker(cls, request):
+        """Add new worker
+
+        Args:
+            request (Request): aiohttp request
+
+        Returns:
+            _type_: _description_
+        """
+        data = await request.json()
+        status, resp = await BaseHandler.resp_add_worker(data)
+        return web.json_response(data=resp, status=status)
