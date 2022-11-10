@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.2.0-beta0.1.3] - 2022-11-10
+
+### Added
+- Query workers in a pool for stats
+
 ## [0.2.0-beta0.1.2] - 2022-10-27
 
 ### Added

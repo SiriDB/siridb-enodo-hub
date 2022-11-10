@@ -5,9 +5,7 @@ import time
 from asyncio import StreamWriter
 from typing import Any, Optional
 
-import qpack
 from enodo import WorkerConfigModel
-from enodo.protocol.package import create_header
 from enodo.net import Package, PROTO_REQ_HANDSHAKE, PROTO_REQ_WORKER_REQUEST
 from enodo.protocol.packagedata import EnodoRequest, EnodoQuery
 from lib.config import Config
