@@ -206,6 +206,19 @@ class BaseHandler:
             return {'data': result}, 200
 
     @classmethod
+    async def resp_query_worker_stats(cls, pool_id):
+        fut = await ClientManager.query_client_stats(pool_id)
+        try:
+            result = await wait_for(fut, timeout=10)
+        except asyncio.TimeoutError:
+            return {'error': "Cannot get result. No response from workers"}, \
+                400
+        except Exception:
+            return {'error': "Cannot get result"}, 400
+        else:
+            return {'data': result}, 200
+
+    @classmethod
     @sync_simple_fields_filter()
     def resp_get_possible_analyser_modules(cls):
         """Get all modules that are available

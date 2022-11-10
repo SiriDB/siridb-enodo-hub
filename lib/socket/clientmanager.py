@@ -7,10 +7,9 @@ from typing import Any, Optional
 
 import qpack
 from enodo import WorkerConfigModel
-from enodo.protocol.package import (
-    UPDATE_SERIES, create_header)
+from enodo.protocol.package import create_header
 from enodo.net import Package, PROTO_REQ_HANDSHAKE, PROTO_REQ_WORKER_REQUEST
-from enodo.protocol.packagedata import EnodoRequest
+from enodo.protocol.packagedata import EnodoRequest, EnodoQuery
 from lib.config import Config
 from lib.serverstate import ServerState
 from lib.socket.queryhandler import QueryHandler
@@ -193,6 +192,10 @@ class WorkerClient:
     async def redirect_response(self, data, worker_id):
         pass
 
+    def handle_query_resp(self, query: EnodoQuery):
+        ClientManager._query_handler.set_query_result(
+            query.query_id, query.result)
+
     def to_dict(self) -> dict:
         return {
             'rid': self.rid,
@@ -226,9 +229,18 @@ class ClientManager:
         return cls._ws.lookup_workers.get(worker_idx)
 
     @classmethod
+    def get_workers_in_pool(cls, pool_id):
+        return [w for w in cls._ws.workers.values() if w.pool_id == pool_id]
+
+    @classmethod
     async def query_series_state(cls, pool_id, job_type_id, series_name):
         worker = cls.get_worker((pool_id << 8) | job_type_id, series_name)
         return await cls._query_handler.do_query(worker, series_name)
+
+    @classmethod
+    async def query_client_stats(cls, pool_id):
+        return await cls._query_handler.do_query_stats(
+            cls.get_workers_in_pool(pool_id))
 
     @classmethod
     async def fetch_request_response_from_worker(
@@ -250,7 +262,6 @@ class ClientManager:
             bpool_idx + current_num.to_bytes(4, 'big'), 'big')
         cls._sd_lookups[pool_idx] = generate_worker_lookup(current_num + 1)
         await cls._ws.create(worker)
-
 
     @classmethod
     def update_worker_pools(cls, workers):
@@ -305,9 +316,10 @@ class ClientManager:
 
     @classmethod
     def update_listener(cls, listener: ListenerClient, data: Any):
-        update = qpack.packb(data)
-        series_update = create_header(len(update), UPDATE_SERIES)
-        listener.writer.write(series_update + update)
+        pass
+        # update = qpack.packb(data)
+        # series_update = create_header(len(update), UPDATE_SERIES)
+        # listener.writer.write(series_update + update)
 
     @classmethod
     def get_workers(cls):

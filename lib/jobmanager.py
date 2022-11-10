@@ -1,6 +1,7 @@
 import logging
 from typing import Optional, Union
 from uuid import uuid4
+import json
 
 import qpack
 from enodo.jobs import *
@@ -12,6 +13,7 @@ from enodo.protocol.packagedata import (
 from lib.outputmanager import EnodoOutputManager
 from lib.socket.clientmanager import WorkerClient
 from .socket import ClientManager
+from lib.serverstate import ServerState
 
 
 class EnodoJob:
@@ -54,8 +56,6 @@ class EnodoJob:
 
 
 class EnodoJobManager:
-    _lock = None
-    _next_job_id = 0
 
     @classmethod
     async def send_job(cls, job: EnodoJob, request: EnodoRequest):
@@ -77,13 +77,16 @@ class EnodoJobManager:
         if not isinstance(data, dict):
             logging.error("Invalid job result, cannot handle")
             return
+
         response = EnodoRequestResponse(**data)
+        await ServerState.sio.emit("trace", json.dumps(response), room="trace")
         if response.request.request_type == REQUEST_TYPE_EXTERNAL:
             await EnodoOutputManager.handle_result(response)
 
     @classmethod
     async def _send_worker_job_request(cls, worker: WorkerClient,
                                        request: EnodoRequest):
+        await ServerState.sio.emit("trace", json.dumps(request), room="trace")
         try:
             worker.send_message(request, PROTO_REQ_WORKER_REQUEST)
         except Exception as e:

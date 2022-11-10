@@ -37,9 +37,12 @@ def setup_routes(app, cors):
         "/api/enodo/output/{output_type}", ApiHandlers.add_enodo_output)
     app.router.add_get(
         "/api/enodo/stats", ApiHandlers.get_enodo_stats)
-    
+
     app.router.add_post(
         "/api/worker", ApiHandlers.add_worker)
+    app.router.add_get(
+        "/api/worker/stats/{pool_id}",
+        ApiHandlers.query_worker_stats)
 
     # Add internal api routes
     app.router.add_get(

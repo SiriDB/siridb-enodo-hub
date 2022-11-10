@@ -3,6 +3,7 @@ import asyncio
 import logging
 from typing import Callable, Optional
 from enodo.net import *
+from enodo.protocol.packagedata import EnodoQuery
 
 
 class EnodoProtocol(BaseProtocol):
@@ -46,6 +47,15 @@ class EnodoProtocol(BaseProtocol):
         logging.debug("Response for redirect requested job")
         await self._worker.redirect_response(pkg.data)
 
+    async def _on_worker_query_response(self, pkg: Package):
+        logging.debug("Received query response")
+        try:
+            query = EnodoQuery(**pkg.data)
+        except Exception:
+            logging.error("Invalid query data")
+        else:
+            self._worker.handle_query_resp(query)
+
     def _get_future(self, pkg: Package) -> asyncio.Future:
         future, task = self._requests.pop(pkg.pid, (None, None))
         if future is None:
@@ -63,7 +73,9 @@ class EnodoProtocol(BaseProtocol):
         PROTO_RES_HEARTBEAT: _on_heartbeat,
         PROTO_REQ_WORKER_REQUEST: _on_worker_request,
         PROTO_RES_WORKER_REQUEST: _on_worker_request_response,
-        PROTO_RES_WORKER_REQUEST_REDIRECT: _on_worker_request_response_redirect
+        PROTO_RES_WORKER_REQUEST_REDIRECT:
+            _on_worker_request_response_redirect,
+        PROTO_RES_WORKER_QUERY: _on_worker_query_response
     }):
         handle = _map.get(pkg.tp)
 

@@ -75,6 +75,25 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
+    async def query_worker_stats(cls, request):
+        """Query stats of workers in a pool
+
+        Args:
+
+        Returns:
+            dict with stats response
+        """
+        pool_id = unquote(request.match_info['pool_id'])
+
+        if pool_id is None:
+            return web.json_response(
+                {}, dumps=safe_json_dumps, status=400)
+        pool_id = int(pool_id)
+        data, status = await BaseHandler.resp_query_worker_stats(pool_id)
+        return web.json_response(data, dumps=safe_json_dumps, status=status)
+
+    @classmethod
+    @EnodoAuth.auth.required
     async def run_siridb_query(cls, request):
         """Run siridb query
 
@@ -419,7 +438,6 @@ class ApiHandlers:
         resp = await BaseHandler.resp_get_enodo_stats(fields=fields)
         return web.json_response(data=resp, status=200)
 
-    
     @classmethod
     @EnodoAuth.auth.required
     async def add_worker(cls, request):
