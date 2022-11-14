@@ -7,7 +7,7 @@ You can request enodo to run a job. You can give an output id (`responseOutputID
 ```
 curl --request POST \
   --url 'http://localhost/api/series/forecast_test2/run?byName=1&poolID=0&responseOutputID=1017' \
-  --header 'Authorization: Basic ZW5vZG86ZW5vZG8=' \
+  --header 'Authorization: Basic qweqweqw=' \
   --header 'Content-Type: application/json' \
   --data '{
 	"meta": {
@@ -46,7 +46,7 @@ Get active outputs for events
 ```
 curl --request GET \
   --url http://localhost/api/enodo/output/event \
-  --header 'Authorization: Basic ZW5vZG86ZW5vZG8='
+  --header 'Authorization: Basic qweqweqw='
 ```
 
 ## Get outputs for results
@@ -55,7 +55,7 @@ Get active output for results
 ```
 curl --request GET \
   --url http://localhost/api/enodo/output/result \
-  --header 'Authorization: Basic ZW5vZG86ZW5vZG8='
+  --header 'Authorization: Basic qweqweqw='
 ```
 
 ## Delete an output
@@ -64,7 +64,7 @@ Delete an output by its type (event or result) and id
 ```
 curl --request DELETE \
   --url http://localhost/api/enodo/output/{type}/{id} \
-  --header 'Authorization: Basic ZW5vZG86ZW5vZG8='
+  --header 'Authorization: Basic qweqweqw='
 ```
 
 ## Add ouput
@@ -73,7 +73,7 @@ Add an event or result output
 ```
 curl --request POST \
   --url http://localhost/api/enodo/output/result \
-  --header 'Authorization: Basic ZW5vZG86ZW5vZG8=' \
+  --header 'Authorization: Basic qweqweqw=' \
   --header 'Content-Type: application/json' \
   --data '{
 	"url": "http://hub:8720/enodo",
@@ -96,5 +96,5 @@ Get stats about workers in a pool
 ```
 curl --request GET \
   --url http://localhost/api/worker/stats/{pool_id} \
-  --header 'Authorization: Basic ZW5vZG86ZW5vZG8='
+  --header 'Authorization: Basic qweqweqw='
   ```
