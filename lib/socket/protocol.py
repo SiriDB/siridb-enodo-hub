@@ -4,6 +4,7 @@ import logging
 from typing import Callable, Optional
 from enodo.net import *
 from enodo.protocol.packagedata import EnodoQuery
+from enodo.model.enodoevent import EnodoEvent
 
 
 class EnodoProtocol(BaseProtocol):
@@ -56,6 +57,18 @@ class EnodoProtocol(BaseProtocol):
         else:
             self._worker.handle_query_resp(query)
 
+    async def _on_event(self, pkg: Package):
+        logging.debug(f'Received an event')
+        try:
+            event = EnodoEvent(**pkg.data)
+        except Exception:
+            logging.error("Invalid event data")
+        else:
+            await self._worker.handle_event(event)
+
+    async def _on_worker_shutdown(self, pkg: Package):
+        logging.warning("Worker is going down")
+
     def _get_future(self, pkg: Package) -> asyncio.Future:
         future, task = self._requests.pop(pkg.pid, (None, None))
         if future is None:
@@ -75,7 +88,9 @@ class EnodoProtocol(BaseProtocol):
         PROTO_RES_WORKER_REQUEST: _on_worker_request_response,
         PROTO_RES_WORKER_REQUEST_REDIRECT:
             _on_worker_request_response_redirect,
-        PROTO_RES_WORKER_QUERY: _on_worker_query_response
+        PROTO_RES_WORKER_QUERY: _on_worker_query_response,
+        PROTO_REQ_EVENT: _on_event,
+        PROTO_REQ_SHUTDOWN: _on_worker_shutdown
     }):
         handle = _map.get(pkg.tp)
 

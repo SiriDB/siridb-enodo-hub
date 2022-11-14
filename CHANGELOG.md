@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.2.0-beta0.1.4] - 2022-11-14
+
+### Added
+- Worker event req
+- Worker shutdown req
+
+### Changed
+- Max retry step for worker reconnect changed to 60
+
 ## [0.2.0-beta0.1.3] - 2022-11-10
 
 ### Added

@@ -5,6 +5,7 @@ from lib.serverstate import ServerState
 from lib.util import Template
 
 from enodo.protocol.packagedata import EnodoRequestResponse
+from enodo.model.enodoevent import EnodoEvent
 
 ENODO_EVENT_ANOMALY_DETECTED = "event_anomaly_detected"
 ENODO_EVENT_JOB_QUEUE_TOO_LONG = "job_queue_too_long"

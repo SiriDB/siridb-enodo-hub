@@ -7,7 +7,6 @@ from siridb.connector.lib.exceptions import QueryError, InsertError, \
 
 from enodo.model.config.series import SeriesJobConfigModel
 from enodo.protocol.packagedata import REQUEST_TYPE_EXTERNAL, EnodoRequest
-from enodo.jobs import JOB_TYPE_FORECAST_SERIES, JOB_TYPE_IDS
 
 from lib.config import Config
 from lib.outputmanager import EnodoOutputManager

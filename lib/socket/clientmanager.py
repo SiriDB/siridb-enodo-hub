@@ -8,6 +8,9 @@ from typing import Any, Optional
 from enodo import WorkerConfigModel
 from enodo.net import Package, PROTO_REQ_HANDSHAKE, PROTO_REQ_WORKER_REQUEST
 from enodo.protocol.packagedata import EnodoRequest, EnodoQuery
+from enodo.model.enodoevent import EnodoEvent
+
+from lib.outputmanager import EnodoOutputManager
 from lib.config import Config
 from lib.serverstate import ServerState
 from lib.socket.queryhandler import QueryHandler
@@ -46,7 +49,7 @@ class ListenerClient:
 
 
 class WorkerClient:
-    MAX_RETRY_STEP = 120
+    MAX_RETRY_STEP = 60
 
     def __init__(self,
                  hostname: str,
@@ -186,6 +189,9 @@ class WorkerClient:
         request = EnodoRequest(**data)
         await ClientManager.fetch_request_response_from_worker(
             self.pool_id, request.series_name, request)
+
+    async def handle_event(self, event: EnodoEvent):
+        await EnodoOutputManager.handle_event(event)
 
     async def redirect_response(self, data, worker_id):
         pass
