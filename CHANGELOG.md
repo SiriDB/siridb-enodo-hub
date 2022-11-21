@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 - Fixed query worker for series state, conform changes stats query
 
+### Removed
+- Removed legacy endpoint series config
+
 ## [0.2.0-beta0.1.6] - 2022-11-21
 
 ### Fixed

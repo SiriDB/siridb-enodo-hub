@@ -20,8 +20,6 @@ class ServerState:
     readiness = None
     scheduler = None
 
-    series_rm = None
-    series_config_rm = None
     job_config_template_rm = None
     thingsdb_client = None
     settings = None

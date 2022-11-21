@@ -125,110 +125,6 @@ class ApiHandlers:
     @classmethod
     @EnodoAuth.auth.required
     @implement_fields_query
-    async def get_series_configs(cls, request, fields=None):
-        """Get all series config templates
-
-        Args:
-            request (Request): aiohttp request
-
-        Returns:
-            _type_: _description_
-
-        Query args:
-            fields (String, comma seperated): list of fields to return
-        """
-        data, status = BaseHandler.resp_get_series_configs(
-            fields=fields)
-        return web.json_response(
-            data=data, status=status)
-
-    @classmethod
-    @EnodoAuth.auth.required
-    async def add_series_config(cls, request):
-        """Add a series config template
-
-        Args:
-            request (Request): aiohttp request
-
-        Returns:
-            _type_: _description_
-        """
-        try:
-            data = await request.json()
-        except JSONDecodeError as e:
-            resp, status = {'error': 'Invalid JSON'}, 400
-        else:
-            resp, status = await BaseHandler.resp_add_series_config(
-                data)
-        return web.json_response(data=resp, status=status)
-
-    @classmethod
-    @EnodoAuth.auth.required
-    async def remove_series_config(cls, request):
-        """Remove a series config template
-
-        Args:
-            request (Request): aiohttp request
-
-        Returns:
-            _type_: _description_
-        """
-        rid = urllib.parse.unquote(
-            request.match_info['rid'])
-        data, status = await BaseHandler.resp_remove_series_config(
-            rid)
-        return web.json_response(
-            data=data, status=status)
-
-    @classmethod
-    @EnodoAuth.auth.required
-    async def update_series_config_static(cls, request):
-        """Update a series config template
-
-        Args:
-            request (Request): aiohttp request
-
-        Returns:
-            _type_: _description_
-        """
-        try:
-            data = await request.json()
-        except JSONDecodeError as e:
-            resp, status = {'error': 'Invalid JSON'}, 400
-        rid = urllib.parse.unquote(
-            request.match_info['rid'])
-        data, status = \
-            await BaseHandler.resp_update_series_config_static(
-                rid, data.get("name"), data.get("description"))
-        return web.json_response(
-            data=data, status=status)
-
-    @classmethod
-    @EnodoAuth.auth.required
-    async def update_series_config(cls, request):
-        """Update a series config template
-
-        Args:
-            request (Request): aiohttp request
-
-        Returns:
-            _type_: _description_
-        """
-        try:
-            data = await request.json()
-        except JSONDecodeError as e:
-            resp, status = {'error': 'Invalid JSON'}, 400
-        rid = urllib.parse.unquote(
-            request.match_info['rid'])
-        data, status = \
-            await BaseHandler.resp_update_series_config(
-                rid, data)
-        return web.json_response(
-            data=data, status=status)
-
-    @classmethod
-    @EnodoAuth.auth.required
-    @implement_fields_query
     async def get_enodo_outputs(cls, request, fields=None):
         """Get all event outputs
 
@@ -356,20 +252,6 @@ class ApiHandlers:
         """
         return web.Response(
             body="OK\r\n", status=200)
-
-    @classmethod
-    @EnodoAuth.auth.required
-    async def get_event_log(cls, request):
-        """Returns enodo event log
-
-        Args:
-            request (Request): aiohttp request
-
-        Returns:
-            _type_: _description_
-        """
-        log = ""
-        return web.json_response(data={'data': log}, status=200)
 
     @classmethod
     @EnodoAuth.auth.required

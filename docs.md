@@ -11,6 +11,8 @@ The hub divides workers into pools. Within a pool, workers are also divided by t
 
 # REST API
 
+Auth is basic auth. Default username and password are `enodo`
+
 ## Run job for series
 You can request enodo to run a job. You can give an output id (`responseOutputID`) which will be used to send the result to
 
@@ -153,4 +155,13 @@ curl --request POST \
 		"config": {}
 	}
 }'
+```
+
+## Get hub status
+Get hub version
+
+```
+curl --request GET \
+  --url http://localhost:8081/api/enodo/status \
+  --header 'Authorization: Basic qweqweqw='
 ```
