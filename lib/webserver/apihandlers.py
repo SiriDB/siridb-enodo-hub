@@ -477,6 +477,17 @@ class ApiHandlers:
                 data={"error": "Invalid pool_id"},
                 status=400)
 
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response(
+                data={"error": "Invalid config in payload, invalid JSON"},
+                status=400)
+        if not isinstance(data, dict):
+            return web.json_response(
+                data={"error": "Invalid config in payload"},
+                status=400)
+
         data = await request.json()
         status, resp = await BaseHandler.resp_add_worker(pool_id, data)
         return web.json_response(data=resp, status=status)
@@ -500,12 +511,12 @@ class ApiHandlers:
                 status=400)
 
         try:
-            worker_idx = int(request.match_info['worker_idx'])
+            job_type_id = int(request.match_info['job_type_id'])
         except Exception:
             return web.json_response(
-                data={"error": "Invalid worker_idx"},
+                data={"error": "Invalid job_type_id"},
                 status=400)
 
         status, resp = await BaseHandler.resp_delete_worker(
-            pool_id, worker_idx)
+            pool_id, job_type_id)
         return web.json_response(data=resp, status=status)

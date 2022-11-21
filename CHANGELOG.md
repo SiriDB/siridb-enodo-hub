@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.2.0-beta0.1.6] - 2022-11-21
+
+### Fixed
+- Fixed deleting worker from pool, only latest worker will be deleted, per request
+
 ## [0.2.0-beta0.1.5] - 2022-11-21
 
 ### Added

@@ -16,7 +16,8 @@ from lib.serverstate import ServerState
 from lib.socket.queryhandler import QueryHandler
 from lib.socket.protocol import EnodoProtocol
 from lib.util.util import (
-    gen_pool_idx, generate_worker_lookup, get_worker_for_series)
+    gen_pool_idx, generate_worker_lookup, get_worker_for_series,
+    gen_worker_idx)
 
 
 class ListenerClient:
@@ -84,7 +85,7 @@ class WorkerClient:
 
     @property
     def worker_id(self):
-        return struct.unpack('>I', self._idx_bytes[8:12])
+        return int.from_bytes(self._idx_bytes[8:12], 'big')
 
     def close(self):
         if self._protocol and self._protocol.transport:
@@ -215,6 +216,7 @@ class ClientManager:
     _ws = None
     _query_handler = None
     _sd_lookups = {}
+    _lock = None
 
     @classmethod
     async def setup(cls):
@@ -222,6 +224,7 @@ class ClientManager:
         cls._ws = await WorkerStore.setup(ServerState.thingsdb_client,
                                           cls.update_worker_pools)
         cls._query_handler = QueryHandler()
+        cls._lock = asyncio.Lock()
 
     @classmethod
     def get_worker(cls, pool_idx, series_name):
@@ -265,25 +268,40 @@ class ClientManager:
 
     @classmethod
     async def add_worker(cls, pool_id: int, worker: dict):
-        pool_idx = gen_pool_idx(
-            pool_id, worker['worker_config']['job_type_id'])
-        current_num = len(
-            [w.pool_idx == pool_idx for w in cls._ws.lookup_workers.values()])
-        bpool_idx = pool_idx.to_bytes(8, 'big')
-        worker['worker_idx'] = int.from_bytes(
-            bpool_idx + current_num.to_bytes(4, 'big'), 'big')
-        cls._sd_lookups[pool_idx] = generate_worker_lookup(current_num + 1)
-        await cls._ws.create(worker)
+        async with cls._lock:
+            pool_idx = gen_pool_idx(
+                pool_id, worker['worker_config']['job_type_id'])
+            current_num = len([w.pool_idx == pool_idx
+                               for w in cls._ws.lookup_workers.values()])
+            bpool_idx = pool_idx.to_bytes(8, 'big')
+            worker['worker_idx'] = int.from_bytes(
+                bpool_idx + current_num.to_bytes(4, 'big'), 'big')
+            cls._sd_lookups[pool_idx] = generate_worker_lookup(current_num + 1)
+            await cls._ws.create(worker)
 
     @classmethod
-    async def delete_worker(cls, pool_id: int, worker_idx: int):
-        worker = cls._ws.lookup_workers.get(worker_idx)
-        if worker is None:
-            return False
-        if worker.pool_id != pool_id:
-            return False
-        await cls._ws.delete_worker(worker.rid)
-        return True
+    async def delete_worker(cls, pool_id: int, job_type_id):
+        async with cls._lock:
+            pool_idx = gen_pool_idx(pool_id, job_type_id)
+            workers_in_pool = len([w.pool_idx == pool_idx
+                                   for w in cls._ws.lookup_workers.values()])
+            if workers_in_pool == 0:
+                logging.error("Cannot delete worker as there "
+                              "are no workers in pool")
+                return False
+            worker_idx = gen_worker_idx(
+                pool_id, job_type_id, workers_in_pool - 1)
+            worker = await cls.get_worker_by_idx(worker_idx)
+
+            if worker is None:
+                return False
+            if worker.pool_id != pool_id:
+                return False
+            try:
+                await cls._ws.delete_worker(worker.rid)
+            except Exception:
+                logging.debug("ThingsDB Error while trying to delete worker")
+            return True
 
     @classmethod
     def update_worker_pools(cls, workers):
@@ -327,7 +345,7 @@ class ClientManager:
 
     @classmethod
     async def get_worker_by_idx(cls, idx: int) -> WorkerClient:
-        return cls.workers.get(idx)
+        return cls._ws.lookup_workers.get(idx)
 
     @classmethod
     def update_listeners(cls, data: Any):

@@ -289,9 +289,9 @@ class BaseHandler:
         return 201, {}
 
     @classmethod
-    async def resp_delete_worker(cls, pool_id: int, worker_idx: int):
+    async def resp_delete_worker(cls, pool_id: int, job_type_id: int):
         try:
-            resp = await ClientManager.delete_worker(pool_id, worker_idx)
+            resp = await ClientManager.delete_worker(pool_id, job_type_id)
         except Exception:
             return 400, {"error": "Cannot delete worker. Invalid data"}
         else:

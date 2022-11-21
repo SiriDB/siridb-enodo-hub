@@ -43,7 +43,7 @@ def setup_routes(app, cors):
     app.router.add_post(
         "/api/worker/{pool_id}", ApiHandlers.add_worker)
     app.router.add_delete(
-        "/api/worker/{pool_id}/{worker_idx}", ApiHandlers.delete_worker)
+        "/api/worker/{pool_id}/{job_type_id}", ApiHandlers.delete_worker)
     app.router.add_get(
         "/api/worker/stats/{pool_id}", ApiHandlers.query_worker_stats)
 

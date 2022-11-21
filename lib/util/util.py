@@ -215,7 +215,7 @@ def get_worker_for_series(lookup: dict, series_name: str) -> int:
     return lookup[n % LOOKUP_SZ]
 
 
-def gen_worker_id(pool_id: int, job_type_id: int,  idx: int):
+def gen_worker_idx(pool_id: int, job_type_id: int,  idx: int):
     binary_data = struct.pack('>III', pool_id, job_type_id, idx)
     return int.from_bytes(binary_data, 'big')
 
