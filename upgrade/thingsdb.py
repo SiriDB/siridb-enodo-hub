@@ -14,7 +14,7 @@ if (!has_type('EventOutput')) {
     new_procedure('delete_event_output', |output_rid| {
         output = thing(output_rid);
         if (type(output) == "EventOutput") {
-            .event_output_store.outputs.remove(|o| o.id() == output_rid)
+            .event_output_store.outputs.remove(|o| o.id() == output_rid);
             .event_output_store.ev.emit('delete-event-output', output);
         }
     });
@@ -45,7 +45,7 @@ if (!has_type('ResultOutput')) {
     new_procedure('delete_result_output', |output_rid| {
         output = thing(output_rid)
         if (type(output) == "ResultOutput") {
-            .result_output_store.outputs.remove(|o| o.id() == output_rid)
+            .result_output_store.outputs.remove(|o| o.id() == output_rid);
             .result_output_store.ev.emit('delete-result-output', output);
         };
     });
@@ -73,7 +73,7 @@ if (!has_type('Worker')) {
     new_procedure('delete_worker', |worker_rid| {
         worker = thing(worker_rid);
         if (type(worker) == "Worker") {
-            .worker_store.workers.remove(|o| o.id() == worker_rid)
+            .worker_store.workers.remove(|o| o.id() == worker_rid);
             .worker_store.ev.emit('delete-worker', worker);
         };
     });
