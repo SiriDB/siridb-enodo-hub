@@ -194,6 +194,8 @@ class BaseHandler:
             cls, pool_id, series_name: str, job_type_id: int):
         fut, fut_id = await ClientManager.query_series_state(
             pool_id, job_type_id, series_name)
+        if fut is False:
+            return {'error': "Cannot query specified worker"}, 400
         try:
             result = await wait_for(fut, timeout=5)
         except asyncio.TimeoutError:

@@ -12,7 +12,7 @@ def setup_routes(app, cors):
     app.router.add_post(
         "/api/series/{series_name}/run", ApiHandlers.run_job_for_series)
     app.router.add_get(
-        "/api/series/{series_name}/state/{job_type}",
+        "/api/series/{series_name}/state/{pool_id}/{job_type_id}",
         ApiHandlers.query_series_state)
     app.router.add_get(
         "/api/config/series", ApiHandlers.get_series_configs)

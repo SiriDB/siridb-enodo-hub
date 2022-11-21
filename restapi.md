@@ -1,4 +1,14 @@
 
+# Worker pools
+The hub divides workers into pools. Within a pool, workers are also divided by their `job_type_id`. So when running a job, the hub needs to know in which pool and for which job type. For each combination of `pool_id` and `job_type_id` a lookup/scaling table is generated based on the number of workers available for that combination.
+
+# Enodo internal vocabulary
+- `pool_id`: the index of a pool (0,1,2....)
+- `job_type_id`: the id that corresponds with a job type (forecast, anomaly detection..)
+- `pool_idx`: the bitshifted combination between pool_id and job_type_id (see `gen_pool_idx` func in hub)
+- `worker_id`: the index of a worker within a pool/job_type combo
+- `worker_idx`: the bitshifted combination between pool_id, job_type_id and worker_id. (see `gen_worker_idx` func in hub) Makes it easy to use one int value for a quick lookup of a certain worker. Also you are able to determine the pool_id and job_type_id from this idx
+
 # REST API
 
 ## Run job for series
@@ -97,4 +107,50 @@ Get stats about workers in a pool
 curl --request GET \
   --url http://localhost/api/worker/stats/{pool_id} \
   --header 'Authorization: Basic qweqweqw='
-  ```
+```
+
+## Get worker state for a series
+Query the responsible worker for the current state the worker has for a specified series
+
+```
+curl --request GET \
+  --url http://localhost/api/series/{series_name}/state/{pool_id}/{job_type_id} \
+  --header 'Authorization: Basic qweqweqw='
+```
+
+
+## Get workers
+Get works the hub knowns
+
+```
+curl --request GET \
+  --url http://localhost/api/worker/{pool_id} \
+  --header 'Authorization: Basic qweqweqw='
+```
+
+## Delete worker
+Delete a worker. The hub will always delete the latest worker in the given pool/job_type combo.
+
+```
+curl --request DELETE \
+  --url http://localhost/api/worker/{pool_id}/{job_type_id} \
+  --header 'Authorization: Basic qweqweqw=' \
+```
+
+## Add worker
+Add a worker to a given `pool_id` for a given `job_type_id`
+
+```
+curl --request POST \
+  --url http://localhost/api/worker/{pool_id} \
+  --header 'Authorization: Basic qweqweqw=' \
+  --header 'Content-Type: application/json' \
+  --data '{
+	"hostname": "localhost",
+	"port": 9105,
+	"worker_config": {
+		"job_type_id": 1,
+		"config": {}
+	}
+}'
+```

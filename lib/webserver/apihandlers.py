@@ -60,16 +60,25 @@ class ApiHandlers:
             dict with state response
         """
         series_name = unquote(request.match_info['series_name'])
-        pool_id = int(request.rel_url.query.get('poolID', 0))
 
-        job_type = unquote(request.match_info['job_type'])
-        if job_type not in JOB_TYPE_IDS:
+        try:
+            pool_id = int(request.match_info['pool_id'])
+        except Exception:
             return web.json_response(
-                {"data": False}, dumps=safe_json_dumps, status=400)
+                {"error": "Invalid pool_id"},
+                dumps=safe_json_dumps, status=400)
+
+        try:
+            job_type_id = int(request.match_info['job_type_id'])
+        except Exception:
+            return web.json_response(
+                {"error": "Invalid job_type_id"},
+                dumps=safe_json_dumps, status=400)
+
         data, status = await BaseHandler.resp_query_series_state(
             pool_id,
             series_name,
-            JOB_TYPE_IDS[job_type])
+            job_type_id)
         return web.json_response(
             data, dumps=safe_json_dumps, status=status)
 

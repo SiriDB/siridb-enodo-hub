@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+### Fixed
+- Fixed query worker for series state, conform changes stats query
+
 ## [0.2.0-beta0.1.6] - 2022-11-21
 
 ### Fixed

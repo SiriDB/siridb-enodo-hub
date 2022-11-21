@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from enodo.net import PROTO_REQ_WORKER_QUERY
 from enodo.protocol.packagedata import (
-    EnodoRequest, EnodoQuery, QUERY_SUBJECT_STATS)
+    EnodoRequest, EnodoQuery, QUERY_SUBJECT_STATS, QUERY_SUBJECT_STATE)
 
 
 class QueryHandler:
@@ -15,12 +15,12 @@ class QueryHandler:
     @classmethod
     async def do_query(cls, worker, series_name):
         _id = str(uuid4()).replace("-", "")
-        body = EnodoRequest(
-            request_id=_id,
-            request_type="query",
+        body = EnodoQuery(
+            _id,
+            QUERY_SUBJECT_STATE,
             series_name=series_name
         )
-        await worker.client.send_message(body, PROTO_REQ_WORKER_QUERY)
+        worker.send_message(body, PROTO_REQ_WORKER_QUERY)
         cls._futures[_id] = Future()
 
         return cls._futures[_id], _id

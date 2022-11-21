@@ -250,6 +250,9 @@ class ClientManager:
     @classmethod
     async def query_series_state(cls, pool_id, job_type_id, series_name):
         worker = cls.get_worker((pool_id << 8) | job_type_id, series_name)
+        if worker is None:
+            logging.warning("Cannot find specified worker to query")
+            return False, False
         return await cls._query_handler.do_query(worker, series_name)
 
     @classmethod
