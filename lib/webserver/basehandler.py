@@ -99,8 +99,8 @@ class BaseHandler:
                                       response_output_id: int):
         try:
             config = SeriesJobConfigModel(**data.get('config'))
-            job = EnodoJob(
-                None, series_name, config, (pool_id << 8) | config.job_type_id)
+            job = EnodoJob(None, series_name, config,
+                           (pool_id << 10) | config.job_type_id)
             request = EnodoRequest(
                 request_type=REQUEST_TYPE_EXTERNAL,
                 config=job.job_config,
@@ -212,7 +212,8 @@ class BaseHandler:
     async def resp_add_worker(cls, pool_id: int, worker_data):
         try:
             await ClientManager.add_worker(pool_id, worker_data)
-        except Exception:
+        except Exception as e:
+            logging.debug(f"Error while trying to add worker: {str(e)}")
             return 400, {"error": "Cannot create worker. Invalid data"}
         return 201, {}
 

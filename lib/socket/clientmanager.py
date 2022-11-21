@@ -59,7 +59,6 @@ class WorkerClient:
                  rid: Optional[str] = None):
         self.rid = rid
         self.worker_idx = worker_idx
-        self._idx_bytes = worker_idx.to_bytes(12, byteorder="big")
         self.hostname = hostname
         self.port = port
         self.worker_config = WorkerConfigModel(**worker_config)
@@ -72,19 +71,19 @@ class WorkerClient:
 
     @property
     def pool_idx(self):
-        return int.from_bytes(self._idx_bytes[0:8], 'big')
+        return self.worker_idx >> 10
 
     @property
     def pool_id(self):
-        return int.from_bytes(self._idx_bytes[:4], 'big')
+        return self.worker_idx >> 20
 
     @property
     def job_type_id(self):
-        return int.from_bytes(self._idx_bytes[4:8], 'big')
+        return (self.worker_idx >> 10) & 0x3ff
 
     @property
     def worker_id(self):
-        return int.from_bytes(self._idx_bytes[8:12], 'big')
+        return self.worker_idx & 0x3ff
 
     def close(self):
         if self._protocol and self._protocol.transport:
@@ -231,8 +230,7 @@ class ClientManager:
             logging.debug(f"Unknown pool_idx: {pool_idx}")
             return None
         wid = get_worker_for_series(cls._sd_lookups[pool_idx], series_name)
-        worker_idx = int.from_bytes(
-            pool_idx.to_bytes(8, 'big') + wid.to_bytes(4, 'big'), 'big')
+        worker_idx = (pool_idx << 10) | wid
         worker = cls._ws.lookup_workers.get(worker_idx)
         if worker is None:
             logging.debug(f"Unknown worker with idx: {worker_idx}")
@@ -248,7 +246,7 @@ class ClientManager:
 
     @classmethod
     async def query_series_state(cls, pool_id, job_type_id, series_name):
-        worker = cls.get_worker((pool_id << 8) | job_type_id, series_name)
+        worker = cls.get_worker((pool_id << 10) | job_type_id, series_name)
         if worker is None:
             logging.warning("Cannot find specified worker to query")
             return False, False
@@ -265,7 +263,7 @@ class ClientManager:
         if request.config is None:
             return
         worker = cls.get_worker(
-            (pool_id << 8) | request.config.job_type_id, series_name)
+            (pool_id << 10) | request.config.job_type_id, series_name)
         await worker.send_message(request, PROTO_REQ_WORKER_REQUEST)
 
     @classmethod
@@ -273,11 +271,9 @@ class ClientManager:
         async with cls._lock:
             pool_idx = gen_pool_idx(
                 pool_id, worker['worker_config']['job_type_id'])
-            current_num = len([w.pool_idx == pool_idx
-                               for w in cls._ws.lookup_workers.values()])
-            bpool_idx = pool_idx.to_bytes(8, 'big')
-            worker['worker_idx'] = int.from_bytes(
-                bpool_idx + current_num.to_bytes(4, 'big'), 'big')
+            current_num = len([w for w in cls._ws.lookup_workers.values()
+                               if w.pool_idx == pool_idx])
+            worker['worker_idx'] = (pool_idx << 10) | current_num
             cls._sd_lookups[pool_idx] = generate_worker_lookup(current_num + 1)
             await cls._ws.create(worker)
 

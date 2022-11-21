@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.2.0-beta0.1.7] - 2022-11-21
+
 ### Fixed
 - Fixed query worker for series state, conform changes stats query
+- Fixed idx generation for worker lookups
 
 ### Removed
 - Removed legacy endpoint series config

@@ -32,7 +32,12 @@ class ApiHandlers:
             dict with siridb response
         """
         series_name = unquote(request.match_info['series_name'])
-        pool_id = int(request.rel_url.query.get('poolID', 0))
+        try:
+            pool_id = int(request.rel_url.query.get('poolID'))
+        except Exception:
+            return web.json_response(
+                {'error': "invalid pool_id"},
+                dumps=safe_json_dumps, status=400)
         response_output_id = request.rel_url.query.get('responseOutputID')
         if response_output_id is None:
             resp, status = {'error': 'Invalid responseOutputID'}, 400

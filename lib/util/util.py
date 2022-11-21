@@ -1,11 +1,7 @@
-from asyncore import loop
 import datetime
 import functools
 import json
 import logging
-import re
-import struct
-from packaging import version
 import urllib.parse
 
 from enodo.jobs import (
@@ -158,18 +154,8 @@ def get_worker_for_series(lookup: dict, series_name: str) -> int:
 
 
 def gen_worker_idx(pool_id: int, job_type_id: int,  idx: int):
-    binary_data = struct.pack('>III', pool_id, job_type_id, idx)
-    return int.from_bytes(binary_data, 'big')
-
-
-def decode_worker_id(wid: int):
-    try:
-        return struct.unpack('>III', wid.to_bytes(12, byteorder="big"))
-    except Exception:
-        return False
+    return (pool_id << 20) | (job_type_id << 10) << idx
 
 
 def gen_pool_idx(pool_id: int, job_type_id: int) -> int:
-    ba = pool_id.to_bytes(4, byteorder='big') + \
-        job_type_id.to_bytes(4, byteorder='big')
-    return int.from_bytes(ba, 'big')
+    return (pool_id << 10) | job_type_id

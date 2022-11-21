@@ -43,7 +43,7 @@ if (!has_type('ResultOutput')) {
         return output;
     });
     new_procedure('delete_result_output', |output_rid| {
-        output = thing(output_rid)
+        output = thing(output_rid);
         if (type(output) == "ResultOutput") {
             .result_output_store.outputs.remove(|o| o.id() == output_rid);
             .result_output_store.ev.emit('delete-result-output', output);
@@ -114,7 +114,8 @@ if (!has_type('SettingStore')) {
     "0.2.0-beta0.1.2": '.hub_version = "0.2.0-beta0.1.2";',
     "0.2.0-beta0.1.3": '.hub_version = "0.2.0-beta0.1.3";',
     "0.2.0-beta0.1.4": '.hub_version = "0.2.0-beta0.1.4";',
-    "0.2.0-beta0.1.5": '.hub_version = "0.2.0-beta0.1.5";'
+    "0.2.0-beta0.1.6": '.hub_version = "0.2.0-beta0.1.6";',
+    "0.2.0-beta0.1.7": '.hub_version = "0.2.0-beta0.1.7";'
 }
 
 with open(os.path.join(os.path.dirname(
