@@ -77,7 +77,7 @@ curl --request DELETE \
   --header 'Authorization: Basic qweqweqw='
 ```
 
-## Add ouput
+## Add output
 Add an event or result output
 
 ```
