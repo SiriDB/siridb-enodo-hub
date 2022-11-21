@@ -1,4 +1,3 @@
-import urllib.parse
 from json import JSONDecodeError
 from urllib.parse import unquote
 
@@ -11,8 +10,6 @@ from lib.util import safe_json_dumps
 from lib.util.util import implement_fields_query
 from lib.webserver.auth import EnodoAuth
 from lib.webserver.basehandler import BaseHandler
-
-from enodo.jobs import JOB_TYPE_IDS
 
 auth = BasicAuthMiddleware(username=None, password=None, force=False)
 

@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from enodo.net import PROTO_REQ_WORKER_QUERY
 from enodo.protocol.packagedata import (
-    EnodoRequest, EnodoQuery, QUERY_SUBJECT_STATS, QUERY_SUBJECT_STATE)
+    EnodoQuery, QUERY_SUBJECT_STATS, QUERY_SUBJECT_STATE)
 
 
 class QueryHandler:
