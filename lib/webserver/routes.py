@@ -38,11 +38,14 @@ def setup_routes(app, cors):
     app.router.add_get(
         "/api/enodo/stats", ApiHandlers.get_enodo_stats)
 
-    app.router.add_post(
-        "/api/worker", ApiHandlers.add_worker)
     app.router.add_get(
-        "/api/worker/stats/{pool_id}",
-        ApiHandlers.query_worker_stats)
+        "/api/worker/{pool_id}", ApiHandlers.get_workers)
+    app.router.add_post(
+        "/api/worker/{pool_id}", ApiHandlers.add_worker)
+    app.router.add_delete(
+        "/api/worker/{pool_id}/{worker_idx}", ApiHandlers.delete_worker)
+    app.router.add_get(
+        "/api/worker/stats/{pool_id}", ApiHandlers.query_worker_stats)
 
     # Add internal api routes
     app.router.add_get(

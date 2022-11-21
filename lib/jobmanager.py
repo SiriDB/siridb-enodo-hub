@@ -58,7 +58,7 @@ class EnodoJobManager:
             logging.error(
                 "Could not send job_type "
                 f"{job.job_config.job_type_id} for series "
-                f"{job.series_name}")
+                f"{job.series_name}, No available worker.")
             return
 
         logging.info(

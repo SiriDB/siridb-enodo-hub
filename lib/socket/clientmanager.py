@@ -185,7 +185,7 @@ class WorkerClient:
 
     async def handle_worker_request(self, data, *args):
         data['pool_id'] = self.pool_id
-        data['worker_id'] = self.increment_id
+        data['worker_id'] = self.worker_id
         request = EnodoRequest(**data)
         await ClientManager.fetch_request_response_from_worker(
             self.pool_id, request.series_name, request)
@@ -226,11 +226,19 @@ class ClientManager:
     @classmethod
     def get_worker(cls, pool_idx, series_name):
         if pool_idx not in cls._sd_lookups:
+            logging.debug(f"Unknown pool_idx: {pool_idx}")
             return None
         wid = get_worker_for_series(cls._sd_lookups[pool_idx], series_name)
         worker_idx = int.from_bytes(
             pool_idx.to_bytes(8, 'big') + wid.to_bytes(4, 'big'), 'big')
-        return cls._ws.lookup_workers.get(worker_idx)
+        worker = cls._ws.lookup_workers.get(worker_idx)
+        if worker is None:
+            logging.debug(f"Unknown worker with idx: {worker_idx}")
+        return worker
+
+    @classmethod
+    def get_pool_idxs(cls):
+        return list(cls._sd_lookups.keys())
 
     @classmethod
     def get_workers_in_pool(cls, pool_id):
@@ -266,6 +274,16 @@ class ClientManager:
             bpool_idx + current_num.to_bytes(4, 'big'), 'big')
         cls._sd_lookups[pool_idx] = generate_worker_lookup(current_num + 1)
         await cls._ws.create(worker)
+
+    @classmethod
+    async def delete_worker(cls, pool_id: int, worker_idx: int):
+        worker = cls._ws.lookup_workers.get(worker_idx)
+        if worker is None:
+            return False
+        if worker.pool_id != pool_id:
+            return False
+        await cls._ws.delete_worker(worker.rid)
+        return True
 
     @classmethod
     def update_worker_pools(cls, workers):

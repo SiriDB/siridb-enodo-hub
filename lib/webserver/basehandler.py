@@ -269,17 +269,32 @@ class BaseHandler:
             }}
 
     @classmethod
-    async def resp_add_worker(cls, worker_data):
+    def resp_get_workers(cls, pool_id):
         try:
-            await ClientManager.add_worker(0, worker_data)
+            workers = ClientManager.get_workers_in_pool(pool_id)
+            data = {
+                'pool_idxs': ClientManager.get_pool_idxs(),
+                'workers': [w.to_dict() for w in workers]
+            }
+        except Exception:
+            return 400, {"error": "Cannot retrieve list of workers"}
+        return 200, data
+
+    @classmethod
+    async def resp_add_worker(cls, pool_id: int, worker_data):
+        try:
+            await ClientManager.add_worker(pool_id, worker_data)
         except Exception:
             return 400, {"error": "Cannot create worker. Invalid data"}
         return 201, {}
 
     @classmethod
-    async def resp_delete_worker(cls, worker_id):
+    async def resp_delete_worker(cls, pool_id: int, worker_idx: int):
         try:
-            await ClientManager
+            resp = await ClientManager.delete_worker(pool_id, worker_idx)
         except Exception:
-            return 400, {"error": "Cannot create worker. Invalid data"}
-        return 201, {}
+            return 400, {"error": "Cannot delete worker. Invalid data"}
+        else:
+            if resp:
+                return 200, {}
+        return 400, {"error": "Cannot delete worker. Invalid data"}

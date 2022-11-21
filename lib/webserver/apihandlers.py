@@ -440,6 +440,27 @@ class ApiHandlers:
 
     @classmethod
     @EnodoAuth.auth.required
+    async def get_workers(cls, request):
+        """Get workers in a pool
+
+        Args:
+            request (Request): aiohttp request
+
+        Returns:
+            _type_: _description_
+        """
+        try:
+            pool_id = int(request.match_info['pool_id'])
+        except Exception:
+            return web.json_response(
+                data={"error": "Invalid pool_id"},
+                status=400)
+
+        status, resp = BaseHandler.resp_get_workers(pool_id)
+        return web.json_response(data=resp, status=status)
+
+    @classmethod
+    @EnodoAuth.auth.required
     async def add_worker(cls, request):
         """Add new worker
 
@@ -449,6 +470,42 @@ class ApiHandlers:
         Returns:
             _type_: _description_
         """
+        try:
+            pool_id = int(request.match_info['pool_id'])
+        except Exception:
+            return web.json_response(
+                data={"error": "Invalid pool_id"},
+                status=400)
+
         data = await request.json()
-        status, resp = await BaseHandler.resp_add_worker(data)
+        status, resp = await BaseHandler.resp_add_worker(pool_id, data)
+        return web.json_response(data=resp, status=status)
+
+    @classmethod
+    @EnodoAuth.auth.required
+    async def delete_worker(cls, request):
+        """Delete worker
+
+        Args:
+            request (Request): aiohttp request
+
+        Returns:
+            _type_: _description_
+        """
+        try:
+            pool_id = int(request.match_info['pool_id'])
+        except Exception:
+            return web.json_response(
+                data={"error": "Invalid pool_id"},
+                status=400)
+
+        try:
+            worker_idx = int(request.match_info['worker_idx'])
+        except Exception:
+            return web.json_response(
+                data={"error": "Invalid worker_idx"},
+                status=400)
+
+        status, resp = await BaseHandler.resp_delete_worker(
+            pool_id, worker_idx)
         return web.json_response(data=resp, status=status)

@@ -112,7 +112,9 @@ if (!has_type('SettingStore')) {
 };
 .hub_version = "0.2.0-beta0.1.0";""",
     "0.2.0-beta0.1.2": '.hub_version = "0.2.0-beta0.1.2";',
-    "0.2.0-beta0.1.3": '.hub_version = "0.2.0-beta0.1.3";'
+    "0.2.0-beta0.1.3": '.hub_version = "0.2.0-beta0.1.3";',
+    "0.2.0-beta0.1.4": '.hub_version = "0.2.0-beta0.1.4";',
+    "0.2.0-beta0.1.5": '.hub_version = "0.2.0-beta0.1.5";'
 }
 
 with open(os.path.join(os.path.dirname(

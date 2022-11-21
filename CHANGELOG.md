@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+## [0.2.0-beta0.1.5] - 2022-11-21
+
+### Added
+- Added get and delete worker(s) endpoint for managing workers via the hub REST api
+
 ## [0.2.0-beta0.1.4] - 2022-11-14
 
 ### Added
