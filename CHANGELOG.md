@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Added
 - Basic auth validation websocket connections
+- Redirect support for worker requests
 
 ## [0.2.0-beta0.1.7] - 2022-11-21
 
