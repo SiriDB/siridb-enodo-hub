@@ -5,8 +5,11 @@ from asyncio import StreamWriter
 from typing import Any, Optional
 
 from enodo import WorkerConfigModel
-from enodo.net import Package, PROTO_REQ_HANDSHAKE, PROTO_REQ_WORKER_REQUEST
-from enodo.protocol.packagedata import EnodoRequest, EnodoQuery
+from enodo.net import (
+    Package, PROTO_REQ_HANDSHAKE, PROTO_REQ_WORKER_REQUEST,
+    PROTO_RES_WORKER_REQUEST)
+from enodo.protocol.packagedata import (
+    EnodoRequest, EnodoQuery, EnodoRequestResponse)
 from enodo.model.enodoevent import EnodoEvent
 
 from lib.outputmanager import EnodoOutputManager
@@ -183,8 +186,8 @@ class WorkerClient:
         return data
 
     async def handle_worker_request(self, data, *args):
-        data['pool_id'] = self.pool_id
-        data['worker_id'] = self.worker_id
+        data['pool_id'] = self.pool_idx
+        data['worker_id'] = self.worker_idx
         request = EnodoRequest(**data)
         await ClientManager.fetch_request_response_from_worker(
             self.pool_id, request.series_name, request)
@@ -192,8 +195,19 @@ class WorkerClient:
     async def handle_event(self, event: EnodoEvent):
         await EnodoOutputManager.handle_event(event)
 
-    async def redirect_response(self, data, worker_id):
-        pass
+    async def redirect_response(self, data):
+        try:
+            response = EnodoRequestResponse(**data)
+        except Exception:
+            logging.error("Received invalid request response format")
+            return
+        worker_idx = response.request.get('worker_id')
+        worker = await ClientManager.get_worker_by_idx(worker_idx)
+        if worker is None:
+            logging.warning("Trying to redirect worker request "
+                            "response to unknown worker")
+            return
+        worker.send_message(data, PROTO_RES_WORKER_REQUEST)
 
     def handle_query_resp(self, query: EnodoQuery):
         ClientManager._query_handler.set_query_result(

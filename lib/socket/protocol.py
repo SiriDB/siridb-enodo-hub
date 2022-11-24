@@ -43,8 +43,7 @@ class EnodoProtocol(BaseProtocol):
         await EnodoJobManager.handle_job_result(pkg.data)
 
     async def _on_worker_request_response_redirect(self,
-                                                   pkg: Package,
-                                                   origin_worker_id: int):
+                                                   pkg: Package):
         logging.debug("Response for redirect requested job")
         await self._worker.redirect_response(pkg.data)
 
@@ -95,13 +94,9 @@ class EnodoProtocol(BaseProtocol):
         handle = _map.get(pkg.tp)
 
         # populate pkg.data. this raises an error when unpack fails
-        if pkg.tp == PROTO_RES_WORKER_REQUEST_REDIRECT:
-            worker_id = pkg.partial_read(36)
         pkg.read_data()
 
         if handle is None:
             logging.error(f'unhandled package type: {pkg.tp}')
-        elif pkg.tp == PROTO_RES_WORKER_REQUEST_REDIRECT:
-            asyncio.ensure_future(handle(self, pkg, worker_id))
         else:
             asyncio.ensure_future(handle(self, pkg))
