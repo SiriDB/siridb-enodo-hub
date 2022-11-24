@@ -1,4 +1,5 @@
 from asyncio import Lock
+import base64
 import logging
 from thingsdb.client import Client
 
@@ -82,7 +83,12 @@ class ServerState:
         cls.sio.attach(app)
 
         @cls.sio.on('connect')
-        def connect(sid, environ):
+        def connect(sid, environ, auth):
+            usr_pass = (f"{Config.basic_auth_username}:"
+                        f"{Config.basic_auth_password}")
+            b64_val = base64.b64encode(usr_pass)
+            if b64_val != auth.token:
+                raise ConnectionRefusedError('authentication failed')
             cls.sio.enter_room(sid, 'trace')
 
     @classmethod

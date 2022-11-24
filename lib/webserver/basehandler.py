@@ -222,7 +222,7 @@ class BaseHandler:
         try:
             resp = await ClientManager.delete_worker(pool_id, job_type_id)
         except Exception:
-            return 400, {"error": "Cannot delete worker. Invalid data"}
+            return 400, {"error": "Cannot delete worker. Something went wrong"}
         else:
             if resp:
                 return 200, {}

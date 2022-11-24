@@ -264,7 +264,7 @@ class ClientManager:
             return
         worker = cls.get_worker(
             (pool_id << 10) | request.config.job_type_id, series_name)
-        await worker.send_message(request, PROTO_REQ_WORKER_REQUEST)
+        worker.send_message(request, PROTO_REQ_WORKER_REQUEST)
 
     @classmethod
     async def add_worker(cls, pool_id: int, worker: dict):
@@ -281,8 +281,9 @@ class ClientManager:
     async def delete_worker(cls, pool_id: int, job_type_id):
         async with cls._lock:
             pool_idx = gen_pool_idx(pool_id, job_type_id)
-            workers_in_pool = len([w.pool_idx == pool_idx
-                                   for w in cls._ws.lookup_workers.values()])
+            workers_in_pool = len(
+                [w for w in cls._ws.lookup_workers.values()
+                 if w.pool_idx == pool_idx])
             if workers_in_pool == 0:
                 logging.error("Cannot delete worker as there "
                               "are no workers in pool")

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+### Added
+- Basic auth validation websocket connections
+
 ## [0.2.0-beta0.1.7] - 2022-11-21
 
 ### Fixed

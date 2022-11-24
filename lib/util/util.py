@@ -154,7 +154,7 @@ def get_worker_for_series(lookup: dict, series_name: str) -> int:
 
 
 def gen_worker_idx(pool_id: int, job_type_id: int,  idx: int):
-    return (pool_id << 20) | (job_type_id << 10) << idx
+    return (pool_id << 20) | (job_type_id << 10) | idx
 
 
 def gen_pool_idx(pool_id: int, job_type_id: int) -> int:
