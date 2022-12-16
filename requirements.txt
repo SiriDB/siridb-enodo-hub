@@ -5,6 +5,6 @@ aiohttp_cors==0.7.0
 jinja2==3.1.2
 python-enodo==0.3.1
 qpack==0.0.21
-siridb-connector==2.0.8
+siridb-connector==2.0.9
 packaging==21.3
 python-thingsdb==1.0.4
