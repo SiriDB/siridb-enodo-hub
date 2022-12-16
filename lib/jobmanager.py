@@ -1,17 +1,18 @@
 import logging
 from typing import Optional, Union
 from uuid import uuid4
+import json
 
 import qpack
 from enodo.jobs import *
 from enodo.model.config.series import SeriesJobConfigModel
 from enodo.net import PROTO_REQ_WORKER_REQUEST
-from enodo.protocol.packagedata import (
-    EnodoJobDataModel, EnodoRequest, EnodoRequestResponse,
-    REQUEST_TYPE_EXTERNAL)
+from enodo.protocol.packagedata import (EnodoRequest, EnodoRequestResponse,
+                                        REQUEST_TYPE_EXTERNAL)
 from lib.outputmanager import EnodoOutputManager
 from lib.socket.clientmanager import WorkerClient
 from .socket import ClientManager
+from lib.serverstate import ServerState
 
 
 class EnodoJob:
@@ -23,20 +24,15 @@ class EnodoJob:
                  series_name: str,
                  job_config: SeriesJobConfigModel,
                  pool_idx: int,
-                 job_data: Optional[dict] = None,
                  send_at: Optional[int] = None,
                  error: Optional[str] = None,
                  worker_id: Optional[str] = None):
-        if not isinstance(
-                job_data, EnodoJobDataModel) and job_data is not None:
-            raise Exception('Unknown job data value')
         if rid is None:
             rid = str(uuid4()).replace("-", "")
         self.rid = rid
         self.series_name = series_name
         self.job_config = job_config
         self.pool_idx = pool_idx
-        self.job_data = job_data
         self.send_at = send_at
         self.error = error
         self.worker_id = worker_id
@@ -54,8 +50,6 @@ class EnodoJob:
 
 
 class EnodoJobManager:
-    _lock = None
-    _next_job_id = 0
 
     @classmethod
     async def send_job(cls, job: EnodoJob, request: EnodoRequest):
@@ -64,7 +58,7 @@ class EnodoJobManager:
             logging.error(
                 "Could not send job_type "
                 f"{job.job_config.job_type_id} for series "
-                f"{job.series_name}")
+                f"{job.series_name}, No available worker.")
             return
 
         logging.info(
@@ -77,13 +71,16 @@ class EnodoJobManager:
         if not isinstance(data, dict):
             logging.error("Invalid job result, cannot handle")
             return
+
         response = EnodoRequestResponse(**data)
+        await ServerState.sio.emit("trace", json.dumps(response), room="trace")
         if response.request.request_type == REQUEST_TYPE_EXTERNAL:
             await EnodoOutputManager.handle_result(response)
 
     @classmethod
     async def _send_worker_job_request(cls, worker: WorkerClient,
                                        request: EnodoRequest):
+        await ServerState.sio.emit("trace", json.dumps(request), room="trace")
         try:
             worker.send_message(request, PROTO_REQ_WORKER_REQUEST)
         except Exception as e:

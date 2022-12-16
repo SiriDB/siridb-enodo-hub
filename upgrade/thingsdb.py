@@ -14,7 +14,7 @@ if (!has_type('EventOutput')) {
     new_procedure('delete_event_output', |output_rid| {
         output = thing(output_rid);
         if (type(output) == "EventOutput") {
-            .event_output_store.outputs.remove(|o| o.id() == output_rid)
+            .event_output_store.outputs.remove(|o| o.id() == output_rid);
             .event_output_store.ev.emit('delete-event-output', output);
         }
     });
@@ -43,9 +43,9 @@ if (!has_type('ResultOutput')) {
         return output;
     });
     new_procedure('delete_result_output', |output_rid| {
-        output = thing(output_rid)
+        output = thing(output_rid);
         if (type(output) == "ResultOutput") {
-            .result_output_store.outputs.remove(|o| o.id() == output_rid)
+            .result_output_store.outputs.remove(|o| o.id() == output_rid);
             .result_output_store.ev.emit('delete-result-output', output);
         };
     });
@@ -73,7 +73,7 @@ if (!has_type('Worker')) {
     new_procedure('delete_worker', |worker_rid| {
         worker = thing(worker_rid);
         if (type(worker) == "Worker") {
-            .worker_store.workers.remove(|o| o.id() == worker_rid)
+            .worker_store.workers.remove(|o| o.id() == worker_rid);
             .worker_store.ev.emit('delete-worker', worker);
         };
     });
@@ -110,7 +110,12 @@ if (!has_type('SettingStore')) {
     };
     .setting_store.to_type('SettingStore');
 };
-.hub_version = "0.2.0-beta1.0.0";"""
+.hub_version = "0.2.0-beta0.1.0";""",
+    "0.2.0-beta0.1.2": '.hub_version = "0.2.0-beta0.1.2";',
+    "0.2.0-beta0.1.3": '.hub_version = "0.2.0-beta0.1.3";',
+    "0.2.0-beta0.1.4": '.hub_version = "0.2.0-beta0.1.4";',
+    "0.2.0-beta0.1.6": '.hub_version = "0.2.0-beta0.1.6";',
+    "0.2.0-beta0.1.7": '.hub_version = "0.2.0-beta0.1.7";'
 }
 
 with open(os.path.join(os.path.dirname(

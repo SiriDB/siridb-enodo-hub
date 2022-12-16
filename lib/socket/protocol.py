@@ -3,6 +3,8 @@ import asyncio
 import logging
 from typing import Callable, Optional
 from enodo.net import *
+from enodo.protocol.packagedata import EnodoQuery
+from enodo.model.enodoevent import EnodoEvent
 
 
 class EnodoProtocol(BaseProtocol):
@@ -41,10 +43,30 @@ class EnodoProtocol(BaseProtocol):
         await EnodoJobManager.handle_job_result(pkg.data)
 
     async def _on_worker_request_response_redirect(self,
-                                                   pkg: Package,
-                                                   origin_worker_id: int):
+                                                   pkg: Package):
         logging.debug("Response for redirect requested job")
         await self._worker.redirect_response(pkg.data)
+
+    async def _on_worker_query_response(self, pkg: Package):
+        logging.debug("Received query response")
+        try:
+            query = EnodoQuery(**pkg.data)
+        except Exception:
+            logging.error("Invalid query data")
+        else:
+            self._worker.handle_query_resp(query)
+
+    async def _on_event(self, pkg: Package):
+        logging.debug(f'Received an event')
+        try:
+            event = EnodoEvent(**pkg.data)
+        except Exception:
+            logging.error("Invalid event data")
+        else:
+            await self._worker.handle_event(event)
+
+    async def _on_worker_shutdown(self, pkg: Package):
+        logging.warning("Worker is going down")
 
     def _get_future(self, pkg: Package) -> asyncio.Future:
         future, task = self._requests.pop(pkg.pid, (None, None))
@@ -63,18 +85,18 @@ class EnodoProtocol(BaseProtocol):
         PROTO_RES_HEARTBEAT: _on_heartbeat,
         PROTO_REQ_WORKER_REQUEST: _on_worker_request,
         PROTO_RES_WORKER_REQUEST: _on_worker_request_response,
-        PROTO_RES_WORKER_REQUEST_REDIRECT: _on_worker_request_response_redirect
+        PROTO_RES_WORKER_REQUEST_REDIRECT:
+            _on_worker_request_response_redirect,
+        PROTO_RES_WORKER_QUERY: _on_worker_query_response,
+        PROTO_REQ_EVENT: _on_event,
+        PROTO_REQ_SHUTDOWN: _on_worker_shutdown
     }):
         handle = _map.get(pkg.tp)
 
         # populate pkg.data. this raises an error when unpack fails
-        if pkg.tp == PROTO_RES_WORKER_REQUEST_REDIRECT:
-            worker_id = pkg.partial_read(36)
         pkg.read_data()
 
         if handle is None:
             logging.error(f'unhandled package type: {pkg.tp}')
-        elif pkg.tp == PROTO_RES_WORKER_REQUEST_REDIRECT:
-            asyncio.ensure_future(handle(self, pkg, worker_id))
         else:
             asyncio.ensure_future(handle(self, pkg))

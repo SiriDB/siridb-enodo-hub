@@ -1,12 +1,11 @@
 import logging
-import time
-import uuid
 
 import aiohttp
 from lib.serverstate import ServerState
 from lib.util import Template
 
 from enodo.protocol.packagedata import EnodoRequestResponse
+from enodo.model.enodoevent import EnodoEvent
 
 ENODO_EVENT_ANOMALY_DETECTED = "event_anomaly_detected"
 ENODO_EVENT_JOB_QUEUE_TOO_LONG = "job_queue_too_long"
@@ -26,36 +25,6 @@ ENODO_EVENT_SEVERITY_LEVELS = [
     ENODO_EVENT_SEVERITY_INFO,
     ENODO_EVENT_SEVERITY_WARNING,
     ENODO_EVENT_SEVERITY_ERROR]
-
-
-class EnodoEvent:
-    """
-    EnodoEvent class. Holds data for an event (error/warning/etc)
-    that occured. No state data is saved.
-    """
-    __slots__ = ('title', 'message', 'event_type',
-                 'series', 'ts', 'severity', 'uuid')
-
-    def __init__(self, title, message, event_type, series=None):
-        if event_type not in ENODO_EVENT_TYPES:
-            raise Exception()  # TODO Nice exception
-        self.title = title
-        self.message = message
-        self.event_type = event_type
-        self.series = series  # only needs to be set if it regards a
-        # series related event
-        self.ts = int(time.time())
-        self.uuid = str(uuid.uuid4()).replace("-", "")
-
-    def to_dict(self):
-        return {
-            'title': self.title,
-            'event_type': self.event_type,
-            'message': self.message,
-            'series': self.series,
-            'ts': self.ts,
-            'uuid': self.uuid
-        }
 
 
 class EnodoEventOutput:

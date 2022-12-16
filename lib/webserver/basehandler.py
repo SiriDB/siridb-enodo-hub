@@ -7,7 +7,6 @@ from siridb.connector.lib.exceptions import QueryError, InsertError, \
 
 from enodo.model.config.series import SeriesJobConfigModel
 from enodo.protocol.packagedata import REQUEST_TYPE_EXTERNAL, EnodoRequest
-from enodo.jobs import JOB_TYPE_FORECAST_SERIES, JOB_TYPE_IDS
 
 from lib.config import Config
 from lib.outputmanager import EnodoOutputManager
@@ -93,80 +92,6 @@ class BaseHandler:
         return {'data': None}, 200
 
     @classmethod
-    @sync_simple_fields_filter(return_index=0)
-    def resp_get_series_configs(cls):
-        scrm = ServerState.series_config_rm
-        templates = scrm.get_cached_resources()
-        return {'data': templates}, 200
-
-    @classmethod
-    async def resp_add_series_config(cls, config_template: dict):
-        scrm = ServerState.series_config_rm
-
-        if scrm.rid_exists(int(config_template.get("rid", -1))):
-            return {'error': "template already exists"}, 400
-
-        # if config_template.get("rid") is None:
-        #     config_template["rid"] = str(uuid4()).replace("-", "")
-
-        async with scrm.create_resource(config_template) as template:
-            return {'data': template}, 201
-
-    @classmethod
-    async def resp_remove_series_config(cls, rid: str):
-        scrm = ServerState.series_config_rm
-        rid = int(rid)
-        if not scrm.rid_exists(rid):
-            return {'error': "config does not exists"}, 404
-
-        async for series in ServerState.series_rm.itter():
-            if series._config_from_template:
-                if series.config.rid == rid:
-                    return {'error': "template is used by series"}, 400
-
-        template = await scrm.get_resource(rid)
-        await scrm.delete_resource(template)
-
-        return {'data': None}, 200
-
-    @classmethod
-    async def resp_update_series_config_static(cls, rid: str,
-                                               name: str, desc: str):
-        scrm = ServerState.series_config_rm
-        rid = int(rid)
-        if not scrm.rid_exists(rid):
-            return {'error': "config does not exists"}, 404
-
-        template = await scrm.get_resource(rid)
-        if name is not None:
-            template['name'] = name
-        if desc is not None:
-            template['description'] = desc
-        await template.store()
-
-        return {'data': template}, 201
-
-    @classmethod
-    async def resp_update_series_config(cls, rid: str,
-                                        config: dict):
-        scrm = ServerState.series_config_rm
-        rid = int(rid)
-        if not scrm.rid_exists(rid):
-            return {'error': "config does not exists"}, 404
-
-        template = await scrm.get_resource(rid)
-        if config is None:
-            return {'error', 'no config given', 400}
-        template['config'] = config
-        await template.store()
-        # async for series in ServerState.series_rm.itter(update=True):
-        #     if series._config_from_template:
-        #         async with SeriesManager.get_state(series.name) as state:
-        #             ServerState.index_series_schedules(series, state)
-
-        return {'data': template}, 201
-
-    @classmethod
     async def resp_run_job_for_series(cls,
                                       series_name: str,
                                       data: dict,
@@ -174,8 +99,8 @@ class BaseHandler:
                                       response_output_id: int):
         try:
             config = SeriesJobConfigModel(**data.get('config'))
-            job = EnodoJob(
-                None, series_name, config, (pool_id << 8) | config.job_type_id)
+            job = EnodoJob(None, series_name, config,
+                           (pool_id << 10) | config.job_type_id)
             request = EnodoRequest(
                 request_type=REQUEST_TYPE_EXTERNAL,
                 config=job.job_config,
@@ -195,11 +120,26 @@ class BaseHandler:
             cls, pool_id, series_name: str, job_type_id: int):
         fut, fut_id = await ClientManager.query_series_state(
             pool_id, job_type_id, series_name)
+        if fut is False:
+            return {'error': "Cannot query specified worker"}, 400
         try:
             result = await wait_for(fut, timeout=5)
         except asyncio.TimeoutError:
             QueryHandler.clear_query(fut_id)
             return {'error': "Cannot get result. No response from worker"}, 400
+        except Exception:
+            return {'error': "Cannot get result"}, 400
+        else:
+            return {'data': result}, 200
+
+    @classmethod
+    async def resp_query_worker_stats(cls, pool_id):
+        fut = await ClientManager.query_client_stats(pool_id)
+        try:
+            result = await wait_for(fut, timeout=10)
+        except asyncio.TimeoutError:
+            return {'error': "Cannot get result. No response from workers"}, \
+                400
         except Exception:
             return {'error': "Cannot get result"}, 400
         else:
@@ -257,17 +197,33 @@ class BaseHandler:
             }}
 
     @classmethod
-    async def resp_add_worker(cls, worker_data):
+    def resp_get_workers(cls, pool_id):
         try:
-            await ClientManager.add_worker(0, worker_data)
+            workers = ClientManager.get_workers_in_pool(pool_id)
+            data = {
+                'pool_idxs': ClientManager.get_pool_idxs(),
+                'workers': [w.to_dict() for w in workers]
+            }
         except Exception:
+            return 400, {"error": "Cannot retrieve list of workers"}
+        return 200, data
+
+    @classmethod
+    async def resp_add_worker(cls, pool_id: int, worker_data):
+        try:
+            await ClientManager.add_worker(pool_id, worker_data)
+        except Exception as e:
+            logging.debug(f"Error while trying to add worker: {str(e)}")
             return 400, {"error": "Cannot create worker. Invalid data"}
         return 201, {}
 
     @classmethod
-    async def resp_delete_worker(cls, worker_id):
+    async def resp_delete_worker(cls, pool_id: int, job_type_id: int):
         try:
-            await ClientManager
+            resp = await ClientManager.delete_worker(pool_id, job_type_id)
         except Exception:
-            return 400, {"error": "Cannot create worker. Invalid data"}
-        return 201, {}
+            return 400, {"error": "Cannot delete worker. Something went wrong"}
+        else:
+            if resp:
+                return 200, {}
+        return 400, {"error": "Cannot delete worker. Invalid data"}

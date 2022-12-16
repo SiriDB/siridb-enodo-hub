@@ -7,7 +7,6 @@ import aiohttp_cors
 from aiohttp import web
 from aiojobs.aiohttp import setup
 from enodo.protocol.packagedata import *
-from enodo.protocol.package import LISTENER_NEW_SERIES_POINTS
 
 from lib.outputmanager import EnodoOutputManager
 from lib.util.upgrade import UpgradeUtil
@@ -16,8 +15,6 @@ from lib.config import Config
 from lib.logging import prepare_logger
 from lib.serverstate import ServerState
 from lib.socket import ClientManager
-from lib.socket.handler import receive_new_series_points
-from lib.socket.socketserver import SocketServer
 from lib.util import print_custom_aiohttp_startup_message
 from lib.webserver.routes import setup_routes
 from version import VERSION
@@ -31,7 +28,6 @@ class Server:
         self.auth = None
 
         self._config_path = config_path
-        self.backend_socket = None
 
         self._check_jobs_task = None
         self._connection_management_task = None
@@ -62,11 +58,6 @@ class Server:
             raise e
         await ServerState.setup_settings()
 
-        # Setup backend socket connection
-        self.backend_socket = SocketServer(
-            Config.socket_server_host, Config.socket_server_port,
-            {LISTENER_NEW_SERIES_POINTS: receive_new_series_points})
-
         # Setup REST API handlers
         ApiHandlers.prepare()
 
@@ -83,15 +74,12 @@ class Server:
         self._connection_loop_task = await scheduler.spawn(
             ClientManager.connect_loop())
 
-        # Open backend socket connection
-        await self.backend_socket.create()
         ServerState.readiness = True
 
     async def clean_up(self):
         """Cleans up before shutdown
         """
         await ServerState.scheduler.close()
-        await self.backend_socket.stop()
 
     async def _manage_connections(self):
         """Background task to check if all connections are up
@@ -199,6 +187,9 @@ class Server:
 
         # Setup aiojobs
         setup(self.app)
+
+        # Setup socketio
+        ServerState.setup_sio(self.app)
 
         try:
             web.run_app(

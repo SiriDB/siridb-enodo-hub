@@ -1,7 +1,6 @@
 from configparser import (NoOptionError, NoSectionError,
                           RawConfigParser, ConfigParser)
 import os
-from secrets import token_urlsafe
 
 from lib.exceptions.enodoexception import EnodoInvalidConfigException
 

@@ -1,9 +1,12 @@
 from asyncio import Lock
+import base64
 import logging
 from thingsdb.client import Client
 
 from aiojobs import create_scheduler
 from siridb.connector import SiriDBClient
+import socketio
+
 from lib.config import Config
 from lib.siridb.siridb import query_time_unit
 
@@ -18,11 +21,10 @@ class ServerState:
     readiness = None
     scheduler = None
 
-    series_rm = None
-    series_config_rm = None
     job_config_template_rm = None
     thingsdb_client = None
     settings = None
+    sio = None
 
     @classmethod
     async def async_setup(cls):
@@ -62,11 +64,32 @@ class ServerState:
                                           port=Config.thingsdb_port)
         await cls.thingsdb_client.authenticate(Config.thingsdb_auth_token)
         cls.thingsdb_client.set_default_scope(Config.thingsdb_scope)
+        deep_level = await cls.thingsdb_client.query("deep();")
+        if deep_level < 6:
+            logging.error(
+                "Enodo expects a ThingsDB collection with a "
+                "default deep of at least 6; use set_default_deep(<collection>, "
+                "99); to change the default deep value")
 
     @classmethod
     async def setup_settings(cls):
         from lib.state.stores import SettingStore  # Circular import
         cls.settings = await SettingStore.setup(cls.thingsdb_client)
+
+    @classmethod
+    def setup_sio(cls, app):
+        cls.sio = socketio.AsyncServer(async_mode='aiohttp',
+                                       cors_allowed_origins='*')
+        cls.sio.attach(app)
+
+        @cls.sio.on('connect')
+        def connect(sid, environ, auth):
+            usr_pass = (f"{Config.basic_auth_username}:"
+                        f"{Config.basic_auth_password}")
+            b64_val = base64.b64encode(usr_pass)
+            if b64_val != auth.token:
+                raise ConnectionRefusedError('authentication failed')
+            cls.sio.enter_room(sid, 'trace')
 
     @classmethod
     def get_readiness(cls):

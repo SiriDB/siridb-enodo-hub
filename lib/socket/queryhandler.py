@@ -1,9 +1,11 @@
-from asyncio import Future
+from asyncio import Future, wait_for
+import asyncio
 import logging
 from uuid import uuid4
 
-from enodo.protocol.package import WORKER_QUERY
-from enodo.protocol.packagedata import EnodoRequest
+from enodo.net import PROTO_REQ_WORKER_QUERY
+from enodo.protocol.packagedata import (
+    EnodoQuery, QUERY_SUBJECT_STATS, QUERY_SUBJECT_STATE)
 
 
 class QueryHandler:
@@ -13,15 +15,39 @@ class QueryHandler:
     @classmethod
     async def do_query(cls, worker, series_name):
         _id = str(uuid4()).replace("-", "")
-        body = EnodoRequest(
-            request_id=_id,
-            request_type="query",
+        body = EnodoQuery(
+            _id,
+            QUERY_SUBJECT_STATE,
             series_name=series_name
         )
-        await worker.client.send_message(body, WORKER_QUERY)
+        worker.send_message(body, PROTO_REQ_WORKER_QUERY)
         cls._futures[_id] = Future()
 
         return cls._futures[_id], _id
+
+    @classmethod
+    async def do_query_stats(cls, workers):
+        _futs = {}
+        for worker in workers:
+            _id = str(uuid4()).replace("-", "")
+            body = EnodoQuery(_id, QUERY_SUBJECT_STATS)
+            worker.send_message(body, PROTO_REQ_WORKER_QUERY)
+            _futs[_id] = Future()
+            cls._futures[_id] = _futs[_id]
+
+        return cls._wait_for_stats(_futs)
+
+    @classmethod
+    async def _wait_for_stats(cls, futs: dict):
+        stats = []
+        for _id, fut in futs.items():
+            try:
+                result = await wait_for(fut, timeout=2)
+            except asyncio.TimeoutError:
+                cls.clear_query(_id)
+            else:
+                stats.append(result)
+        return stats
 
     @classmethod
     def set_query_result(cls, query_id, result):

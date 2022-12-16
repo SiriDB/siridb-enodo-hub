@@ -1,11 +1,7 @@
-from asyncore import loop
 import datetime
 import functools
 import json
 import logging
-import re
-import struct
-from packaging import version
 import urllib.parse
 
 from enodo.jobs import (
@@ -30,14 +26,6 @@ def print_custom_aiohttp_startup_message(line):
         logging.info('REST API is up')
 
 
-def regex_valid(regex):
-    try:
-        re.compile(regex)
-        return True
-    except re.error:
-        return False
-
-
 def parse_output_series_name(series_name, output_series_name):
     # enodo_{series_name}_forecast_{job_config_name}
     type_and_config_name = output_series_name.replace(
@@ -54,56 +42,6 @@ def get_job_config_output_series_name(
         JOB_TYPE_DETECT_ANOMALIES_FOR_SERIES: "anomalies"
     }
     return f"enodo_{series_name}_{job_prefix_mapping[job_type]}_{config_name}"
-
-
-def load_disk_data(path):
-    f = open(path, "r")
-    data = f.read()
-    f.close()
-    data = json.loads(data)
-
-    if data.get("version") is None or \
-        version.parse(data.get("version")) < \
-            version.parse(MIN_DATA_FILE_VERSION):
-        logging.error(
-            "Error: "
-            f"invalid data file version found at {path}, "
-            "please update the file structure or remove it "
-            "before proceeding")
-        raise Exception("Invalid data file version")
-
-    return data.get('data')
-
-
-def save_disk_data(path, data):
-    try:
-        f = open(path, "r")
-        current_data = f.read()
-        f.close()
-        save_data = json.loads(current_data)
-    except Exception as e:
-        save_data = {}
-
-    if save_data is None or save_data.get("version") is None:
-        save_data['version'] = CURRENT_DATA_FILE_VERSION
-    save_data["data"] = data
-
-    f = open(path, "w+")
-    f.write(json.dumps(save_data, default=safe_json_dumps))
-    f.close()
-
-
-def cls_lock():
-    def wrapper(func):
-        @functools.wraps(func)
-        async def wrapped(*args, **kwargs):
-            if len(args) > 0 and hasattr(args[0], "_lock"):
-                async with args[0]._lock:
-                    return await func(*args, **kwargs)
-            else:
-                raise Exception("Incorrect usage of cls_lock func")
-        return wrapped
-    return wrapper
 
 
 def apply_fields_filter(resources: list, fields: list) -> list:
@@ -215,19 +153,9 @@ def get_worker_for_series(lookup: dict, series_name: str) -> int:
     return lookup[n % LOOKUP_SZ]
 
 
-def gen_worker_id(pool_id: int, job_type_id: int,  idx: int):
-    binary_data = struct.pack('>III', pool_id, job_type_id, idx)
-    return int.from_bytes(binary_data, 'big')
-
-
-def decode_worker_id(wid: int):
-    try:
-        return struct.unpack('>III', wid.to_bytes(12, byteorder="big"))
-    except Exception:
-        return False
+def gen_worker_idx(pool_id: int, job_type_id: int,  idx: int):
+    return (pool_id << 20) | (job_type_id << 10) | idx
 
 
 def gen_pool_idx(pool_id: int, job_type_id: int) -> int:
-    ba = pool_id.to_bytes(4, byteorder='big') + \
-        job_type_id.to_bytes(4, byteorder='big')
-    return int.from_bytes(ba, 'big')
+    return (pool_id << 10) | job_type_id

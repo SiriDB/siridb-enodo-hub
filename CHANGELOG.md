@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [unreleased] - yyyy-mm-dd
 
+### Added
+- Basic auth validation websocket connections
+- Redirect support for worker requests
+
+## [0.2.0-beta0.1.7] - 2022-11-21
+
+### Fixed
+- Fixed query worker for series state, conform changes stats query
+- Fixed idx generation for worker lookups
+
+### Removed
+- Removed legacy endpoint series config
+
+## [0.2.0-beta0.1.6] - 2022-11-21
+
+### Fixed
+- Fixed deleting worker from pool, only latest worker will be deleted, per request
+
+## [0.2.0-beta0.1.5] - 2022-11-21
+
+### Added
+- Added get and delete worker(s) endpoint for managing workers via the hub REST api
+
+## [0.2.0-beta0.1.4] - 2022-11-14
+
+### Added
+- Worker event req
+- Worker shutdown req
+
+### Changed
+- Max retry step for worker reconnect changed to 60
+
+## [0.2.0-beta0.1.3] - 2022-11-10
+
+### Added
+- Query workers in a pool for stats
+
 ## [0.2.0-beta0.1.2] - 2022-10-27
 
 ### Added

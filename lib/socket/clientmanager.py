@@ -1,22 +1,25 @@
 import asyncio
 import logging
-import struct
 import time
 from asyncio import StreamWriter
 from typing import Any, Optional
 
-import qpack
 from enodo import WorkerConfigModel
-from enodo.protocol.package import (
-    UPDATE_SERIES, create_header)
-from enodo.net import Package, PROTO_REQ_HANDSHAKE, PROTO_REQ_WORKER_REQUEST
-from enodo.protocol.packagedata import EnodoRequest
+from enodo.net import (
+    Package, PROTO_REQ_HANDSHAKE, PROTO_REQ_WORKER_REQUEST,
+    PROTO_RES_WORKER_REQUEST)
+from enodo.protocol.packagedata import (
+    EnodoRequest, EnodoQuery, EnodoRequestResponse)
+from enodo.model.enodoevent import EnodoEvent
+
+from lib.outputmanager import EnodoOutputManager
 from lib.config import Config
 from lib.serverstate import ServerState
 from lib.socket.queryhandler import QueryHandler
 from lib.socket.protocol import EnodoProtocol
 from lib.util.util import (
-    gen_pool_idx, generate_worker_lookup, get_worker_for_series)
+    gen_pool_idx, generate_worker_lookup, get_worker_for_series,
+    gen_worker_idx)
 
 
 class ListenerClient:
@@ -49,7 +52,7 @@ class ListenerClient:
 
 
 class WorkerClient:
-    MAX_RETRY_STEP = 120
+    MAX_RETRY_STEP = 60
 
     def __init__(self,
                  hostname: str,
@@ -59,7 +62,6 @@ class WorkerClient:
                  rid: Optional[str] = None):
         self.rid = rid
         self.worker_idx = worker_idx
-        self._idx_bytes = worker_idx.to_bytes(12, byteorder="big")
         self.hostname = hostname
         self.port = port
         self.worker_config = WorkerConfigModel(**worker_config)
@@ -72,19 +74,19 @@ class WorkerClient:
 
     @property
     def pool_idx(self):
-        return int.from_bytes(self._idx_bytes[0:8], 'big')
+        return self.worker_idx >> 10
 
     @property
     def pool_id(self):
-        return int.from_bytes(self._idx_bytes[:4], 'big')
+        return self.worker_idx >> 20
 
     @property
     def job_type_id(self):
-        return int.from_bytes(self._idx_bytes[4:8], 'big')
+        return (self.worker_idx >> 10) & 0x3ff
 
     @property
     def worker_id(self):
-        return struct.unpack('>I', self._idx_bytes[8:12])
+        return self.worker_idx & 0x3ff
 
     def close(self):
         if self._protocol and self._protocol.transport:
@@ -184,14 +186,32 @@ class WorkerClient:
         return data
 
     async def handle_worker_request(self, data, *args):
-        data['pool_id'] = self.pool_id
-        data['worker_id'] = self.increment_id
+        data['pool_id'] = self.pool_idx
+        data['worker_id'] = self.worker_idx
         request = EnodoRequest(**data)
         await ClientManager.fetch_request_response_from_worker(
             self.pool_id, request.series_name, request)
 
-    async def redirect_response(self, data, worker_id):
-        pass
+    async def handle_event(self, event: EnodoEvent):
+        await EnodoOutputManager.handle_event(event)
+
+    async def redirect_response(self, data):
+        try:
+            response = EnodoRequestResponse(**data)
+        except Exception:
+            logging.error("Received invalid request response format")
+            return
+        worker_idx = response.request.get('worker_id')
+        worker = await ClientManager.get_worker_by_idx(worker_idx)
+        if worker is None:
+            logging.warning("Trying to redirect worker request "
+                            "response to unknown worker")
+            return
+        worker.send_message(data, PROTO_RES_WORKER_REQUEST)
+
+    def handle_query_resp(self, query: EnodoQuery):
+        ClientManager._query_handler.set_query_result(
+            query.query_id, query.result)
 
     def to_dict(self) -> dict:
         return {
@@ -208,6 +228,7 @@ class ClientManager:
     _ws = None
     _query_handler = None
     _sd_lookups = {}
+    _lock = None
 
     @classmethod
     async def setup(cls):
@@ -215,20 +236,40 @@ class ClientManager:
         cls._ws = await WorkerStore.setup(ServerState.thingsdb_client,
                                           cls.update_worker_pools)
         cls._query_handler = QueryHandler()
+        cls._lock = asyncio.Lock()
 
     @classmethod
     def get_worker(cls, pool_idx, series_name):
         if pool_idx not in cls._sd_lookups:
+            logging.debug(f"Unknown pool_idx: {pool_idx}")
             return None
         wid = get_worker_for_series(cls._sd_lookups[pool_idx], series_name)
-        worker_idx = int.from_bytes(
-            pool_idx.to_bytes(8, 'big') + wid.to_bytes(4, 'big'), 'big')
-        return cls._ws.lookup_workers.get(worker_idx)
+        worker_idx = (pool_idx << 10) | wid
+        worker = cls._ws.lookup_workers.get(worker_idx)
+        if worker is None:
+            logging.debug(f"Unknown worker with idx: {worker_idx}")
+        return worker
+
+    @classmethod
+    def get_pool_idxs(cls):
+        return list(cls._sd_lookups.keys())
+
+    @classmethod
+    def get_workers_in_pool(cls, pool_id):
+        return [w for w in cls._ws.workers.values() if w.pool_id == pool_id]
 
     @classmethod
     async def query_series_state(cls, pool_id, job_type_id, series_name):
-        worker = cls.get_worker((pool_id << 8) | job_type_id, series_name)
+        worker = cls.get_worker((pool_id << 10) | job_type_id, series_name)
+        if worker is None:
+            logging.warning("Cannot find specified worker to query")
+            return False, False
         return await cls._query_handler.do_query(worker, series_name)
+
+    @classmethod
+    async def query_client_stats(cls, pool_id):
+        return await cls._query_handler.do_query_stats(
+            cls.get_workers_in_pool(pool_id))
 
     @classmethod
     async def fetch_request_response_from_worker(
@@ -236,21 +277,44 @@ class ClientManager:
         if request.config is None:
             return
         worker = cls.get_worker(
-            (pool_id << 8) | request.config.job_type_id, series_name)
-        await worker.send_message(request, PROTO_REQ_WORKER_REQUEST)
+            (pool_id << 10) | request.config.job_type_id, series_name)
+        worker.send_message(request, PROTO_REQ_WORKER_REQUEST)
 
     @classmethod
     async def add_worker(cls, pool_id: int, worker: dict):
-        pool_idx = gen_pool_idx(
-            pool_id, worker['worker_config']['job_type_id'])
-        current_num = len(
-            [w.pool_idx == pool_idx for w in cls._ws.lookup_workers.values()])
-        bpool_idx = pool_idx.to_bytes(8, 'big')
-        worker['worker_idx'] = int.from_bytes(
-            bpool_idx + current_num.to_bytes(4, 'big'), 'big')
-        cls._sd_lookups[pool_idx] = generate_worker_lookup(current_num + 1)
-        await cls._ws.create(worker)
+        async with cls._lock:
+            pool_idx = gen_pool_idx(
+                pool_id, worker['worker_config']['job_type_id'])
+            current_num = len([w for w in cls._ws.lookup_workers.values()
+                               if w.pool_idx == pool_idx])
+            worker['worker_idx'] = (pool_idx << 10) | current_num
+            cls._sd_lookups[pool_idx] = generate_worker_lookup(current_num + 1)
+            await cls._ws.create(worker)
 
+    @classmethod
+    async def delete_worker(cls, pool_id: int, job_type_id):
+        async with cls._lock:
+            pool_idx = gen_pool_idx(pool_id, job_type_id)
+            workers_in_pool = len(
+                [w for w in cls._ws.lookup_workers.values()
+                 if w.pool_idx == pool_idx])
+            if workers_in_pool == 0:
+                logging.error("Cannot delete worker as there "
+                              "are no workers in pool")
+                return False
+            worker_idx = gen_worker_idx(
+                pool_id, job_type_id, workers_in_pool - 1)
+            worker = await cls.get_worker_by_idx(worker_idx)
+
+            if worker is None:
+                return False
+            if worker.pool_id != pool_id:
+                return False
+            try:
+                await cls._ws.delete_worker(worker.rid)
+            except Exception:
+                logging.debug("ThingsDB Error while trying to delete worker")
+            return True
 
     @classmethod
     def update_worker_pools(cls, workers):
@@ -294,7 +358,7 @@ class ClientManager:
 
     @classmethod
     async def get_worker_by_idx(cls, idx: int) -> WorkerClient:
-        return cls.workers.get(idx)
+        return cls._ws.lookup_workers.get(idx)
 
     @classmethod
     def update_listeners(cls, data: Any):
@@ -305,9 +369,10 @@ class ClientManager:
 
     @classmethod
     def update_listener(cls, listener: ListenerClient, data: Any):
-        update = qpack.packb(data)
-        series_update = create_header(len(update), UPDATE_SERIES)
-        listener.writer.write(series_update + update)
+        pass
+        # update = qpack.packb(data)
+        # series_update = create_header(len(update), UPDATE_SERIES)
+        # listener.writer.write(series_update + update)
 
     @classmethod
     def get_workers(cls):
