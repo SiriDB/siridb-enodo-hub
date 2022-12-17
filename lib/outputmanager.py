@@ -187,13 +187,19 @@ class EnodoResultOutputWebhook:
         self.rid = rid
         self.url = url
         self.params = params
-        self.payload = payload
         self.headers = headers
         if not isinstance(
                 self.headers, dict) and self.headers is not None:
             self.headers = None
-        if self.payload is None:
-            self.payload = ""
+        self._set_payload(payload)
+
+    def _set_payload(self, payload):
+        if payload is None:
+            payload = ""
+        if isinstance(payload, str):
+            self.payload = Template(payload)
+        else:
+            self.payload = payload
 
     def _get_query_params(self, response: EnodoRequestResponse):
         if not isinstance(self.params, dict):
@@ -226,14 +232,11 @@ class EnodoResultOutputWebhook:
         return _headers
 
     def _get_payload(self, response: EnodoRequestResponse):
-        if not isinstance(self.payload, str):
-            return self.payload
-        _sub_data = {
-            "request": response.request,
-            "response": response
-        }
-        template = Template(self.payload)
-        return template.safe_substitute(**_sub_data)
+        if isinstance(self.payload, Template):
+            return self.payload.safe_substitute(
+                request=response.request,
+                response=response)
+        return self.payload
 
     def _get_url(self, response: EnodoRequestResponse):
         return f"{self.url}{self._get_query_params(response)}"
@@ -260,16 +263,14 @@ class EnodoResultOutputWebhook:
     def update(self, data):
         self.url = data.get('url') if data.get(
             'url') is not None else self.url
-        self.payload = data.get('payload') if data.get(
-            'payload') is not None else self.payload
+        payload = data.get('payload')
+        if payload is not None:
+            self._set_payload(payload)
         self.headers = data.get('headers') if data.get(
             'headers') is not None else self.headers
-
         if not isinstance(
                 self.headers, dict) and self.headers is not None:
             self.headers = None
-        if self.payload is None:
-            self.payload = ""
 
         super().update(data)
 

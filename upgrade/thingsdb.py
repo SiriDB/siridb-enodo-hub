@@ -115,7 +115,8 @@ if (!has_type('SettingStore')) {
     "0.2.0-beta0.1.3": '.hub_version = "0.2.0-beta0.1.3";',
     "0.2.0-beta0.1.4": '.hub_version = "0.2.0-beta0.1.4";',
     "0.2.0-beta0.1.6": '.hub_version = "0.2.0-beta0.1.6";',
-    "0.2.0-beta0.1.7": '.hub_version = "0.2.0-beta0.1.7";'
+    "0.2.0-beta0.1.7": '.hub_version = "0.2.0-beta0.1.7";',
+    "0.2.0-beta0.1.8": '.hub_version = "0.2.0-beta0.1.8";'
 }
 
 with open(os.path.join(os.path.dirname(
