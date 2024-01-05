@@ -2,7 +2,7 @@ repo_name: SiriDB/siridb-enodo-hub
 report_id: dfaec964f3bccf4f562cedf6016272fa
 version: 0.1
 repo_type: Public
-timestamp: '2023-12-27T20:00:39+00:00'
+timestamp: '2024-01-05T08:34:56+00:00'
 requested_by: joente
 provider: github
 branch: master
@@ -31,6 +31,7 @@ tools:
   category: Languages & Frameworks
   sub_category: Languages
   image_url: https://img.stackshare.io/service/993/pUBY5pVj.png
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub
   detection_source: Repo Metadata
 - name: Docker
   description: Enterprise Container Platform for High-Velocity Innovation.
@@ -41,6 +42,7 @@ tools:
   category: Build, Test, Deploy
   sub_category: Virtual Machine Platforms & Containers
   image_url: https://img.stackshare.io/service/586/n4u37v9t_400x400.png
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub
   detection_source: Repo Metadata
 - name: Git
   description: Fast, scalable, distributed revision control system
@@ -50,6 +52,7 @@ tools:
   category: Build, Test, Deploy
   sub_category: Version Control System
   image_url: https://img.stackshare.io/service/1046/git.png
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub
   detection_source: Repo Metadata
 - name: GitHub Actions
   description: Automate your workflow from idea to production
@@ -59,6 +62,7 @@ tools:
   category: Build, Test, Deploy
   sub_category: Continuous Integration
   image_url: https://img.stackshare.io/service/11563/actions.png
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub/blob/master/.github/workflows/ci.yml
   detection_source: ".github/workflows/ci.yml"
   last_updated_by: Jeroen van der Heijden
   last_updated_on: 2022-04-15 07:32:23.000000000 Z
@@ -70,6 +74,7 @@ tools:
   category: Build, Test, Deploy
   sub_category: Hosted Package Repository
   image_url: https://img.stackshare.io/service/12572/-RIWgodF_400x400.jpg
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub/blob/master/requirements.txt
   detection_source: requirements.txt
   last_updated_by: Rob
   last_updated_on: 2021-02-22 17:37:10.000000000 Z
