@@ -1,0 +1,215 @@
+repo_name: SiriDB/siridb-enodo-hub
+report_id: dfaec964f3bccf4f562cedf6016272fa
+version: 0.1
+repo_type: Public
+timestamp: '2024-02-29T18:53:09+00:00'
+requested_by: joente
+provider: github
+branch: master
+detected_tools_count: 12
+tools:
+- name: Jinja
+  description: Full featured template engine for Python
+  website_url: https://palletsprojects.com/p/jinja/
+  version: 3.1.2
+  license: BSD-3-Clause
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Templating Languages & Extensions
+  image_url: https://img.stackshare.io/service/2303/New_Project__20_.png
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub/blob/master/requirements.txt
+  detection_source: requirements.txt
+  last_updated_by: timoj
+  last_updated_on: 2022-05-09 13:39:45.000000000 Z
+- name: Python
+  description: A clear and powerful object-oriented programming language, comparable
+    to Perl, Ruby, Scheme, or Java.
+  website_url: https://www.python.org
+  open_source: true
+  hosted_saas: false
+  category: Languages & Frameworks
+  sub_category: Languages
+  image_url: https://img.stackshare.io/service/993/pUBY5pVj.png
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub
+  detection_source: Repo Metadata
+- name: Docker
+  description: Enterprise Container Platform for High-Velocity Innovation.
+  website_url: https://www.docker.com/
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Virtual Machine Platforms & Containers
+  image_url: https://img.stackshare.io/service/586/n4u37v9t_400x400.png
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub
+  detection_source: Repo Metadata
+- name: Git
+  description: Fast, scalable, distributed revision control system
+  website_url: http://git-scm.com/
+  open_source: true
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Version Control System
+  image_url: https://img.stackshare.io/service/1046/git.png
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub
+  detection_source: Repo Metadata
+- name: GitHub Actions
+  description: Automate your workflow from idea to production
+  website_url: https://github.com/features/actions
+  open_source: false
+  hosted_saas: true
+  category: Build, Test, Deploy
+  sub_category: Continuous Integration
+  image_url: https://img.stackshare.io/service/11563/actions.png
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub/blob/master/.github/workflows/ci.yml
+  detection_source: ".github/workflows/ci.yml"
+  last_updated_by: Jeroen van der Heijden
+  last_updated_on: 2022-04-15 07:32:23.000000000 Z
+- name: PyPI
+  description: A repository of software for the Python programming language
+  website_url: https://pypi.org/
+  open_source: false
+  hosted_saas: false
+  category: Build, Test, Deploy
+  sub_category: Hosted Package Repository
+  image_url: https://img.stackshare.io/service/12572/-RIWgodF_400x400.jpg
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub/blob/master/requirements.txt
+  detection_source: requirements.txt
+  last_updated_by: Rob
+  last_updated_on: 2021-02-22 17:37:10.000000000 Z
+- name: aiohttp
+  description: Async http client/server framework
+  package_url: https://pypi.org/project/aiohttp
+  version: 3.8.1
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: PyPI Packages
+  image_url: https://img.stackshare.io/package/19852/default_d748224707283d9d8a73c2323730c87bda6b313a.png
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub/blob/master/requirements.txt
+  detection_source: requirements.txt
+  last_updated_by: timoj
+  last_updated_on: 2022-03-25 10:15:29.000000000 Z
+  vulnerabilities:
+  - name: aiohttp's ClientSession is vulnerable to CRLF injection via version
+    cve_id: CVE-2023-49081
+    cve_url: https://github.com/advisories/GHSA-q3qx-c6g2-7pw2
+    detected_date: Nov 28
+    severity: high
+    first_patched: 3.9.0
+  - name: aiohttp is vulnerable to directory traversal
+    cve_id: CVE-2024-23334
+    cve_url: https://github.com/advisories/GHSA-5h86-8mv2-jq9f
+    detected_date: Jan 30
+    severity: moderate
+    first_patched: 3.9.2
+  - name: AIOHTTP has problems in HTTP parser (the python one, not llhttp)
+    cve_id: CVE-2023-47627
+    cve_url: https://github.com/advisories/GHSA-gfw2-4jvh-wgfg
+    detected_date: Nov 15
+    severity: moderate
+    first_patched: 3.8.6
+  - name: aiohttp has vulnerable dependency that is vulnerable to request smuggling
+    cve_id: 
+    cve_url: https://github.com/advisories/GHSA-pjjw-qhg8-p2p9
+    detected_date: Nov 29
+    severity: moderate
+    first_patched: 3.8.6
+  - name: aiohttp's ClientSession is vulnerable to CRLF injection via method
+    cve_id: CVE-2023-49082
+    cve_url: https://github.com/advisories/GHSA-qvrw-v9rv-5rjx
+    detected_date: Nov 28
+    severity: moderate
+    first_patched: 3.9.0
+  - name: 'Withdrawn: Denial of Service in aiohttp'
+    cve_id: CVE-2022-33124
+    cve_url: https://github.com/advisories/GHSA-rwqr-c348-m5wr
+    detected_date: Jun 26
+    severity: moderate
+    first_patched: 
+  - name: aiohttp.web.Application vulnerable to HTTP request smuggling via llhttp
+      HTTP request parser
+    cve_id: CVE-2023-37276
+    cve_url: https://github.com/advisories/GHSA-45c4-8wx5-qw6w
+    detected_date: Jul 21
+    severity: moderate
+    first_patched: 3.8.5
+  - name: aiohttp's HTTP parser (the python one, not llhttp) still overly lenient
+      about separators
+    cve_id: CVE-2024-23829
+    cve_url: https://github.com/advisories/GHSA-8qpw-xqxj-h4r2
+    detected_date: Jan 30
+    severity: moderate
+    first_patched: 3.9.2
+- name: aiohttp_cors
+  description: CORS support for aiohttp
+  package_url: https://pypi.org/project/aiohttp_cors
+  version: 0.7.0
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: PyPI Packages
+  image_url: https://img.stackshare.io/package/pypi/image.png
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub/blob/master/requirements.txt
+  detection_source: requirements.txt
+  last_updated_by: timoj
+  last_updated_on: 2022-03-25 10:15:29.000000000 Z
+- name: aiojobs
+  description: Jobs scheduler for managing background task
+  package_url: https://pypi.org/project/aiojobs
+  version: 1.0.0
+  license: Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: PyPI Packages
+  image_url: https://img.stackshare.io/package/pypi/image.png
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub/blob/master/requirements.txt
+  detection_source: requirements.txt
+  last_updated_by: timoj
+  last_updated_on: 2022-04-01 11:58:40.000000000 Z
+- name: packaging
+  description: Core utilities for Python packages
+  package_url: https://pypi.org/project/packaging
+  version: '21.3'
+  license: BSD-3-Clause,Apache-2.0
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: PyPI Packages
+  image_url: https://img.stackshare.io/package/19894/default_f716e4bc541a9eb6e3f5b7a20d7c35355075b0b4.png
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub/blob/master/requirements.txt
+  detection_source: requirements.txt
+  last_updated_by: timoj
+  last_updated_on: 2022-03-25 10:15:29.000000000 Z
+- name: python-socketio
+  description: Socket.IO server
+  package_url: https://pypi.org/project/python-socketio
+  version: 5.6.0
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: PyPI Packages
+  image_url: https://img.stackshare.io/package/20330/default_cf6b540611cb9b9b5d016a661f54f50ad3400f1a.png
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub/blob/master/requirements.txt
+  detection_source: requirements.txt
+  last_updated_by: Jeroen van der Heijden
+  last_updated_on: 2022-07-28 08:15:36.000000000 Z
+- name: recordclass
+  description: Mutable variants of tuple
+  package_url: https://pypi.org/project/recordclass
+  version: 0.17.2
+  license: MIT
+  open_source: true
+  hosted_saas: false
+  category: Libraries
+  sub_category: PyPI Packages
+  image_url: https://img.stackshare.io/package/pypi/image.png
+  detection_source_url: https://github.com/SiriDB/siridb-enodo-hub/blob/master/requirements.txt
+  detection_source: requirements.txt
+  last_updated_by: timoj
+  last_updated_on: 2022-08-01 10:30:09.000000000 Z
